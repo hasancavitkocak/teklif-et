@@ -292,6 +292,7 @@ export default function DiscoverScreen() {
             <Image
               source={{ uri: currentProposal.creator.profile_photo }}
               style={styles.cardImage}
+              resizeMode="cover"
             />
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -330,7 +331,11 @@ export default function DiscoverScreen() {
               <Zap size={28} color="#FFF" fill="#FFF" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.likeButton} onPress={() => handleLike()}>
-              <Heart size={32} color="#10B981" />
+              <Image 
+                source={require('@/assets/images/puzzle-icon.png')} 
+                style={{ width: 48, height: 48, tintColor: '#8B5CF6' }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -448,21 +453,59 @@ function CreateProposalModal({
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [locationName, setLocationName] = useState('');
-  const [participantCount, setParticipantCount] = useState('2');
+  const [participantCount, setParticipantCount] = useState(1);
   const [isGroup, setIsGroup] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [interests, setInterests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [currentCity, setCurrentCity] = useState('');
+  const [showManualLocation, setShowManualLocation] = useState(false);
 
   useEffect(() => {
     if (visible) {
       loadInterests();
+      detectCurrentLocation(); // Modal açılınca otomatik konum bul
     }
   }, [visible]);
 
   const loadInterests = async () => {
     const { data } = await supabase.from('interests').select('*');
     if (data) setInterests(data);
+  };
+
+  const detectCurrentLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const Location = require('expo-location');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('İzin Gerekli', 'Konum izni vermelisiniz');
+        setDetectingLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (address.city) {
+        setCurrentCity(address.city);
+        setLocationName(address.city);
+      } else if (address.region) {
+        setCurrentCity(address.region);
+        setLocationName(address.region);
+      }
+    } catch (error: any) {
+      console.error('Location error:', error);
+      Alert.alert('Hata', 'Konumunuz tespit edilemedi. Manuel olarak girebilirsiniz.');
+      setShowManualLocation(true);
+    } finally {
+      setDetectingLocation(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -484,10 +527,10 @@ function CreateProposalModal({
         activity_name: activityName.trim(),
         description: description.trim() || null,
         location_name: locationName.trim() || null,
-        participant_count: parseInt(participantCount) || 2,
+        participant_count: participantCount,
         is_group: isGroup,
         interest_id: selectedInterest,
-        city: profile?.city || 'İstanbul',
+        city: currentCity || profile?.city || 'İstanbul',
       });
 
       if (error) throw error;
@@ -496,9 +539,10 @@ function CreateProposalModal({
       setActivityName('');
       setDescription('');
       setLocationName('');
-      setParticipantCount('2');
+      setParticipantCount(1);
       setIsGroup(false);
       setSelectedInterest(null);
+      setCurrentCity('');
       onCreated();
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -519,74 +563,93 @@ function CreateProposalModal({
           </View>
 
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>Aktivite Adı *</Text>
+            <Text style={styles.inputLabel}>Aktivite *</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="Örn: Kahve içmek ister misin?"
+              placeholder="Ne yapmak istersin?"
               value={activityName}
               onChangeText={setActivityName}
               maxLength={100}
             />
 
-            <Text style={styles.label}>Açıklama</Text>
+            <Text style={styles.inputLabel}>Detaylar</Text>
             <TextInput
               style={[styles.textInput, styles.textAreaInput]}
-              placeholder="Aktivite hakkında detaylar..."
+              placeholder="Aktivite hakkında kısa açıklama (opsiyonel)"
               value={description}
               onChangeText={setDescription}
               maxLength={300}
               multiline
-              numberOfLines={3}
+              numberOfLines={2}
             />
 
-            <Text style={styles.label}>Konum</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Örn: Starbucks Kadıköy"
-              value={locationName}
-              onChangeText={setLocationName}
-              maxLength={100}
-            />
+            <Text style={styles.inputLabel}>Konum</Text>
+            {detectingLocation ? (
+              <View style={styles.locationDetectButton}>
+                <MapPin size={20} color="#8B5CF6" />
+                <Text style={styles.locationDetectButtonText}>Konum bulunuyor...</Text>
+              </View>
+            ) : currentCity ? (
+              <View style={styles.locationDetectedBadge}>
+                <MapPin size={18} color="#8B5CF6" />
+                <Text style={styles.locationDetectedText}>{currentCity}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.locationDetectButton}
+                onPress={detectCurrentLocation}
+              >
+                <MapPin size={20} color="#8B5CF6" />
+                <Text style={styles.locationDetectButtonText}>Konumu Bul</Text>
+              </TouchableOpacity>
+            )}
 
-            <Text style={styles.label}>Kaç Kişi?</Text>
-            <View style={styles.countSelector}>
-              {['2', '3', '4', '5+'].map(count => (
-                <TouchableOpacity
-                  key={count}
-                  style={[
-                    styles.countOption,
-                    participantCount === count && styles.countOptionSelected,
-                  ]}
-                  onPress={() => setParticipantCount(count)}
-                >
-                  <Text
-                    style={[
-                      styles.countText,
-                      participantCount === count && styles.countTextSelected,
-                    ]}
-                  >
-                    {count}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
+            <Text style={styles.inputLabel}>Aktivite Tipi</Text>
             <TouchableOpacity
               style={styles.groupToggle}
-              onPress={() => setIsGroup(!isGroup)}
+              onPress={() => {
+                setIsGroup(!isGroup);
+                if (!isGroup) {
+                  setParticipantCount(2);
+                } else {
+                  setParticipantCount(1);
+                }
+              }}
             >
               <View style={[styles.checkbox, isGroup && styles.checkboxActive]}>
                 {isGroup && <Text style={styles.checkmark}>✓</Text>}
               </View>
-              <View style={styles.groupToggleTextContainer}>
-                <Text style={styles.groupToggleTitle}>Grup Aktivitesi</Text>
-                <Text style={styles.groupToggleSubtitle}>
-                  Birden fazla kişinin katılabileceği grup etkinliği
-                </Text>
-              </View>
+              <Text style={styles.groupToggleTitle}>Grup Aktivitesi</Text>
             </TouchableOpacity>
 
-            <Text style={styles.label}>Kategori *</Text>
+            {isGroup && (
+              <View style={styles.participantSelector}>
+                <Text style={styles.participantLabel}>Kaç Kişi?</Text>
+                <View style={styles.participantButtons}>
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.participantButton,
+                        participantCount === num && styles.participantButtonActive,
+                      ]}
+                      onPress={() => setParticipantCount(num)}
+                    >
+                      <Text
+                        style={[
+                          styles.participantButtonText,
+                          participantCount === num && styles.participantButtonTextActive,
+                        ]}
+                      >
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Kategori *</Text>
             <View style={styles.interestsGrid}>
               {interests.map(interest => (
                 <TouchableOpacity
@@ -681,7 +744,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   card: {
     flex: 1,
@@ -801,12 +864,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: '#8B5CF6',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  puzzleIconContainer: {
+    width: 32,
+    height: 32,
+    position: 'relative',
+  },
+  puzzlePiece: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    backgroundColor: '#8B5CF6',
+  },
+  puzzlePieceLeft: {
+    left: 0,
+    top: 7,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 8,
+  },
+  puzzlePieceRight: {
+    right: 0,
+    top: 7,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    borderTopLeftRadius: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -882,51 +970,99 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    marginTop: 4,
+  },
   textInput: {
     backgroundColor: '#F9FAFB',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: '#1F2937',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   textAreaInput: {
-    minHeight: 80,
+    minHeight: 60,
     textAlignVertical: 'top',
   },
-  countSelector: {
+  locationDetectButton: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  countOption: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingVertical: 18,
-    borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 2,
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  locationDetectButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  locationDetectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    marginBottom: 16,
+  },
+  locationDetectedText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    flex: 1,
+  },
+
+  participantSelector: {
+    marginBottom: 16,
+  },
+  participantLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 10,
+  },
+  participantButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  participantButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  countOptionSelected: {
+  participantButtonActive: {
     backgroundColor: '#8B5CF6',
     borderColor: '#8B5CF6',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  countText: {
-    fontSize: 18,
+  participantButtonText: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#6B7280',
   },
-  countTextSelected: {
-    color: '#FFFFFF',
+  participantButtonTextActive: {
+    color: '#FFF',
   },
   groupToggle: {
     flexDirection: 'row',
@@ -962,18 +1098,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  groupToggleTextContainer: {
-    flex: 1,
-  },
   groupToggleTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
-  },
-  groupToggleSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
+    flex: 1,
   },
   interestsGrid: {
     flexDirection: 'row',

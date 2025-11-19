@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Clock, Check, X as XIcon, Zap, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
@@ -57,6 +58,7 @@ interface MyProposal {
 export default function ProposalsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { setProposalsCount } = useUnread();
   const [activeTab, setActiveTab] = useState<'my_proposals' | 'received' | 'sent'>('my_proposals');
   const [myProposals, setMyProposals] = useState<MyProposal[]>([]);
   const [received, setReceived] = useState<ProposalRequest[]>([]);
@@ -132,6 +134,10 @@ export default function ProposalsScreen() {
         .order('created_at', { ascending: false });
 
       setReceived(receivedData as any || []);
+      
+      // Bekleyen başvuru sayısını hesapla
+      const pendingCount = (receivedData || []).filter((r: any) => r.status === 'pending').length;
+      setProposalsCount(pendingCount);
 
       // Load sent requests (user's requests to other proposals)
       const { data: sentData } = await supabase
@@ -431,7 +437,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 24,
   },

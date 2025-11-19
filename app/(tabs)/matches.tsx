@@ -17,6 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MessageCircle, Send, X as XIcon, User, XCircle } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
@@ -37,6 +38,7 @@ interface Match {
     content: string;
     created_at: string;
   };
+  unreadCount?: number;
 }
 
 interface Message {
@@ -50,6 +52,7 @@ interface Message {
 export default function MatchesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { setUnreadCount } = useUnread();
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -62,9 +65,38 @@ export default function MatchesScreen() {
 
   useEffect(() => {
     loadMatches();
-  }, []);
+
+    // Real-time mesaj dinleme
+    const messagesSubscription = supabase
+      .channel('messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        if (selectedMatch) {
+          loadMessages(selectedMatch.id);
+        }
+        loadMatches(); // Badge güncellemesi için
+      })
+      .subscribe();
+
+    // Real-time eşleşme dinleme
+    const matchesSubscription = supabase
+      .channel('matches')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
+        loadMatches();
+      })
+      .subscribe();
+
+    return () => {
+      messagesSubscription.unsubscribe();
+      matchesSubscription.unsubscribe();
+    };
+  }, [selectedMatch]);
 
   const loadMatches = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('matches')
@@ -75,7 +107,7 @@ export default function MatchesScreen() {
           matched_at,
           proposal:proposals(activity_name)
         `)
-        .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`)
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
         .order('matched_at', { ascending: false });
 
       if (error) throw error;
@@ -98,15 +130,28 @@ export default function MatchesScreen() {
             .limit(1)
             .maybeSingle();
 
+          // Okunmamış mesaj sayısı
+          const { count: unreadCount } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('match_id', match.id)
+            .eq('read', false)
+            .neq('sender_id', user.id);
+
           return {
             ...match,
             otherUser,
             lastMessage: lastMsg,
+            unreadCount: unreadCount || 0,
           };
         })
       );
 
       setMatches(matchesWithUsers as any);
+      
+      // Kaç kişiden okunmamış mesaj var (kişi bazında)
+      const unreadPeopleCount = matchesWithUsers.filter(match => (match.unreadCount || 0) > 0).length;
+      setUnreadCount(unreadPeopleCount);
     } catch (error: any) {
       Alert.alert('Hata', error.message);
     } finally {
@@ -178,14 +223,26 @@ export default function MatchesScreen() {
     const isOwn = item.sender_id === user?.id;
     return (
       <View style={[styles.messageWrapper, isOwn && styles.messageWrapperOwn]}>
+        {!isOwn && selectedMatch && (
+          <Image
+            source={{ uri: selectedMatch.otherUser?.profile_photo }}
+            style={styles.messageAvatar}
+          />
+        )}
         <View style={[styles.messageBubble, isOwn && styles.messageBubbleOwn]}>
           <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
             {item.content}
           </Text>
-          <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
-            {formatTime(item.created_at)}
-          </Text>
+          <View style={styles.messageFooter}>
+            <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
+              {formatTime(item.created_at)}
+            </Text>
+            {isOwn && item.read && (
+              <Text style={styles.readIndicator}>✓✓</Text>
+            )}
+          </View>
         </View>
+        {isOwn && <View style={styles.avatarSpacer} />}
       </View>
     );
   };
@@ -227,7 +284,16 @@ export default function MatchesScreen() {
                   </Text>
                 )}
               </View>
-              <MessageCircle size={24} color="#8B5CF6" />
+              <View style={styles.matchIconContainer}>
+                <MessageCircle size={24} color="#8B5CF6" />
+                {match.unreadCount && match.unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>
+                      {match.unreadCount > 9 ? '9+' : match.unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           ))
         ) : (
@@ -352,11 +418,12 @@ export default function MatchesScreen() {
         animationType="fade"
         onRequestClose={() => setShowDeleteConfirm(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowDeleteConfirm(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDeleteConfirm(false)}
+          />
           <View style={styles.confirmModalContent}>
             <View style={styles.confirmModalHeader}>
               <Text style={styles.confirmModalTitle}>Sohbeti Sonlandır</Text>
@@ -393,7 +460,7 @@ export default function MatchesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -405,7 +472,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 24,
   },
@@ -458,6 +525,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
   },
+  matchIconContainer: {
+    position: 'relative',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  unreadBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -480,7 +569,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   chatHeader: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 16,
   },
   chatHeaderContent: {
@@ -520,49 +609,75 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAFA',
   },
   messagesContainer: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 8,
     flexGrow: 1,
   },
   messageWrapper: {
-    marginBottom: 8,
-    alignItems: 'flex-start',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 4,
   },
   messageWrapperOwn: {
-    alignItems: 'flex-end',
+    flexDirection: 'row-reverse',
+  },
+  messageAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 2,
+  },
+  avatarSpacer: {
+    width: 32,
+    marginLeft: 8,
   },
   messageBubble: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
     borderBottomLeftRadius: 4,
-    maxWidth: '75%',
+    maxWidth: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   messageBubbleOwn: {
     backgroundColor: '#8B5CF6',
-    borderBottomLeftRadius: 20,
+    borderBottomLeftRadius: 18,
     borderBottomRightRadius: 4,
   },
   messageText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#1F2937',
-    lineHeight: 22,
-    marginBottom: 4,
+    lineHeight: 20,
   },
   messageTextOwn: {
     color: '#FFF',
   },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
   messageTime: {
     fontSize: 11,
     color: '#9CA3AF',
-    alignSelf: 'flex-end',
   },
   messageTimeOwn: {
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  readIndicator: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.9)',
   },
   inputWrapper: {
     backgroundColor: '#FFF',
@@ -573,20 +688,22 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#F3F4F6',
     alignItems: 'flex-end',
-    gap: 8,
+    gap: 10,
   },
   messageInput: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 22,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 24,
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 12,
-    fontSize: 16,
+    fontSize: 15,
     maxHeight: 100,
     color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   sendButton: {
     width: 44,
@@ -596,10 +713,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sendButtonDisabled: {
     opacity: 0.5,
@@ -607,7 +724,16 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalContent: {
     backgroundColor: '#FFF',
@@ -652,11 +778,10 @@ const styles = StyleSheet.create({
   },
   confirmModalContent: {
     backgroundColor: '#FFF',
-    marginHorizontal: 20,
     borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 'auto',
-    marginTop: 'auto',
+    width: '100%',
+    maxWidth: 400,
   },
   confirmModalHeader: {
     padding: 24,

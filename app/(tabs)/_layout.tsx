@@ -1,8 +1,13 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, View, Text } from 'react-native';
 import { Heart, MessageCircle, FileText, Crown, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUnread } from '@/contexts/UnreadContext';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const { unreadCount, proposalsCount } = useUnread();
+  
   return (
     <Tabs
       screenOptions={{
@@ -14,8 +19,8 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
           paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingBottom: Math.max(insets.bottom, 8),
+          height: Platform.OS === 'ios' ? 90 : 60 + Math.max(insets.bottom, 0),
           position: 'absolute',
           bottom: 0,
           left: 0,
@@ -42,14 +47,62 @@ export default function TabLayout() {
         name="proposals"
         options={{
           title: 'Tekliflerim',
-          tabBarIcon: ({ size, color }) => <FileText size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => (
+            <View style={{ position: 'relative' }}>
+              <FileText size={size} color={color} />
+              {(proposalsCount || 0) > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    backgroundColor: '#EF4444',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    {(proposalsCount || 0) > 9 ? '9+' : String(proposalsCount || 0)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
           title: 'Sohbet',
-          tabBarIcon: ({ size, color }) => <MessageCircle size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => (
+            <View style={{ position: 'relative' }}>
+              <MessageCircle size={size} color={color} />
+              {(unreadCount || 0) > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    backgroundColor: '#EF4444',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    {(unreadCount || 0) > 9 ? '9+' : String(unreadCount || 0)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen

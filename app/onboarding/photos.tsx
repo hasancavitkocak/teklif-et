@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera as CameraIcon, Image as ImageIcon, X } from 'lucide-react-native';
@@ -11,6 +11,7 @@ export default function PhotosScreen() {
   const { user } = useAuth();
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<any>(null);
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -20,7 +21,10 @@ export default function PhotosScreen() {
 
   const openCamera = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('Web Desteği Yok', 'Kamera özelliği sadece mobil cihazlarda çalışır');
+      // Web'de file input kullan
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
       return;
     }
 
@@ -59,7 +63,10 @@ export default function PhotosScreen() {
 
   const openGallery = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('Web Desteği Yok', 'Galeri özelliği sadece mobil cihazlarda çalışır');
+      // Web'de file input kullan
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
       return;
     }
 
@@ -105,7 +112,7 @@ export default function PhotosScreen() {
         const result = e.target?.result as string;
         if (result) {
           triggerHaptic();
-          setPhotos([...photos, result]);
+          setPhotos(prevPhotos => [...prevPhotos, result]);
         }
       };
       reader.readAsDataURL(file);
@@ -117,8 +124,13 @@ export default function PhotosScreen() {
 
 
   const removePhoto = (index: number) => {
+    console.log('Removing photo at index:', index);
     triggerHaptic();
-    setPhotos(photos.filter((_, i) => i !== index));
+    setPhotos(prevPhotos => {
+      const newPhotos = prevPhotos.filter((_, i) => i !== index);
+      console.log('Photos after removal:', newPhotos.length);
+      return newPhotos;
+    });
   };
 
   const handleComplete = async () => {
@@ -162,6 +174,15 @@ export default function PhotosScreen() {
 
   return (
     <View style={styles.container}>
+      {Platform.OS === 'web' && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+      )}
       <View style={styles.progressBar}>
         <View style={[styles.progress, { width: '100%' }]} />
       </View>
@@ -202,7 +223,11 @@ export default function PhotosScreen() {
                 )}
                 <TouchableOpacity
                   style={styles.removeButton}
-                  onPress={() => removePhoto(index)}
+                  onPress={() => {
+                    console.log('Delete button clicked for index:', index);
+                    removePhoto(index);
+                  }}
+                  activeOpacity={0.7}
                 >
                   <X size={16} color="#FFF" strokeWidth={3} />
                 </TouchableOpacity>
@@ -357,6 +382,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   addPhotoCard: {
     width: '48%',

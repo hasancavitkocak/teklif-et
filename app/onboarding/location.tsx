@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, MapPin, Navigation } from 'lucide-react-native';
@@ -24,6 +24,13 @@ export default function LocationScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
+
+  useEffect(() => {
+    // Sayfa açılınca otomatik konum tespiti başlat
+    if (Platform.OS !== 'web') {
+      detectLocation();
+    }
+  }, []);
 
   const detectLocation = async () => {
     if (Platform.OS === 'web') {
@@ -68,11 +75,9 @@ export default function LocationScreen() {
         if (result.city) {
           setCity(result.city);
           triggerHaptic();
-          Alert.alert('Başarılı', `Konumunuz tespit edildi: ${result.city}`);
         } else if (result.region) {
           setCity(result.region);
           triggerHaptic();
-          Alert.alert('Başarılı', `Konumunuz tespit edildi: ${result.region}`);
         } else {
           Alert.alert('Hata', 'Şehir bilgisi bulunamadı. Lütfen manuel olarak seçin.');
         }
