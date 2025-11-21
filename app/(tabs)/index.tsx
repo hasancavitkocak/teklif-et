@@ -18,11 +18,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store, ChevronDown, Crown, Edit3 } from 'lucide-react-native';
+import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store, ChevronDown, Crown } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
+import PremiumPopup from '@/components/PremiumPopup';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -39,8 +40,10 @@ export default function DiscoverScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [userCity, setUserCity] = useState<string>('');
-  const [isPremium, setIsPremium] = useState<boolean>(true); // TODO: Gerçek premium kontrolü - şimdilik true
+  const [isPremium, setIsPremium] = useState<boolean>(false); // TODO: Gerçek premium kontrolü
   const [editingCity, setEditingCity] = useState(false);
+  const [premiumPopupVisible, setPremiumPopupVisible] = useState(false);
+  const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'boost' | 'filters'>('likes');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
@@ -49,6 +52,7 @@ export default function DiscoverScreen() {
   const [maxDistance, setMaxDistance] = useState<number>(50);
   const [interests, setInterests] = useState<any[]>([]);
   const [showInterestDropdown, setShowInterestDropdown] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -224,7 +228,13 @@ export default function DiscoverScreen() {
       setCurrentIndex(currentIndex + 1);
     } catch (error: any) {
       if (error.message.includes('limit') || error.message.includes('başvurdunuz')) {
-        Alert.alert('Bilgi', error.message);
+        // Limit hatası - Premium popup göster
+        if (error.message.includes('limit')) {
+          setPremiumFeature(isSuperLike ? 'superLikes' : 'likes');
+          setPremiumPopupVisible(true);
+        } else {
+          Alert.alert('Bilgi', error.message);
+        }
         if (error.message.includes('başvurdunuz')) {
           setCurrentIndex(currentIndex + 1);
         }
@@ -272,7 +282,10 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => Alert.alert('Boost', 'Premium özelliği - Profilinizi 30 dakika öne çıkarın!')}
+            onPress={() => {
+              setPremiumFeature('boost');
+              setPremiumPopupVisible(true);
+            }}
           >
             <Sparkles size={22} color="#8B5CF6" />
           </TouchableOpacity>
@@ -418,6 +431,55 @@ export default function DiscoverScreen() {
         }}
       />
 
+      {/* Premium Popup */}
+      <PremiumPopup
+        visible={premiumPopupVisible}
+        onClose={() => setPremiumPopupVisible(false)}
+        feature={premiumFeature}
+      />
+
+      {/* Premium Modal - Şehir değiştirme için */}
+      <Modal
+        visible={showPremiumModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPremiumModal(false)}
+      >
+        <View style={styles.premiumModalOverlay}>
+          <View style={styles.premiumModalContent}>
+            <View style={styles.premiumModalIcon}>
+              <Crown size={48} color="#F59E0B" fill="#F59E0B" />
+            </View>
+            
+            <Text style={styles.premiumModalTitle}>Premium Özellik</Text>
+            <Text style={styles.premiumModalMessage}>
+              Farklı şehirlerde arama yapmak için Premium üyelik gereklidir.
+            </Text>
+            
+            <View style={styles.premiumModalButtons}>
+              <TouchableOpacity
+                style={styles.premiumModalCancelButton}
+                onPress={() => setShowPremiumModal(false)}
+              >
+                <Text style={styles.premiumModalCancelText}>İptal</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.premiumModalUpgradeButton}
+                onPress={() => {
+                  setShowPremiumModal(false);
+                  setFilterModalVisible(false);
+                  router.push('/(tabs)/premium');
+                }}
+              >
+                <Crown size={18} color="#FFF" fill="#FFF" />
+                <Text style={styles.premiumModalUpgradeText}>Premium Ol</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={filterModalVisible}
         transparent
@@ -468,7 +530,7 @@ export default function DiscoverScreen() {
                         if (isPremium) {
                           setEditingCity(true);
                         } else {
-                          Alert.alert('Premium', 'Premium özelliği - Farklı şehirlerde ara!');
+                          setShowPremiumModal(true);
                         }
                       }}
                     >
@@ -1835,6 +1897,76 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   filterApplyButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  // Premium Modal Stilleri
+  premiumModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  premiumModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  premiumModalIcon: {
+    marginBottom: 20,
+  },
+  premiumModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  premiumModalMessage: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  premiumModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  premiumModalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  premiumModalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  premiumModalUpgradeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+  },
+  premiumModalUpgradeText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FFF',
