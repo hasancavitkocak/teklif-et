@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,18 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store } from 'lucide-react-native';
+import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store, ChevronDown, Crown, Edit3 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
+
+import { PROVINCES } from '@/constants/cities';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,8 +38,49 @@ export default function DiscoverScreen() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>('');
+  const [userCity, setUserCity] = useState<string>('');
+  const [isPremium, setIsPremium] = useState<boolean>(true); // TODO: Gerçek premium kontrolü - şimdilik true
+  const [editingCity, setEditingCity] = useState(false);
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
+  const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
+  const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string>('');
+  const [maxDistance, setMaxDistance] = useState<number>(50);
   const [interests, setInterests] = useState<any[]>([]);
+  const [showInterestDropdown, setShowInterestDropdown] = useState(false);
+  const sliderWidth = useRef(0);
+
+  // Slider için ref
+  const sliderTrackRef = useRef<View>(null);
+  const sliderStartX = useRef(0);
+
+  // Slider PanResponder
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        // Başlangıç pozisyonunu kaydet
+        if (sliderTrackRef.current) {
+          sliderTrackRef.current.measure((x, y, width, height, pageX) => {
+            sliderStartX.current = pageX;
+            sliderWidth.current = width;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (sliderWidth.current > 0 && sliderStartX.current > 0) {
+          const touchX = evt.nativeEvent.pageX;
+          const relativeX = touchX - sliderStartX.current;
+          const percentage = Math.max(0, Math.min(1, relativeX / sliderWidth.current));
+          const newDistance = Math.round(percentage * 99) + 1; // 1-100 km
+          setMaxDistance(newDistance);
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
 
   // Sayfa her açıldığında veri yükle
   useFocusEffect(
@@ -51,6 +95,7 @@ export default function DiscoverScreen() {
   useEffect(() => {
     loadProposals();
     loadInterests();
+    loadUserCity();
 
     // Real-time yeni teklif dinleme
     const subscription = supabase
@@ -93,6 +138,25 @@ export default function DiscoverScreen() {
       setInterests(data);
     } catch (error: any) {
       console.error('Error loading interests:', error.message);
+    }
+  };
+
+  const loadUserCity = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('city')
+        .eq('id', user.id)
+        .single();
+      if (profile?.city) {
+        setUserCity(profile.city);
+        if (!selectedCity) {
+          setSelectedCity(profile.city);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user city:', error);
     }
   };
 
@@ -357,73 +421,301 @@ export default function DiscoverScreen() {
       <Modal
         visible={filterModalVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filtrele</Text>
+        <TouchableOpacity 
+          style={styles.filterModalOverlay} 
+          activeOpacity={1}
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <TouchableOpacity 
+            style={styles.filterModalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filtreler</Text>
               <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                <X size={24} color="#000" />
+                <X size={22} color="#8B5CF6" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.label}>ŞEHİR</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Şehir adı girin"
-                value={selectedCity}
-                onChangeText={setSelectedCity}
-                placeholderTextColor="#9CA3AF"
-              />
+            {/* Body */}
+            <ScrollView 
+              style={styles.filterModalBody}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
+              {/* Şehir */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Şehir</Text>
+                
+                {!editingCity ? (
+                  <View style={styles.cityDisplayContainer}>
+                    <View style={styles.cityDisplay}>
+                      <MapPin size={18} color="#8B5CF6" />
+                      <Text style={styles.cityDisplayText}>
+                        {selectedProvince && selectedDistrict
+                          ? `${selectedDistrict}, ${PROVINCES.find(p => p.id === selectedProvince)?.name}`
+                          : userCity || 'Konum alınıyor...'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.editCityButton}
+                      onPress={() => {
+                        if (isPremium) {
+                          setEditingCity(true);
+                        } else {
+                          Alert.alert('Premium', 'Premium özelliği - Farklı şehirlerde ara!');
+                        }
+                      }}
+                    >
+                      <Crown size={14} color="#F59E0B" fill="#F59E0B" />
+                      <Text style={styles.editCityButtonText}>Değiştir</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.cityEditContainer}>
+                    {/* İl Seçimi */}
+                    <View style={styles.citySelectGroup}>
+                      <Text style={styles.citySelectLabel}>İl</Text>
+                      <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => {
+                          setShowProvinceDropdown(!showProvinceDropdown);
+                          setShowDistrictDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownButtonText}>
+                          {selectedProvince
+                            ? PROVINCES.find(p => p.id === selectedProvince)?.name || 'İl Seç'
+                            : 'İl Seç'}
+                        </Text>
+                        <ChevronDown size={20} color="#8B5CF6" />
+                      </TouchableOpacity>
+                      
+                      {showProvinceDropdown && (
+                        <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                          {PROVINCES.map((province) => (
+                            <TouchableOpacity
+                              key={province.id}
+                              style={[
+                                styles.dropdownItem,
+                                selectedProvince === province.id && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => {
+                                setSelectedProvince(province.id);
+                                setSelectedDistrict('');
+                                setShowProvinceDropdown(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.dropdownItemText,
+                                  selectedProvince === province.id && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {province.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
+                    </View>
 
-              <Text style={styles.label}>İLGİ ALANI</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-                <View style={styles.interestsGrid}>
+                    {/* İlçe Seçimi */}
+                    {selectedProvince && (
+                      <View style={styles.citySelectGroup}>
+                        <Text style={styles.citySelectLabel}>İlçe</Text>
+                        <TouchableOpacity
+                          style={styles.dropdownButton}
+                          onPress={() => {
+                            setShowDistrictDropdown(!showDistrictDropdown);
+                            setShowProvinceDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownButtonText}>
+                            {selectedDistrict || 'İlçe Seç'}
+                          </Text>
+                          <ChevronDown size={20} color="#8B5CF6" />
+                        </TouchableOpacity>
+                        
+                        {showDistrictDropdown && (
+                          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                            {PROVINCES.find(p => p.id === selectedProvince)?.districts.map((district) => (
+                              <TouchableOpacity
+                                key={district}
+                                style={[
+                                  styles.dropdownItem,
+                                  selectedDistrict === district && styles.dropdownItemActive,
+                                ]}
+                                onPress={() => {
+                                  setSelectedDistrict(district);
+                                  setShowDistrictDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    selectedDistrict === district && styles.dropdownItemTextActive,
+                                  ]}
+                                >
+                                  {district}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Butonlar */}
+                    <View style={styles.cityEditButtons}>
+                      <TouchableOpacity
+                        style={styles.cityEditCancel}
+                        onPress={() => {
+                          setEditingCity(false);
+                          setShowProvinceDropdown(false);
+                          setShowDistrictDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.cityEditCancelText}>İptal</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.cityEditDone}
+                        onPress={() => {
+                          if (selectedProvince && selectedDistrict) {
+                            const provinceName = PROVINCES.find(p => p.id === selectedProvince)?.name;
+                            setSelectedCity(`${selectedDistrict}, ${provinceName}`);
+                            setEditingCity(false);
+                            setShowProvinceDropdown(false);
+                            setShowDistrictDropdown(false);
+                          } else {
+                            Alert.alert('Uyarı', 'Lütfen il ve ilçe seçin');
+                          }
+                        }}
+                      >
+                        <Text style={styles.cityEditDoneText}>Tamam</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Mesafe */}
+              <View style={styles.filterSection}>
+                <View style={styles.filterLabelRow}>
+                  <Text style={styles.filterLabel}>Mesafe</Text>
+                  <Text style={styles.filterValue}>Max. {maxDistance} km</Text>
+                </View>
+                <View style={styles.sliderContainer}>
+                  <Text style={styles.sliderMinMax}>1 km</Text>
+                  <View
+                    ref={sliderTrackRef}
+                    style={styles.sliderTrack}
+                    {...panResponder.panHandlers}
+                  >
+                    <View style={[styles.sliderFill, { width: `${(maxDistance / 100) * 100}%` }]} />
+                    <View style={[styles.sliderThumb, { left: `${(maxDistance / 100) * 100}%` }]} />
+                  </View>
+                  <Text style={styles.sliderMinMax}>100 km</Text>
+                </View>
+              </View>
+
+              {/* Kategori Dropdown */}
+              <View style={styles.filterSectionLast}>
+                <Text style={styles.filterLabel}>Kategori</Text>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowInterestDropdown(!showInterestDropdown)}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {selectedInterest
+                      ? interests.find((i) => i.id === selectedInterest)?.name || 'Kategori Seç'
+                      : 'Kategori Seç'}
+                  </Text>
+                  <ChevronDown size={20} color="#8B5CF6" />
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            {/* Kategori Dropdown - Modal Seviyesinde */}
+            {showInterestDropdown && (
+              <View style={styles.dropdownOverlay}>
+                <ScrollView style={styles.dropdownListFixed} nestedScrollEnabled>
+                  <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setSelectedInterest('');
+                      setShowInterestDropdown(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>Tümü</Text>
+                  </TouchableOpacity>
                   {interests.map((interest) => (
                     <TouchableOpacity
                       key={interest.id}
                       style={[
-                        styles.interestOption,
-                        selectedInterest === interest.id && styles.interestOptionSelected,
+                        styles.dropdownItem,
+                        selectedInterest === interest.id && styles.dropdownItemActive,
                       ]}
-                      onPress={() => setSelectedInterest(selectedInterest === interest.id ? '' : interest.id)}
+                      onPress={() => {
+                        setSelectedInterest(interest.id);
+                        setShowInterestDropdown(false);
+                      }}
                     >
                       <Text
                         style={[
-                          styles.interestOptionText,
-                          selectedInterest === interest.id && styles.interestOptionTextSelected,
+                          styles.dropdownItemText,
+                          selectedInterest === interest.id && styles.dropdownItemTextActive,
                         ]}
                       >
                         {interest.name}
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
-              </ScrollView>
-            </ScrollView>
+                </ScrollView>
+              </View>
+            )}
 
-            <View style={{ paddingHorizontal: 24, paddingBottom: 16, gap: 12 }}>
-              <TouchableOpacity
-                style={styles.createProposalButton}
-                onPress={applyFilters}
-              >
-                <Text style={styles.createProposalButtonText}>Filtreleri Uygula</Text>
-              </TouchableOpacity>
-
-              {(selectedCity || selectedInterest) && (
+            {/* Footer */}
+            <View style={styles.filterModalFooter}>
+              {(selectedCity || selectedInterest || maxDistance !== 50) && (
                 <TouchableOpacity
-                  style={[styles.createProposalButton, { backgroundColor: '#EF4444' }]}
-                  onPress={clearFilters}
+                  style={styles.filterClearButton}
+                  onPress={() => {
+                    setSelectedCity('');
+                    setSelectedInterest('');
+                    setMaxDistance(50);
+                    setShowInterestDropdown(false);
+                  }}
                 >
-                  <Text style={styles.createProposalButtonText}>Filtreleri Temizle</Text>
+                  <Text style={styles.filterClearButtonText}>Temizle</Text>
                 </TouchableOpacity>
               )}
+              <TouchableOpacity
+                style={[
+                  styles.filterApplyButton,
+                  editingCity && styles.filterApplyButtonDisabled
+                ]}
+                onPress={() => {
+                  if (!editingCity) {
+                    setFilterModalVisible(false);
+                    setShowInterestDropdown(false);
+                    applyFilters();
+                  }
+                }}
+                disabled={editingCity}
+              >
+                <Text style={styles.filterApplyButtonText}>
+                  {editingCity ? 'Şehir seçimini tamamlayın' : 'Uygula'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -1234,5 +1526,317 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFF',
     letterSpacing: 0.5,
+  },
+  // Yeni Filtre Modal Stilleri
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  filterModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'visible',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  filterModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  filterModalBody: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    overflow: 'visible',
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionLast: {
+    marginBottom: 24,
+    overflow: 'visible',
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 10,
+  },
+  filterLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  filterValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  premiumButton: {
+    padding: 4,
+  },
+  cityDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  cityDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  cityDisplayText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  editCityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 8,
+  },
+  editCityButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  cityEditContainer: {
+    gap: 12,
+  },
+  citySelectGroup: {
+    gap: 8,
+    position: 'relative',
+    marginBottom: 16,
+  },
+  citySelectLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cityEditButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  cityEditCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cityEditCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cityEditDone: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cityEditDoneText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  filterInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#000',
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  sliderMinMax: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  sliderTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    position: 'relative',
+  },
+  sliderFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: '100%',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 3,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    top: -7,
+    width: 20,
+    height: 20,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 10,
+    marginLeft: -10,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    position: 'relative',
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 8,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 999,
+    zIndex: 9999,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    bottom: 80,
+    left: 20,
+    right: 20,
+    zIndex: 10000,
+  },
+  dropdownListFixed: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    maxHeight: 250,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 999,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#F3E8FF',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: '#8B5CF6',
+    fontWeight: '700',
+  },
+  filterModalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    zIndex: 1,
+  },
+  filterClearButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  filterClearButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  filterApplyButton: {
+    flex: 2,
+    paddingVertical: 14,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  filterApplyButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  filterApplyButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });
