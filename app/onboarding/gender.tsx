@@ -21,7 +21,7 @@ export default function GenderScreen() {
   const genderOptions = [
     { value: 'male', label: 'Erkek' },
     { value: 'female', label: 'Kadın' },
-    { value: 'other', label: 'Diğer' },
+    { value: 'prefer_not_to_say', label: 'Belirtmek İstemiyorum' },
   ];
 
   const handleContinue = async () => {
@@ -69,34 +69,37 @@ export default function GenderScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Cinsiyetiniz?</Text>
-        </View>
+        <View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.stepIndicator}>Adım 3/7</Text>
+            <Text style={styles.title}>Cinsiyetiniz?</Text>
+          </View>
 
-        <View style={styles.optionsContainer}>
-          {genderOptions.map(option => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.optionButton,
-                gender === option.value && styles.optionButtonSelected,
-              ]}
-              onPress={() => {
-                triggerHaptic();
-                setGender(option.value);
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
+          <View style={styles.optionsContainer}>
+            {genderOptions.map(option => (
+              <TouchableOpacity
+                key={option.value}
                 style={[
-                  styles.optionText,
-                  gender === option.value && styles.optionTextSelected,
+                  styles.optionButton,
+                  gender === option.value && styles.optionButtonSelected,
                 ]}
+                onPress={() => {
+                  triggerHaptic();
+                  setGender(option.value);
+                }}
+                activeOpacity={0.8}
               >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.optionText,
+                    gender === option.value && styles.optionTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -140,9 +143,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 20,
+    justifyContent: 'space-between',
   },
   titleContainer: {
     marginBottom: 32,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,
@@ -152,7 +165,6 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     gap: 12,
-    marginBottom: 32,
   },
   optionButton: {
     backgroundColor: '#FFF',

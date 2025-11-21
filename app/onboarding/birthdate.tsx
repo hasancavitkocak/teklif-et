@@ -76,12 +76,13 @@ export default function BirthdateScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Doğum tarihiniz?</Text>
-          <Text style={styles.subtitle}>Yaşınız: {calculateAge(date)}</Text>
-        </View>
+        <View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.stepIndicator}>Adım 2/7</Text>
+            <Text style={styles.title}>Doğum tarihiniz?</Text>
+            <Text style={styles.subtitle}>Yaşınız: {calculateAge(date)}</Text>
+          </View>
 
-        <View style={styles.pickerWrapper}>
           <View style={styles.pickerContainer}>
             <DateTimePicker
               value={date}
@@ -145,10 +146,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 20,
     justifyContent: 'space-between',
   },
   titleContainer: {
     marginBottom: 32,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,
@@ -161,11 +171,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#8E8E93',
     fontWeight: '400',
-  },
-  pickerWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   pickerContainer: {
     backgroundColor: '#FFF',
@@ -183,7 +188,6 @@ const styles = StyleSheet.create({
     paddingVertical: 17,
     borderRadius: 14,
     alignItems: 'center',
-    marginBottom: 20,
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

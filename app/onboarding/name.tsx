@@ -71,22 +71,21 @@ export default function NameScreen() {
       </View>
 
       <View style={styles.content}>
-        <View>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>Adınız nedir?</Text>
-            <Text style={styles.subtitle}>Profilinizde görünecek</Text>
-          </View>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Adınızı girin"
-            placeholderTextColor="#9CA3AF"
-            value={name}
-            onChangeText={setName}
-            autoFocus
-            maxLength={30}
-          />
+        <View style={styles.titleContainer}>
+          <Text style={styles.stepIndicator}>Adım 1/7</Text>
+          <Text style={styles.title}>Adınız nedir?</Text>
+          <Text style={styles.subtitle}>Profilinizde görünecek</Text>
         </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Adınızı girin"
+          placeholderTextColor="#9CA3AF"
+          value={name}
+          onChangeText={setName}
+          autoFocus
+          maxLength={30}
+        />
 
         <TouchableOpacity
           style={[styles.button, (!name.trim() || loading) && styles.disabledButton]}
@@ -119,10 +118,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
-    justifyContent: 'space-between',
+    paddingBottom: 20,
   },
   titleContainer: {
-    marginBottom: 28,
+    marginBottom: 32,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,
@@ -152,7 +159,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 24,
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

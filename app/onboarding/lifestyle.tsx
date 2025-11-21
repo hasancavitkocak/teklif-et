@@ -66,6 +66,7 @@ export default function LifestyleScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
+          <Text style={styles.stepIndicator}>Adım 5/7</Text>
           <Text style={styles.title}>Yaşam tarzınız</Text>
         </View>
 
@@ -184,6 +185,14 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: 32,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,

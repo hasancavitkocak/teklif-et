@@ -103,6 +103,7 @@ export default function InterestsScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
+          <Text style={styles.stepIndicator}>Adım 4/7</Text>
           <Text style={styles.title}>İlgi alanlarınız</Text>
           <Text style={styles.subtitle}>
             En az 3, en fazla 5 seçin ({selectedInterests.length}/5)
@@ -186,6 +187,14 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: 24,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,

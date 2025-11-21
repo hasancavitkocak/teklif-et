@@ -201,6 +201,7 @@ export default function PhotosScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
+          <Text style={styles.stepIndicator}>Adım 7/7</Text>
           <Text style={styles.title}>Fotoğraflarınızı ekleyin</Text>
           <Text style={styles.subtitle}>
             En az 2 fotoğraf gerekli ({photos.length}/6)
@@ -310,6 +311,14 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: 28,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,

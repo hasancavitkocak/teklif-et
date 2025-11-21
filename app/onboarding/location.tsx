@@ -142,6 +142,7 @@ export default function LocationScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
+          <Text style={styles.stepIndicator}>Adım 6/7</Text>
           <Text style={styles.title}>Neredesiniz?</Text>
           <Text style={styles.subtitle}>Şehrinizi seçin veya tespit edin</Text>
         </View>
@@ -248,6 +249,14 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: 24,
+  },
+  stepIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 28,

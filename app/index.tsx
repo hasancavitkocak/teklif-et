@@ -22,16 +22,33 @@ export default function Index() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('onboarding_completed, name, birth_date, gender, city')
         .eq('id', user.id)
         .maybeSingle();
 
       if (!profile) {
         router.replace('/onboarding/name');
-      } else if (!profile.onboarding_completed) {
-        router.replace('/onboarding/name');
-      } else {
+        return;
+      }
+
+      // Onboarding tamamlandıysa ana ekrana git
+      if (profile.onboarding_completed) {
         router.replace('/(tabs)');
+        return;
+      }
+
+      // Hangi adımda kaldığını kontrol et
+      if (!profile.name) {
+        router.replace('/onboarding/name');
+      } else if (!profile.birth_date) {
+        router.replace('/onboarding/birthdate');
+      } else if (!profile.gender) {
+        router.replace('/onboarding/gender');
+      } else if (!profile.city) {
+        router.replace('/onboarding/location');
+      } else {
+        // Diğer adımlar için interests'e git
+        router.replace('/onboarding/interests');
       }
     };
 
