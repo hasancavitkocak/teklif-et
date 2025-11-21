@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera as CameraIcon, Image as ImageIcon, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -173,7 +174,7 @@ export default function PhotosScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       {Platform.OS === 'web' && (
         <input
           ref={fileInputRef}
@@ -276,7 +277,7 @@ export default function PhotosScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

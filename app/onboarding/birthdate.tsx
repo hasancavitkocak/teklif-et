@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,7 +59,7 @@ export default function BirthdateScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
         <View style={[styles.progress, { width: '28%' }]} />
       </View>
@@ -114,7 +115,7 @@ export default function BirthdateScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

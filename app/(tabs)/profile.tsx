@@ -235,8 +235,14 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Yaşam Tarzı</Text>
+          <Text style={styles.sectionTitle}>Hakkımda</Text>
           <View style={styles.lifestyleContainer}>
+            <View style={styles.lifestyleItem}>
+              <Text style={styles.lifestyleLabel}>Cinsiyet</Text>
+              <Text style={styles.lifestyleValue}>
+                {profile.gender === 'male' ? 'Erkek' : profile.gender === 'female' ? 'Kadın' : profile.gender === 'prefer_not_to_say' ? 'Belirtmek İstemiyorum' : 'Belirtilmemiş'}
+              </Text>
+            </View>
             <View style={styles.lifestyleItem}>
               <Text style={styles.lifestyleLabel}>Sigara</Text>
               <Text style={styles.lifestyleValue}>

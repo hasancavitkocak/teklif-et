@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView ,  Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -84,7 +85,7 @@ export default function InterestsScreen() {
   }, {} as Record<string, Interest[]>);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
         <View style={[styles.progress, { width: '56%' }]} />
       </View>
@@ -152,7 +153,7 @@ export default function InterestsScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

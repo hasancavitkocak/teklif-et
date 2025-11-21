@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,10 +31,11 @@ export default function GenderScreen() {
       return;
     }
 
+    console.log('Saving gender:', gender, 'for user:', user?.id);
     triggerHaptic();
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('profiles')
         .update({
           gender,
@@ -41,9 +43,14 @@ export default function GenderScreen() {
         })
         .eq('id', user?.id);
 
+      console.log('Gender save result:', { error, data });
+      
       if (error) throw error;
+      
+      console.log('Gender saved successfully, navigating to interests');
       router.push('/onboarding/interests');
     } catch (error: any) {
+      console.error('Gender save error:', error);
       Alert.alert('Hata', error.message);
     } finally {
       setLoading(false);
@@ -51,7 +58,7 @@ export default function GenderScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
         <View style={[styles.progress, { width: '42%' }]} />
       </View>
@@ -84,6 +91,7 @@ export default function GenderScreen() {
                   gender === option.value && styles.optionButtonSelected,
                 ]}
                 onPress={() => {
+                  console.log('Gender selected:', option.value);
                   triggerHaptic();
                   setGender(option.value);
                 }}
@@ -111,7 +119,7 @@ export default function GenderScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
