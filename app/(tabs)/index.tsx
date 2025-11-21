@@ -17,7 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock } from 'lucide-react-native';
+import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -286,7 +286,7 @@ export default function DiscoverScreen() {
                     {/* Mekan ve Konum - Alt Alta */}
                     {currentProposal.venue_name && (
                       <View style={styles.infoItem}>
-                        <MapPin size={12} color="#FFF" />
+                        <Store size={12} color="#FFF" />
                         <Text style={styles.infoText} numberOfLines={1}>
                           {currentProposal.venue_name}
                         </Text>
@@ -440,7 +440,6 @@ function CreateProposalModal({
 }) {
   const { user } = useAuth();
   const [activityName, setActivityName] = useState('');
-  const [description, setDescription] = useState('');
   const [venueName, setVenueName] = useState('');
   const [userCity, setUserCity] = useState('');
   const [eventDate, setEventDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Yarın
@@ -516,7 +515,6 @@ function CreateProposalModal({
       await proposalsAPI.createProposal({
         creator_id: user!.id,
         activity_name: activityName.trim(),
-        description: description.trim() || undefined,
         participant_count: 1,
         is_group: false,
         interest_id: selectedInterest,
@@ -527,7 +525,6 @@ function CreateProposalModal({
 
       Alert.alert('Başarılı', 'Teklifiniz oluşturuldu');
       setActivityName('');
-      setDescription('');
       setVenueName('');
       setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
       setSelectedInterest(null);
@@ -572,21 +569,6 @@ function CreateProposalModal({
                 maxLength={100}
                 placeholderTextColor="#9CA3AF"
                 autoFocus
-              />
-            </View>
-
-            {/* Açıklama */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Açıklama (Opsiyonel)</Text>
-              <TextInput
-                style={[styles.textInput, styles.textAreaInput]}
-                placeholder="Aktivite hakkında kısa bilgi..."
-                value={description}
-                onChangeText={setDescription}
-                maxLength={200}
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={3}
               />
             </View>
 
