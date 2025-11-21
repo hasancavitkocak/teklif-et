@@ -37,10 +37,10 @@ export default function MessageDetailScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId || !user?.id) return;
     
-    loadMatchInfo();
-    loadMessages();
+    // TEK API ÇAĞRISI - Her şeyi birlikte yükle
+    initializeConversation();
 
     // Real-time mesaj dinleme
     const subscription = supabase
@@ -68,16 +68,20 @@ export default function MessageDetailScreen() {
       keyboardDidShow.remove();
       keyboardDidHide.remove();
     };
-  }, [matchId]);
+  }, [matchId, user?.id]);
 
-  const loadMatchInfo = async () => {
+  const initializeConversation = async () => {
     if (!user?.id || !matchId) return;
     
     try {
-      const data = await messagesAPI.getMatchInfo(matchId as string, user.id);
-      setMatchInfo(data);
+      const { matchInfo: info, messages: msgs } = await messagesAPI.initializeConversation(
+        matchId as string,
+        user.id
+      );
+      setMatchInfo(info);
+      setMessages(msgs);
     } catch (error) {
-      console.error('Match info error:', error);
+      console.error('Initialize conversation error:', error);
     }
   };
 
@@ -111,6 +115,7 @@ export default function MessageDetailScreen() {
     if (!user?.id || !matchId) return;
     
     try {
+      // Real-time güncellemeler için sadece mesajları yükle
       const data = await messagesAPI.getMessages(matchId as string, user.id);
       setMessages(data);
     } catch (error) {
@@ -168,15 +173,7 @@ export default function MessageDetailScreen() {
     );
   };
 
-  if (!matchInfo) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <View style={styles.loadingContent}>
-          <View style={styles.loadingSkeleton} />
-        </View>
-      </View>
-    );
-  }
+  // Loading state'i kaldırdık - header hemen gösterilecek
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -197,16 +194,24 @@ export default function MessageDetailScreen() {
             <ArrowLeft size={24} color="#000" />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Image
-              source={{ uri: matchInfo.otherUser.profile_photo }}
-              style={styles.headerAvatar}
-            />
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerName}>{matchInfo.otherUser.name}</Text>
-              {matchInfo.activity && (
-                <Text style={styles.headerActivity}>{matchInfo.activity}</Text>
-              )}
-            </View>
+            {matchInfo ? (
+              <>
+                <Image
+                  source={{ uri: matchInfo.otherUser.profile_photo }}
+                  style={styles.headerAvatar}
+                />
+                <View style={styles.headerInfo}>
+                  <Text style={styles.headerName}>{matchInfo.otherUser.name}</Text>
+                  {matchInfo.activity && (
+                    <Text style={styles.headerActivity}>{matchInfo.activity}</Text>
+                  )}
+                </View>
+              </>
+            ) : (
+              <View style={styles.headerInfo}>
+                <View style={styles.loadingPlaceholder} />
+              </View>
+            )}
           </View>
           <TouchableOpacity 
             onPress={(event) => {
@@ -396,6 +401,12 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 10,
   },
+  loadingPlaceholder: {
+    height: 20,
+    width: 120,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 4,
+  },
   messageRow: {
     flexDirection: 'row',
     marginBottom: 8,
@@ -476,19 +487,6 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 1,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContent: {
-    width: '100%',
-    paddingHorizontal: 16,
-  },
-  loadingSkeleton: {
-    height: 60,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
   },
   menuOverlay: {
     flex: 1,

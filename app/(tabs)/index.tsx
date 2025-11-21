@@ -13,7 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal } from 'lucide-react-native';
+import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -196,6 +196,12 @@ export default function DiscoverScreen() {
       <View style={styles.header}>
         <Text style={styles.logoText}>Test</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.push('/notifications')}
+          >
+            <Bell size={22} color="#8B5CF6" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => Alert.alert('Boost', 'Premium özelliği - Profilinizi 30 dakika öne çıkarın!')}

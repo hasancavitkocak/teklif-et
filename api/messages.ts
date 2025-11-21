@@ -18,23 +18,77 @@ export interface MatchInfo {
 }
 
 export const messagesAPI = {
-  // Match bilgilerini getir
+  // Conversation'ı başlat - match info ve mesajları birlikte getir (TEK ÇAĞRI)
+  initializeConversation: async (matchId: string, userId: string) => {
+    // Paralel olarak her şeyi yükle
+    const [matchResult, messagesResult] = await Promise.all([
+      // Match bilgisi
+      supabase
+        .from('matches')
+        .select(`
+          id,
+          user1_id,
+          user2_id,
+          proposal:proposals(activity_name),
+          user1:profiles!user1_id(name, profile_photo),
+          user2:profiles!user2_id(name, profile_photo)
+        `)
+        .eq('id', matchId)
+        .single(),
+      // Mesajlar
+      supabase
+        .from('messages')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: true }),
+    ]);
+
+    if (matchResult.error) throw matchResult.error;
+    if (messagesResult.error) throw messagesResult.error;
+
+    // Okundu işaretleme - arka planda (await etmiyoruz)
+    supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('match_id', matchId)
+      .neq('sender_id', userId)
+      .eq('read', false)
+      .then(() => console.log('Messages marked as read'));
+
+    // Match info'yu hazırla
+    const match = matchResult.data;
+    const isUser1 = match.user1_id === userId;
+    const otherUser = isUser1 ? (match as any).user2 : (match as any).user1;
+
+    return {
+      matchInfo: {
+        id: match.id,
+        otherUser: otherUser || { name: '', profile_photo: '' },
+        activity: (match.proposal as any)?.activity_name || '',
+      } as MatchInfo,
+      messages: messagesResult.data as Message[],
+    };
+  },
+
+  // Match bilgilerini getir (eski - geriye dönük uyumluluk için)
   getMatchInfo: async (matchId: string, userId: string) => {
     const { data: match, error } = await supabase
       .from('matches')
-      .select('id, user1_id, user2_id, proposal:proposals(activity_name)')
+      .select(`
+        id,
+        user1_id,
+        user2_id,
+        proposal:proposals(activity_name),
+        user1:profiles!user1_id(name, profile_photo),
+        user2:profiles!user2_id(name, profile_photo)
+      `)
       .eq('id', matchId)
       .single();
 
     if (error) throw error;
 
-    const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
-
-    const { data: otherUser } = await supabase
-      .from('profiles')
-      .select('name, profile_photo')
-      .eq('id', otherUserId)
-      .single();
+    const isUser1 = match.user1_id === userId;
+    const otherUser = isUser1 ? (match as any).user2 : (match as any).user1;
 
     return {
       id: match.id,
@@ -43,25 +97,25 @@ export const messagesAPI = {
     } as MatchInfo;
   },
 
-  // Mesajları getir
+  // Mesajları getir (eski - geriye dönük uyumluluk için)
   getMessages: async (matchId: string, userId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('match_id', matchId)
-      .order('created_at', { ascending: true });
+    const [messagesResult] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('match_id', matchId)
+        .neq('sender_id', userId)
+        .eq('read', false),
+    ]);
 
-    if (error) throw error;
+    if (messagesResult.error) throw messagesResult.error;
 
-    // Mesajları okundu olarak işaretle
-    await supabase
-      .from('messages')
-      .update({ read: true })
-      .eq('match_id', matchId)
-      .neq('sender_id', userId)
-      .eq('read', false);
-
-    return data as Message[];
+    return messagesResult.data as Message[];
   },
 
   // Mesaj gönder

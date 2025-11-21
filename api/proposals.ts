@@ -77,6 +77,7 @@ export const proposalsAPI = {
   },
 
   // Gelen başvuruları getir (optimize edilmiş - tek sorgu)
+  // Pending ve accepted olanları göster, rejected/auto_rejected olanları gösterme
   getReceivedRequests: async (userId: string) => {
     const { data, error } = await supabase
       .from('proposal_requests')
@@ -96,7 +97,7 @@ export const proposalsAPI = {
         requester:profiles!requester_id(name, profile_photo, birth_date)
       `)
       .eq('proposals.creator_id', userId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -104,6 +105,7 @@ export const proposalsAPI = {
   },
 
   // Gönderilen başvuruları getir
+  // Tüm durumları göster ama auto_rejected olanları filtrele
   getSentRequests: async (userId: string) => {
     const { data, error } = await supabase
       .from('proposal_requests')
@@ -121,6 +123,7 @@ export const proposalsAPI = {
         requester:profiles!requester_id(name, profile_photo, birth_date)
       `)
       .eq('requester_id', userId)
+      .neq('status', 'auto_rejected')
       .order('created_at', { ascending: false });
 
     if (error) throw error;

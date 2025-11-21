@@ -218,7 +218,20 @@ export default function ProposalsScreen() {
         ? '#10B981'
         : request.status === 'rejected'
         ? '#EF4444'
+        : request.status === 'auto_rejected'
+        ? '#9CA3AF'
         : '#F59E0B';
+
+    const statusText =
+      request.status === 'pending'
+        ? 'Beklemede'
+        : request.status === 'accepted'
+        ? '✓ Kabul Edildi'
+        : request.status === 'rejected'
+        ? '✗ Reddedildi'
+        : request.status === 'auto_rejected'
+        ? 'Başka Biri Kabul Edildi'
+        : 'Beklemede';
 
     return (
       <View key={request.id} style={styles.requestCard}>
@@ -237,11 +250,7 @@ export default function ProposalsScreen() {
           <Text style={styles.requestActivity}>{request.proposal.activity_name}</Text>
           <Text style={styles.requestCity}>{request.proposal.city}</Text>
           <Text style={[styles.requestStatus, { color: statusColor }]}>
-            {request.status === 'pending'
-              ? 'Beklemede'
-              : request.status === 'accepted'
-              ? 'Kabul Edildi'
-              : 'Reddedildi'}
+            {statusText}
           </Text>
         </View>
         {type === 'received' && request.status === 'pending' && (
@@ -260,6 +269,19 @@ export default function ProposalsScreen() {
             >
               <Check size={20} color="#FFF" />
             </TouchableOpacity>
+          </View>
+        )}
+        {request.status === 'accepted' && (
+          <View style={{
+            width: 40,
+            height: 40,
+            backgroundColor: '#D1FAE5',
+            borderRadius: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginLeft: 8,
+          }}>
+            <Check size={16} color="#10B981" />
           </View>
         )}
       </View>
@@ -314,7 +336,7 @@ export default function ProposalsScreen() {
                     <Text style={styles.proposalTitle}>{proposal.activity_name}</Text>
                   </View>
                   <View style={styles.proposalActions}>
-                    {proposal.requests_count > 0 && (
+                    {(proposal.requests_count ?? 0) > 0 && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>{proposal.requests_count}</Text>
                       </View>
@@ -595,3 +617,4 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 });
+
