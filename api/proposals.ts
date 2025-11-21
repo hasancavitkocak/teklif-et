@@ -76,7 +76,7 @@ export const proposalsAPI = {
     return proposalsWithCounts as Proposal[];
   },
 
-  // Gelen başvuruları getir (optimize edilmiş - tek sorgu)
+  // Gelen başvuruları getir
   // Pending ve accepted olanları göster, rejected/auto_rejected olanları gösterme
   getReceivedRequests: async (userId: string) => {
     const { data, error } = await supabase
@@ -91,17 +91,45 @@ export const proposalsAPI = {
           id,
           activity_name,
           city,
-          creator_id,
-          creator:profiles!creator_id(name, profile_photo, birth_date)
-        ),
-        requester:profiles!requester_id(name, profile_photo, birth_date)
+          creator_id
+        )
       `)
       .eq('proposals.creator_id', userId)
       .in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as any as ProposalRequest[];
+
+    // Requester ve creator bilgilerini ayrı olarak çek
+    const requestsWithProfiles = await Promise.all(
+      (data || [])
+        .filter((request: any) => request.proposal !== null) // Null proposal'ları filtrele
+        .map(async (request: any) => {
+          const [{ data: requester }, { data: creator }] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('name, profile_photo, birth_date')
+              .eq('id', request.requester_id)
+              .single(),
+            supabase
+              .from('profiles')
+              .select('name, profile_photo, birth_date')
+              .eq('id', request.proposal.creator_id)
+              .single(),
+          ]);
+
+          return {
+            ...request,
+            requester: requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+            proposal: {
+              ...request.proposal,
+              creator: creator || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+            },
+          };
+        })
+    );
+
+    return requestsWithProfiles as any as ProposalRequest[];
   },
 
   // Gönderilen başvuruları getir
@@ -114,20 +142,50 @@ export const proposalsAPI = {
         status,
         is_super_like,
         created_at,
+        requester_id,
         proposal:proposals!proposal_id(
           id,
           activity_name,
           city,
-          creator:profiles!creator_id(name, profile_photo, birth_date)
-        ),
-        requester:profiles!requester_id(name, profile_photo, birth_date)
+          creator_id
+        )
       `)
       .eq('requester_id', userId)
       .neq('status', 'auto_rejected')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as any as ProposalRequest[];
+
+    // Requester ve creator bilgilerini ayrı olarak çek
+    const requestsWithProfiles = await Promise.all(
+      (data || [])
+        .filter((request: any) => request.proposal !== null) // Null proposal'ları filtrele
+        .map(async (request: any) => {
+          const [{ data: requester }, { data: creator }] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('name, profile_photo, birth_date')
+              .eq('id', request.requester_id)
+              .single(),
+            supabase
+              .from('profiles')
+              .select('name, profile_photo, birth_date')
+              .eq('id', request.proposal.creator_id)
+              .single(),
+          ]);
+
+          return {
+            ...request,
+            requester: requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+            proposal: {
+              ...request.proposal,
+              creator: creator || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+            },
+          };
+        })
+    );
+
+    return requestsWithProfiles as any as ProposalRequest[];
   },
 
   // Teklif oluştur
