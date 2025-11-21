@@ -47,6 +47,7 @@ export default function MatchesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<Match | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
   useEffect(() => {
     loadMatches();
@@ -54,22 +55,16 @@ export default function MatchesScreen() {
     // Real-time mesaj dinleme
     const messagesSubscription = supabase
       .channel('messages-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         loadMatches();
       })
-      .subscribe();
-
-    // Real-time eşleşme dinleme
-    const matchesSubscription = supabase
-      .channel('matches-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
         loadMatches();
       })
       .subscribe();
 
     return () => {
       messagesSubscription.unsubscribe();
-      matchesSubscription.unsubscribe();
     };
   }, []);
 
@@ -87,9 +82,11 @@ export default function MatchesScreen() {
           user1_id,
           user2_id,
           matched_at,
+          deleted_by,
           proposal:proposals(activity_name)
         `)
         .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .is('deleted_by', null)
         .order('matched_at', { ascending: false });
 
       if (error) throw error;
@@ -176,20 +173,31 @@ export default function MatchesScreen() {
   const handleDeleteMatch = async () => {
     if (!selectedMatchForMenu) return;
     
+    const matchIdToDelete = selectedMatchForMenu.id;
+    
+    // Önce UI'dan kaldır (instant)
+    setMatches(prev => prev.filter(m => m.id !== matchIdToDelete));
+    setShowDeleteConfirm(false);
+    setSelectedMatchForMenu(null);
+    
+    // Soft delete - sadece flag güncelle
     try {
       const { error } = await supabase
         .from('matches')
-        .delete()
-        .eq('id', selectedMatchForMenu.id);
+        .update({ deleted_by: user?.id })
+        .eq('id', matchIdToDelete);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Soft delete error:', error);
+        throw error;
+      }
       
-      setShowDeleteConfirm(false);
-      setSelectedMatchForMenu(null);
-      loadMatches();
+      console.log('Match soft deleted successfully');
     } catch (error: any) {
       console.error('Delete error:', error);
-      Alert.alert('Hata', error.message);
+      Alert.alert('Hata', 'Sohbet sonlandırılamadı');
+      // Hata olursa geri yükle
+      loadMatches();
     }
   };
 
@@ -219,6 +227,7 @@ export default function MatchesScreen() {
             <View key={match.id} style={styles.matchCardWrapper}>
               <TouchableOpacity
                 style={styles.matchCard}
+                activeOpacity={0.7}
                 onPress={() => {
                   router.push({
                     pathname: '/messages/[id]',
@@ -255,7 +264,12 @@ export default function MatchesScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuButton}
-                onPress={() => setSelectedMatchForMenu(match)}
+                onPress={(event) => {
+                  event.currentTarget.measure((x, y, width, height, pageX, pageY) => {
+                    setMenuPosition({ top: pageY + height, right: 16 });
+                    setSelectedMatchForMenu(match);
+                  });
+                }}
               >
                 <MoreVertical size={20} color="#8E8E93" />
               </TouchableOpacity>
@@ -280,35 +294,33 @@ export default function MatchesScreen() {
         onRequestClose={() => setSelectedMatchForMenu(null)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setSelectedMatchForMenu(null)}
         >
-          <View style={styles.modalContent}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.menuPopup, { top: menuPosition.top, right: menuPosition.right }]}
+          >
             <TouchableOpacity
-              style={styles.modalOption}
+              style={styles.menuItem}
               onPress={() => {
                 setSelectedMatchForMenu(null);
-                setShowDeleteConfirm(true);
+                setTimeout(() => setShowDeleteConfirm(true), 100);
               }}
             >
-              <XCircle size={22} color="#FF3B30" />
-              <Text style={styles.modalOptionTextDanger}>Sohbeti Sonlandır</Text>
+              <XCircle size={20} color="#FF3B30" strokeWidth={2} />
+              <Text style={styles.menuItemTextDanger}>Sohbeti Sonlandır</Text>
             </TouchableOpacity>
+            <View style={styles.menuDivider} />
             <TouchableOpacity
-              style={styles.modalOption}
+              style={styles.menuItem}
               onPress={handleReport}
             >
-              <Flag size={22} color="#8E8E93" />
-              <Text style={styles.modalOptionText}>Rapor Et</Text>
+              <Flag size={20} color="#6B7280" strokeWidth={2} />
+              <Text style={styles.menuItemText}>Rapor Et</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalOptionCancel}
-              onPress={() => setSelectedMatchForMenu(null)}
-            >
-              <Text style={styles.modalOptionCancelText}>İptal</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -445,89 +457,101 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
   },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  menuPopup: {
+    position: 'absolute',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  menuItemTextDanger: {
+    fontSize: 15,
+    color: '#FF3B30',
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 12,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    paddingBottom: 34,
-  },
-  modalOption: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: '#000',
-  },
-  modalOptionTextDanger: {
-    fontSize: 16,
-    color: '#FF3B30',
-  },
-  modalOptionCancel: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  modalOptionCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    padding: 20,
   },
   confirmModal: {
     backgroundColor: '#FFF',
-    borderRadius: 14,
-    marginHorizontal: 40,
+    borderRadius: 16,
+    marginHorizontal: 32,
     overflow: 'hidden',
   },
   confirmTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#000',
     textAlign: 'center',
-    paddingTop: 20,
-    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingHorizontal: 20,
   },
   confirmMessage: {
-    fontSize: 13,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
-    lineHeight: 18,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    lineHeight: 20,
   },
   confirmButtons: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   confirmButtonCancel: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#E5E5E5',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
   },
   confirmButtonCancelText: {
-    fontSize: 17,
-    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
   },
   confirmButtonDelete: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 14,
     alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
   },
   confirmButtonDeleteText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: '#FFF',
   },
 });

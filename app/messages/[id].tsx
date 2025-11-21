@@ -49,6 +49,7 @@ export default function MessageDetailScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -195,6 +196,13 @@ export default function MessageDetailScreen() {
     }
   };
 
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwn = item.sender_id === user?.id;
     
@@ -206,9 +214,14 @@ export default function MessageDetailScreen() {
             style={styles.avatar}
           />
         )}
-        <View style={[styles.bubble, isOwn && styles.bubbleOwn]}>
-          <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
-            {item.content}
+        <View style={styles.messageContent}>
+          <View style={[styles.bubble, isOwn && styles.bubbleOwn]}>
+            <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
+              {item.content}
+            </Text>
+          </View>
+          <Text style={[styles.timeText, isOwn && styles.timeTextOwn]}>
+            {formatTime(item.created_at)}
           </Text>
         </View>
       </View>
@@ -234,7 +247,13 @@ export default function MessageDetailScreen() {
       >
         {/* Header - Sabit */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              Keyboard.dismiss();
+              router.back();
+            }} 
+            style={styles.backButton}
+          >
             <ArrowLeft size={24} color="#000" />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
@@ -249,7 +268,15 @@ export default function MessageDetailScreen() {
               )}
             </View>
           </View>
-          <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuButton}>
+          <TouchableOpacity 
+            onPress={(event) => {
+              event.currentTarget.measure((x, y, width, height, pageX, pageY) => {
+                setMenuPosition({ top: pageY + height, right: 16 });
+                setShowMenu(true);
+              });
+            }} 
+            style={styles.menuButton}
+          >
             <MoreVertical size={22} color="#000" />
           </TouchableOpacity>
         </View>
@@ -294,37 +321,35 @@ export default function MessageDetailScreen() {
       <Modal
         visible={showMenu}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowMenu(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setShowMenu(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.menuPopup, { top: menuPosition.top, right: menuPosition.right }]}
+          >
             <TouchableOpacity
-              style={styles.modalOption}
+              style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
-                setTimeout(() => setShowDeleteConfirm(true), 300);
+                setTimeout(() => setShowDeleteConfirm(true), 100);
               }}
             >
-              <XCircle size={22} color="#FF3B30" />
-              <Text style={styles.modalOptionTextDanger}>Sohbeti Sonlandır</Text>
+              <XCircle size={20} color="#FF3B30" strokeWidth={2} />
+              <Text style={styles.menuItemTextDanger}>Sohbeti Sonlandır</Text>
             </TouchableOpacity>
+            <View style={styles.menuDivider} />
             <TouchableOpacity
-              style={styles.modalOption}
+              style={styles.menuItem}
               onPress={handleReport}
             >
-              <Flag size={22} color="#8E8E93" />
-              <Text style={styles.modalOptionText}>Rapor Et</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalOptionCancel}
-              onPress={() => setShowMenu(false)}
-            >
-              <Text style={styles.modalOptionCancelText}>İptal</Text>
+              <Flag size={20} color="#6B7280" strokeWidth={2} />
+              <Text style={styles.menuItemText}>Rapor Et</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -433,7 +458,7 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 3,
+    marginBottom: 8,
     alignItems: 'flex-end',
   },
   messageRowOwn: {
@@ -445,12 +470,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginRight: 6,
   },
+  messageContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    maxWidth: '75%',
+  },
   bubble: {
     backgroundColor: '#F0F0F0',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 18,
-    maxWidth: '70%',
+    flexShrink: 1,
   },
   bubbleOwn: {
     backgroundColor: '#8B5CF6',
@@ -462,6 +493,14 @@ const styles = StyleSheet.create({
   },
   messageTextOwn: {
     color: '#FFF',
+  },
+  timeText: {
+    fontSize: 10,
+    color: '#8E8E93',
+    marginBottom: 2,
+  },
+  timeTextOwn: {
+    color: '#8E8E93',
   },
   inputWrapper: {
     backgroundColor: '#FFF',
@@ -511,42 +550,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
   },
-  modalOverlay: {
+  menuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  modalContent: {
+  menuPopup: {
+    position: 'absolute',
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    paddingBottom: 34,
-    marginBottom: 0,
+    borderRadius: 12,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  modalOption: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
-  modalOptionText: {
-    fontSize: 16,
-    color: '#000',
+  menuItemText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
   },
-  modalOptionTextDanger: {
-    fontSize: 16,
+  menuItemTextDanger: {
+    fontSize: 15,
     color: '#FF3B30',
+    fontWeight: '500',
   },
-  modalOptionCancel: {
-    padding: 16,
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalOptionCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    padding: 20,
   },
   confirmOverlay: {
     flex: 1,
@@ -557,52 +603,55 @@ const styles = StyleSheet.create({
   },
   confirmModal: {
     backgroundColor: '#FFF',
-    borderRadius: 14,
-    width: '100%',
-    maxWidth: 320,
+    borderRadius: 16,
+    marginHorizontal: 32,
     overflow: 'hidden',
   },
   confirmTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#000',
     textAlign: 'center',
-    paddingTop: 20,
-    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingHorizontal: 20,
   },
   confirmMessage: {
-    fontSize: 13,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
-    lineHeight: 18,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    lineHeight: 20,
   },
   confirmButtons: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   confirmButtonCancel: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#E5E5E5',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
   },
   confirmButtonCancelText: {
-    fontSize: 17,
-    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
   },
   confirmButtonDelete: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 14,
     alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
   },
   confirmButtonDeleteText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: '#FFF',
   },
 });
