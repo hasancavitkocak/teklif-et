@@ -6,6 +6,8 @@ export interface DiscoverProposal {
   city: string;
   is_boosted: boolean;
   creator_id: string;
+  event_datetime?: string;
+  venue_name?: string;
   creator: {
     name: string;
     profile_photo: string;
@@ -30,6 +32,8 @@ export const discoverAPI = {
           is_boosted,
           interest_id,
           creator_id,
+          event_datetime,
+          venue_name,
           creator:profiles!creator_id(name, profile_photo, birth_date),
           interest:interests(name)
         )

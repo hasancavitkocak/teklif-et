@@ -11,9 +11,13 @@ import {
   TextInput,
   ScrollView,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -241,18 +245,66 @@ export default function DiscoverScreen() {
                   <Text style={styles.boostText}>Boost</Text>
                 </View>
               )}
-              <View style={styles.cardInfo}>
-                <Text style={styles.activityName}>{currentProposal.activity_name}</Text>
-                <Text style={styles.userName}>
-                  {currentProposal.creator.name}, {calculateAge(currentProposal.creator.birth_date)}
-                </Text>
-                <View style={styles.locationRow}>
-                  <MapPin size={16} color="#FFF" />
-                  <Text style={styles.locationText}>{currentProposal.city}</Text>
+              
+              {/* Ana Container - Yan Yana */}
+              <View style={styles.cardBottomContainer}>
+                {/* Sol Taraf - Aktivite ve Kullanıcı */}
+                <View style={styles.cardLeftInfo}>
+                  <Text style={styles.activityName}>{currentProposal.activity_name}</Text>
+                  <Text style={styles.userName}>
+                    {currentProposal.creator.name}, {calculateAge(currentProposal.creator.birth_date)}
+                  </Text>
                 </View>
-                <View style={styles.interestChip}>
-                  <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
-                </View>
+                
+                {/* Sağ Taraf - Tarih/Saat/Mekan/Konum */}
+                {(currentProposal.event_datetime || currentProposal.venue_name || currentProposal.city) && (
+                  <View style={styles.cardRightInfo}>
+                    {/* Tarih ve Saat - Yan Yana */}
+                    {currentProposal.event_datetime && (
+                      <View style={styles.dateTimeRow}>
+                        <View style={styles.infoItem}>
+                          <Calendar size={12} color="#FFF" />
+                          <Text style={styles.infoText}>
+                            {new Date(currentProposal.event_datetime).toLocaleDateString('tr-TR', {
+                              day: 'numeric',
+                              month: 'short',
+                            })}
+                          </Text>
+                        </View>
+                        <View style={styles.infoItem}>
+                          <Clock size={12} color="#FFF" />
+                          <Text style={styles.infoText}>
+                            {new Date(currentProposal.event_datetime).toLocaleTimeString('tr-TR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                    
+                    {/* Mekan ve Konum - Alt Alta */}
+                    {currentProposal.venue_name && (
+                      <View style={styles.infoItem}>
+                        <MapPin size={12} color="#FFF" />
+                        <Text style={styles.infoText} numberOfLines={1}>
+                          {currentProposal.venue_name}
+                        </Text>
+                      </View>
+                    )}
+                    {currentProposal.city && (
+                      <View style={styles.infoItem}>
+                        <MapPin size={12} color="#FFF" />
+                        <Text style={styles.infoText}>{currentProposal.city}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+              
+              {/* Kategori - En Alt */}
+              <View style={styles.interestChip}>
+                <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
               </View>
             </LinearGradient>
           </View>
@@ -389,20 +441,18 @@ function CreateProposalModal({
   const { user } = useAuth();
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
-  const [locationName, setLocationName] = useState('');
-  const [participantCount, setParticipantCount] = useState(1);
-  const [isGroup, setIsGroup] = useState(false);
+  const [venueName, setVenueName] = useState('');
+  const [userCity, setUserCity] = useState('');
+  const [eventDate, setEventDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Yarın
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [interests, setInterests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [detectingLocation, setDetectingLocation] = useState(false);
-  const [currentCity, setCurrentCity] = useState('');
-  const [showManualLocation, setShowManualLocation] = useState(false);
 
   useEffect(() => {
     if (visible) {
       loadInterests();
-      detectCurrentLocation(); // Modal açılınca otomatik konum bul
+      loadUserCity();
     }
   }, [visible]);
 
@@ -411,73 +461,76 @@ function CreateProposalModal({
     if (data) setInterests(data);
   };
 
-  const detectCurrentLocation = async () => {
-    setDetectingLocation(true);
-    try {
-      const Location = require('expo-location');
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Konum izni vermelisiniz');
-        setDetectingLocation(false);
-        return;
-      }
+  const loadUserCity = async () => {
+    if (!user?.id) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('city')
+      .eq('id', user.id)
+      .single();
+    if (profile?.city) {
+      setUserCity(profile.city);
+    }
+  };
 
-      const location = await Location.getCurrentPositionAsync({});
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+  const showDateTimePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: eventDate,
+        mode: 'date',
+        is24Hour: true,
+        onChange: (event, date) => {
+          if (event.type === 'set' && date) {
+            // Tarih seçildikten sonra saat seçiciyi aç
+            DateTimePickerAndroid.open({
+              value: date,
+              mode: 'time',
+              is24Hour: true,
+              onChange: (timeEvent, time) => {
+                if (timeEvent.type === 'set' && time) {
+                  setEventDate(time);
+                }
+              },
+            });
+          }
+        },
       });
-
-      if (address.city) {
-        setCurrentCity(address.city);
-        setLocationName(address.city);
-      } else if (address.region) {
-        setCurrentCity(address.region);
-        setLocationName(address.region);
-      }
-    } catch (error: any) {
-      console.error('Location error:', error);
-      Alert.alert('Hata', 'Konumunuz tespit edilemedi. Manuel olarak girebilirsiniz.');
-      setShowManualLocation(true);
-    } finally {
-      setDetectingLocation(false);
+    } else {
+      setShowDatePicker(true);
     }
   };
 
   const handleCreate = async () => {
-    if (!activityName.trim() || !selectedInterest || !user?.id) {
-      Alert.alert('Hata', 'Lütfen aktivite adı ve kategori seçin');
+    if (!activityName.trim()) {
+      Alert.alert('Eksik Bilgi', 'Lütfen aktivite adı girin');
+      return;
+    }
+    
+    if (!selectedInterest) {
+      Alert.alert('Eksik Bilgi', 'Lütfen kategori seçin');
       return;
     }
 
     setLoading(true);
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('city')
-        .eq('id', user.id)
-        .single();
-
       await proposalsAPI.createProposal({
-        creator_id: user.id,
+        creator_id: user!.id,
         activity_name: activityName.trim(),
         description: description.trim() || undefined,
-        location_name: locationName.trim() || undefined,
-        participant_count: participantCount,
-        is_group: isGroup,
+        participant_count: 1,
+        is_group: false,
         interest_id: selectedInterest,
-        city: currentCity || profile?.city || 'İstanbul',
+        city: userCity || 'İstanbul',
+        event_datetime: eventDate.toISOString(),
+        venue_name: venueName.trim() || undefined,
       });
 
       Alert.alert('Başarılı', 'Teklifiniz oluşturuldu');
       setActivityName('');
       setDescription('');
-      setLocationName('');
-      setParticipantCount(1);
-      setIsGroup(false);
+      setVenueName('');
+      setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
       setSelectedInterest(null);
-      setCurrentCity('');
       onCreated();
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -487,138 +540,169 @@ function CreateProposalModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+      <SafeAreaView style={styles.fullScreenModal} edges={['top', 'bottom']}>
         <View style={styles.modalContent}>
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Yeni Teklif Oluştur</Text>
-            <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalTitle}>Yeni Teklif</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#000" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={styles.inputLabel}>Aktivite *</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Ne yapmak istersin?"
-              value={activityName}
-              onChangeText={setActivityName}
-              maxLength={100}
-            />
+          {/* Content */}
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+          >
+            <ScrollView 
+              style={styles.modalBody} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+            {/* Aktivite Adı */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Ne yapmak istersin?</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Örn: Kahve içmek, Sinemaya gitmek..."
+                value={activityName}
+                onChangeText={setActivityName}
+                maxLength={100}
+                placeholderTextColor="#9CA3AF"
+                autoFocus
+              />
+            </View>
 
-            <Text style={styles.inputLabel}>Detaylar</Text>
-            <TextInput
-              style={[styles.textInput, styles.textAreaInput]}
-              placeholder="Aktivite hakkında kısa açıklama (opsiyonel)"
-              value={description}
-              onChangeText={setDescription}
-              maxLength={300}
-              multiline
-              numberOfLines={2}
-            />
+            {/* Açıklama */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Açıklama (Opsiyonel)</Text>
+              <TextInput
+                style={[styles.textInput, styles.textAreaInput]}
+                placeholder="Aktivite hakkında kısa bilgi..."
+                value={description}
+                onChangeText={setDescription}
+                maxLength={200}
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
 
-            <Text style={styles.inputLabel}>Konum</Text>
-            {detectingLocation ? (
-              <View style={styles.locationDetectButton}>
-                <MapPin size={20} color="#8B5CF6" />
-                <Text style={styles.locationDetectButtonText}>Konum bulunuyor...</Text>
-              </View>
-            ) : currentCity ? (
+            {/* Konum - Otomatik */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Konum</Text>
               <View style={styles.locationDetectedBadge}>
                 <MapPin size={18} color="#8B5CF6" />
-                <Text style={styles.locationDetectedText}>{currentCity}</Text>
+                <Text style={styles.locationDetectedText}>
+                  {userCity || 'Konum alınıyor...'}
+                </Text>
               </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.locationDetectButton}
-                onPress={detectCurrentLocation}
-              >
-                <MapPin size={20} color="#8B5CF6" />
-                <Text style={styles.locationDetectButtonText}>Konumu Bul</Text>
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.inputLabel}>Aktivite Tipi</Text>
-            <TouchableOpacity
-              style={styles.groupToggle}
-              onPress={() => {
-                setIsGroup(!isGroup);
-                if (!isGroup) {
-                  setParticipantCount(2);
-                } else {
-                  setParticipantCount(1);
-                }
-              }}
-            >
-              <View style={[styles.checkbox, isGroup && styles.checkboxActive]}>
-                {isGroup && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text style={styles.groupToggleTitle}>Grup Aktivitesi</Text>
-            </TouchableOpacity>
-
-            {isGroup && (
-              <View style={styles.participantSelector}>
-                <Text style={styles.participantLabel}>Kaç Kişi?</Text>
-                <View style={styles.participantButtons}>
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                    <TouchableOpacity
-                      key={num}
-                      style={[
-                        styles.participantButton,
-                        participantCount === num && styles.participantButtonActive,
-                      ]}
-                      onPress={() => setParticipantCount(num)}
-                    >
-                      <Text
-                        style={[
-                          styles.participantButtonText,
-                          participantCount === num && styles.participantButtonTextActive,
-                        ]}
-                      >
-                        {num}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <Text style={styles.inputLabel}>Kategori *</Text>
-            <View style={styles.interestsGrid}>
-              {interests.map(interest => (
-                <TouchableOpacity
-                  key={interest.id}
-                  style={[
-                    styles.interestOption,
-                    selectedInterest === interest.id && styles.interestOptionSelected,
-                  ]}
-                  onPress={() => setSelectedInterest(interest.id)}
-                >
-                  <Text
-                    style={[
-                      styles.interestOptionText,
-                      selectedInterest === interest.id && styles.interestOptionTextSelected,
-                    ]}
-                  >
-                    {interest.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
             </View>
-          </ScrollView>
 
-          <TouchableOpacity
-            style={[styles.createProposalButton, loading && styles.disabledButton]}
-            onPress={handleCreate}
-            disabled={loading}
-          >
-            <Text style={styles.createProposalButtonText}>
-              {loading ? 'Oluşturuluyor...' : 'Oluştur'}
-            </Text>
-          </TouchableOpacity>
+            {/* Mekan İsmi */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mekan İsmi (Opsiyonel)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Örn: Starbucks Kadıköy, Moda Sahil..."
+                value={venueName}
+                onChangeText={setVenueName}
+                maxLength={100}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+
+            {/* Tarih ve Saat */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Tarih ve Saat Seç</Text>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={showDateTimePicker}
+              >
+                <View style={styles.dateTimeDisplay}>
+                  <Calendar size={18} color="#8B5CF6" />
+                  <Text style={styles.dateTimeDisplayText}>
+                    {eventDate.toLocaleDateString('tr-TR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.dateTimeDisplay}>
+                  <Clock size={18} color="#8B5CF6" />
+                  <Text style={styles.dateTimeDisplayText}>
+                    {eventDate.toLocaleTimeString('tr-TR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Kategori */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Kategori</Text>
+              <View style={styles.interestsGrid}>
+                {interests.map(interest => (
+                  <TouchableOpacity
+                    key={interest.id}
+                    style={[
+                      styles.interestChipSmall,
+                      selectedInterest === interest.id && styles.interestChipSelected,
+                    ]}
+                    onPress={() => setSelectedInterest(interest.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.interestChipText,
+                        selectedInterest === interest.id && styles.interestChipTextSelected,
+                      ]}
+                    >
+                      {interest.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            </ScrollView>
+
+            {/* Button */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.submitButton, loading && styles.disabledButton]}
+                onPress={handleCreate}
+                disabled={loading}
+              >
+                <Text style={styles.submitButtonText}>
+                  {loading ? 'Oluşturuluyor...' : 'Oluştur'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </SafeAreaView>
+      
+      {/* DateTimePicker - Sadece iOS için */}
+      {Platform.OS === 'ios' && showDatePicker && (
+        <DateTimePicker
+          value={eventDate}
+          mode="datetime"
+          display="spinner"
+          onChange={(event, date) => {
+            if (event.type === 'set' && date) {
+              setEventDate(date);
+              setShowDatePicker(false);
+            } else if (event.type === 'dismissed') {
+              setShowDatePicker(false);
+            }
+          }}
+          minimumDate={new Date()}
+        />
+      )}
     </Modal>
   );
 }
@@ -721,26 +805,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
-  cardInfo: {
-    gap: 8,
+  cardBottomContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  cardLeftInfo: {
+    flex: 1,
+    gap: 6,
   },
   activityName: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFF',
   },
-  locationRow: {
+  cardRightInfo: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  locationText: {
-    fontSize: 16,
+  infoText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#FFF',
   },
   interestChip: {
@@ -864,38 +971,72 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 12,
-    paddingBottom: 40,
-    maxHeight: height * 0.85,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    flex: 1,
+    backgroundColor: '#FFF',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 20,
-    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   modalTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBody: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  dateTimeButton: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  dateTimeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dateTimeDisplayText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   label: {
     fontSize: 14,
@@ -906,11 +1047,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   inputLabel: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 8,
-    marginTop: 4,
+    color: '#000',
+    marginBottom: 12,
   },
   textInput: {
     backgroundColor: '#F9FAFB',
@@ -919,13 +1059,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 15,
-    color: '#1F2937',
-    marginBottom: 16,
+    fontSize: 16,
+    color: '#000',
   },
   textAreaInput: {
-    minHeight: 60,
+    minHeight: 80,
     textAlignVertical: 'top',
+    paddingTop: 14,
   },
   locationDetectButton: {
     flexDirection: 'row',
@@ -1042,8 +1182,7 @@ const styles = StyleSheet.create({
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
   },
   interestOption: {
     backgroundColor: '#F3F4F6',
@@ -1062,6 +1201,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
+  interestChipSmall: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  interestChipSelected: {
+    backgroundColor: '#8B5CF6',
+  },
+  interestChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  interestChipTextSelected: {
+    color: '#FFF',
+  },
   interestOptionTextSelected: {
     color: '#FFF',
   },
@@ -1077,9 +1233,19 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  submitButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
   disabledButton: {
-    opacity: 0.6,
-    shadowOpacity: 0.2,
+    opacity: 0.5,
   },
   createProposalButtonText: {
     fontSize: 18,

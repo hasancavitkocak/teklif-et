@@ -140,6 +140,8 @@ export const proposalsAPI = {
     is_group: boolean;
     interest_id: string;
     city: string;
+    event_datetime?: string;
+    venue_name?: string;
   }) => {
     const { data: proposal, error } = await supabase
       .from('proposals')
