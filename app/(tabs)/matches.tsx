@@ -6,16 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  FlatList,
   RefreshControl,
   Alert,
+  Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MessageCircle, Send, X as XIcon, User, XCircle } from 'lucide-react-native';
+import { MessageCircle, MoreVertical, XCircle, Flag } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
@@ -41,26 +36,16 @@ interface Match {
   unreadCount?: number;
 }
 
-interface Message {
-  id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  read: boolean;
-}
+
 
 export default function MatchesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setUnreadCount } = useUnread();
   const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<Match | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
@@ -68,18 +53,15 @@ export default function MatchesScreen() {
 
     // Real-time mesaj dinleme
     const messagesSubscription = supabase
-      .channel('messages')
+      .channel('messages-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        if (selectedMatch) {
-          loadMessages(selectedMatch.id);
-        }
-        loadMatches(); // Badge güncellemesi için
+        loadMatches();
       })
       .subscribe();
 
     // Real-time eşleşme dinleme
     const matchesSubscription = supabase
-      .channel('matches')
+      .channel('matches-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
         loadMatches();
       })
@@ -89,7 +71,7 @@ export default function MatchesScreen() {
       messagesSubscription.unsubscribe();
       matchesSubscription.unsubscribe();
     };
-  }, [selectedMatch]);
+  }, []);
 
   const loadMatches = async () => {
     if (!user?.id) {
@@ -160,48 +142,7 @@ export default function MatchesScreen() {
     }
   };
 
-  const loadMessages = async (matchId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('match_id', matchId)
-        .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
-
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('match_id', matchId)
-        .neq('sender_id', user?.id);
-    } catch (error: any) {
-      Alert.alert('Hata', error.message);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!messageText.trim() || !selectedMatch || sendingMessage) return;
-
-    setSendingMessage(true);
-    try {
-      const { error } = await supabase.from('messages').insert({
-        match_id: selectedMatch.id,
-        sender_id: user?.id,
-        content: messageText.trim(),
-      });
-
-      if (error) throw error;
-
-      setMessageText('');
-      loadMessages(selectedMatch.id);
-    } catch (error: any) {
-      Alert.alert('Hata', error.message);
-    } finally {
-      setSendingMessage(false);
-    }
-  };
 
   const calculateAge = (birthDate: string) => {
     const today = new Date();
@@ -216,43 +157,57 @@ export default function MatchesScreen() {
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Şimdi';
+    if (diffMins < 60) return `${diffMins}d`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}s`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}g`;
+    
+    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isOwn = item.sender_id === user?.id;
-    return (
-      <View style={[styles.messageWrapper, isOwn && styles.messageWrapperOwn]}>
-        {!isOwn && selectedMatch && (
-          <Image
-            source={{ uri: selectedMatch.otherUser?.profile_photo }}
-            style={styles.messageAvatar}
-          />
-        )}
-        <View style={[styles.messageBubble, isOwn && styles.messageBubbleOwn]}>
-          <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
-            {item.content}
-          </Text>
-          <View style={styles.messageFooter}>
-            <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
-              {formatTime(item.created_at)}
-            </Text>
-            {isOwn && item.read && (
-              <Text style={styles.readIndicator}>✓✓</Text>
-            )}
-          </View>
-        </View>
-        {isOwn && <View style={styles.avatarSpacer} />}
-      </View>
-    );
+  const handleDeleteMatch = async () => {
+    if (!selectedMatchForMenu) return;
+    
+    try {
+      const { error } = await supabase
+        .from('matches')
+        .delete()
+        .eq('id', selectedMatchForMenu.id);
+      
+      if (error) throw error;
+      
+      setShowDeleteConfirm(false);
+      setSelectedMatchForMenu(null);
+      loadMatches();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      Alert.alert('Hata', error.message);
+    }
   };
+
+  const handleReport = () => {
+    setSelectedMatchForMenu(null);
+    Alert.alert('Rapor Et', 'Bu özellik yakında eklenecek');
+  };
+
+
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.header}>
-        <Text style={styles.headerTitle}>Eşleşmeler</Text>
-      </LinearGradient>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Mesajlar</Text>
+      </View>
 
+      {/* Matches List */}
       <ScrollView
         style={styles.content}
         refreshControl={
@@ -261,149 +216,95 @@ export default function MatchesScreen() {
       >
         {matches.length > 0 ? (
           matches.map(match => (
-            <TouchableOpacity
-              key={match.id}
-              style={styles.matchCard}
-              onPress={() => {
-                setSelectedMatch(match);
-                loadMessages(match.id);
-              }}
-            >
-              <Image
-                source={{ uri: match.otherUser?.profile_photo }}
-                style={styles.matchImage}
-              />
-              <View style={styles.matchInfo}>
-                <Text style={styles.matchName}>
-                  {match.otherUser?.name}, {calculateAge(match.otherUser?.birth_date || '')}
-                </Text>
-                <Text style={styles.matchActivity}>{match.proposal.activity_name}</Text>
-                {match.lastMessage && (
-                  <Text style={styles.lastMessage} numberOfLines={1}>
-                    {match.lastMessage.content}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.matchIconContainer}>
-                <MessageCircle size={24} color="#8B5CF6" />
-                {match.unreadCount && match.unreadCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>
-                      {match.unreadCount > 9 ? '9+' : match.unreadCount}
+            <View key={match.id} style={styles.matchCardWrapper}>
+              <TouchableOpacity
+                style={styles.matchCard}
+                onPress={() => {
+                  router.push({
+                    pathname: '/messages/[id]',
+                    params: { id: match.id }
+                  });
+                }}
+              >
+                <Image
+                  source={{ uri: match.otherUser?.profile_photo }}
+                  style={styles.matchImage}
+                />
+                <View style={styles.matchInfo}>
+                  <View style={styles.matchHeader}>
+                    <Text style={styles.matchName}>
+                      {match.otherUser?.name}
                     </Text>
+                    {(match.unreadCount ?? 0) > 0 && (
+                      <View style={styles.unreadDot} />
+                    )}
                   </View>
-                )}
-              </View>
-            </TouchableOpacity>
+                  {match.lastMessage ? (
+                    <Text style={styles.lastMessage} numberOfLines={1}>
+                      {match.lastMessage.content}
+                    </Text>
+                  ) : (
+                    <Text style={styles.lastMessage}>Yeni eşleşme</Text>
+                  )}
+                </View>
+                <View style={styles.matchRight}>
+                  <Text style={styles.timeText}>
+                    {match.lastMessage ? formatTime(match.lastMessage.created_at) : formatTime(match.matched_at)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => setSelectedMatchForMenu(match)}
+              >
+                <MoreVertical size={20} color="#8E8E93" />
+              </TouchableOpacity>
+            </View>
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <MessageCircle size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>Henüz eşleşme yok</Text>
+            <MessageCircle size={64} color="#D1D5DB" strokeWidth={1.5} />
+            <Text style={styles.emptyText}>Mesajınız yok</Text>
             <Text style={styles.emptySubtext}>
-              Teklifleri keşfedin ve eşleşmeye başlayın
+              Yeni insanlarla tanışın ve sohbet edin
             </Text>
           </View>
         )}
       </ScrollView>
 
+      {/* Menu Modal */}
       <Modal
-        visible={!!selectedMatch}
-        animationType="slide"
-        onRequestClose={() => setSelectedMatch(null)}
-      >
-        {selectedMatch && (
-          <View style={styles.chatContainer}>
-            <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.chatHeader}>
-              <View style={styles.chatHeaderContent}>
-                <TouchableOpacity onPress={() => setSelectedMatch(null)} style={styles.chatCloseButton}>
-                  <XIcon size={24} color="#FFF" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.chatHeaderInfo}
-                  onPress={() => setShowOptionsModal(true)}
-                >
-                  <Image
-                    source={{ uri: selectedMatch.otherUser?.profile_photo }}
-                    style={styles.chatHeaderImage}
-                  />
-                  <View>
-                    <Text style={styles.chatHeaderName}>
-                      {selectedMatch.otherUser?.name}
-                    </Text>
-                    <Text style={styles.chatHeaderActivity}>
-                      {selectedMatch.proposal.activity_name}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <FlatList
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.messagesContainer}
-              style={styles.messagesList}
-            />
-
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-              style={styles.inputWrapper}
-            >
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.messageInput}
-                  placeholder="Mesaj yaz..."
-                  placeholderTextColor="#9CA3AF"
-                  value={messageText}
-                  onChangeText={setMessageText}
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity
-                  style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
-                  onPress={sendMessage}
-                  disabled={!messageText.trim() || sendingMessage}
-                >
-                  <Send size={20} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        )}
-      </Modal>
-
-      {/* Options Modal */}
-      <Modal
-        visible={showOptionsModal}
+        visible={!!selectedMatchForMenu}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowOptionsModal(false)}
+        onRequestClose={() => setSelectedMatchForMenu(null)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowOptionsModal(false)}
+          onPress={() => setSelectedMatchForMenu(null)}
         >
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Seçenekler</Text>
-            </View>
             <TouchableOpacity
               style={styles.modalOption}
               onPress={() => {
-                setShowOptionsModal(false);
+                setSelectedMatchForMenu(null);
                 setShowDeleteConfirm(true);
               }}
             >
-              <XCircle size={22} color="#EF4444" />
+              <XCircle size={22} color="#FF3B30" />
               <Text style={styles.modalOptionTextDanger}>Sohbeti Sonlandır</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.modalOption}
+              onPress={handleReport}
+            >
+              <Flag size={22} color="#8E8E93" />
+              <Text style={styles.modalOptionText}>Rapor Et</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.modalOptionCancel}
-              onPress={() => setShowOptionsModal(false)}
+              onPress={() => setSelectedMatchForMenu(null)}
             >
               <Text style={styles.modalOptionCancelText}>İptal</Text>
             </TouchableOpacity>
@@ -419,44 +320,23 @@ export default function MatchesScreen() {
         onRequestClose={() => setShowDeleteConfirm(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowDeleteConfirm(false)}
-          />
-          <View style={styles.confirmModalContent}>
-            <View style={styles.confirmModalHeader}>
-              <Text style={styles.confirmModalTitle}>Sohbeti Sonlandır</Text>
-              <Text style={styles.confirmModalMessage}>
-                Bu sohbeti sonlandırmak istediğinize emin misiniz? Tüm mesajlar silinecektir.
-              </Text>
-            </View>
-            <View style={styles.confirmModalButtons}>
+          <View style={styles.confirmModal}>
+            <Text style={styles.confirmTitle}>Sohbeti Sonlandır</Text>
+            <Text style={styles.confirmMessage}>
+              Bu sohbeti sonlandırmak istediğinize emin misiniz? Tüm mesajlar silinecektir.
+            </Text>
+            <View style={styles.confirmButtons}>
               <TouchableOpacity
-                style={styles.confirmModalButtonCancel}
+                style={styles.confirmButtonCancel}
                 onPress={() => setShowDeleteConfirm(false)}
               >
-                <Text style={styles.confirmModalButtonCancelText}>İptal</Text>
+                <Text style={styles.confirmButtonCancelText}>İptal</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.confirmModalButtonDelete}
-                onPress={async () => {
-                  try {
-                    if (selectedMatch) {
-                      await supabase
-                        .from('matches')
-                        .delete()
-                        .eq('id', selectedMatch.id);
-                      setShowDeleteConfirm(false);
-                      setSelectedMatch(null);
-                      loadMatches();
-                    }
-                  } catch (error: any) {
-                    Alert.alert('Hata', error.message);
-                  }
-                }}
+                style={styles.confirmButtonDelete}
+                onPress={handleDeleteMatch}
               >
-                <Text style={styles.confirmModalButtonDeleteText}>Sonlandır</Text>
+                <Text style={styles.confirmButtonDeleteText}>Sonlandır</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -469,361 +349,185 @@ export default function MatchesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFF',
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFF',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#000',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 100,
+  },
+  matchCardWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   matchCard: {
+    flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingLeft: 16,
+    paddingRight: 8,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: '#FFF',
+  },
+  menuButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   matchImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   matchInfo: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
+    justifyContent: 'center',
   },
-  matchName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+  matchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  matchActivity: {
-    fontSize: 15,
+  matchName: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 2,
+    color: '#000',
+    marginRight: 8,
   },
   lastMessage: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#8E8E93',
   },
-  matchIconContainer: {
-    position: 'relative',
+  matchRight: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
   },
-  unreadBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2,
-    borderColor: '#FFF',
+  timeText: {
+    fontSize: 13,
+    color: '#8E8E93',
   },
-  unreadBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFF',
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 80,
+    paddingVertical: 120,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#000',
+    marginTop: 20,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
-  },
-  chatContainer: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  chatHeader: {
-    paddingTop: 50,
-    paddingBottom: 16,
-  },
-  chatHeaderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  chatCloseButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatHeaderInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  chatHeaderImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  chatHeaderName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  chatHeaderActivity: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '500',
-  },
-  messagesList: {
-    flex: 1,
-    backgroundColor: '#FAFAFA',
-  },
-  messagesContainer: {
-    padding: 12,
-    paddingBottom: 8,
-    flexGrow: 1,
-  },
-  messageWrapper: {
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 4,
-  },
-  messageWrapperOwn: {
-    flexDirection: 'row-reverse',
-  },
-  messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 2,
-  },
-  avatarSpacer: {
-    width: 32,
-    marginLeft: 8,
-  },
-  messageBubble: {
-    backgroundColor: '#FFF',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
-    maxWidth: '70%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  messageBubbleOwn: {
-    backgroundColor: '#8B5CF6',
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    color: '#1F2937',
-    lineHeight: 20,
-  },
-  messageTextOwn: {
-    color: '#FFF',
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  messageTime: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  messageTimeOwn: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  readIndicator: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  inputWrapper: {
-    backgroundColor: '#FFF',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    paddingBottom: 16,
-    backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    alignItems: 'flex-end',
-    gap: 10,
-  },
-  messageInput: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 12,
-    fontSize: 15,
-    maxHeight: 100,
-    color: '#1F2937',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
+    color: '#8E8E93',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    paddingBottom: 34,
   },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#000',
   },
   modalOptionTextDanger: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
+    color: '#FF3B30',
   },
   modalOptionCancel: {
-    padding: 20,
-    marginHorizontal: 20,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    marginTop: 8,
+    padding: 16,
+    alignItems: 'center',
   },
   modalOptionCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6B7280',
-    textAlign: 'center',
+    color: '#007AFF',
   },
-  confirmModalContent: {
+  confirmModal: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 14,
+    marginHorizontal: 40,
     overflow: 'hidden',
-    width: '100%',
-    maxWidth: 400,
   },
-  confirmModalHeader: {
-    padding: 24,
-  },
-  confirmModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 12,
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
     textAlign: 'center',
+    paddingTop: 20,
+    paddingHorizontal: 16,
   },
-  confirmModalMessage: {
-    fontSize: 15,
-    color: '#6B7280',
+  confirmMessage: {
+    fontSize: 13,
+    color: '#8E8E93',
     textAlign: 'center',
-    lineHeight: 22,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+    lineHeight: 18,
   },
-  confirmModalButtons: {
+  confirmButtons: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#E5E5E5',
   },
-  confirmModalButtonCancel: {
+  confirmButtonCancel: {
     flex: 1,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: '#E5E5E5',
   },
-  confirmModalButtonCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
+  confirmButtonCancelText: {
+    fontSize: 17,
+    color: '#007AFF',
   },
-  confirmModalButtonDelete: {
+  confirmButtonDelete: {
     flex: 1,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
   },
-  confirmModalButtonDeleteText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#EF4444',
+  confirmButtonDeleteText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
 });
