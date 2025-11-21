@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ interface Proposal {
 
 export default function DiscoverScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -361,7 +363,7 @@ export default function DiscoverScreen() {
         onClose={() => setCreateModalVisible(false)}
         onCreated={() => {
           setCreateModalVisible(false);
-          loadProposals();
+          router.push('/(tabs)/proposals');
         }}
       />
 

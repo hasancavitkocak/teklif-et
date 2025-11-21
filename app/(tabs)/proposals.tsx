@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { Clock, Check, X as XIcon, Zap, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
@@ -68,6 +68,22 @@ export default function ProposalsScreen() {
 
   useEffect(() => {
     loadProposals();
+
+    // Real-time başvuru dinleme
+    const subscription = supabase
+      .channel('proposal-requests-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'proposal_requests' 
+      }, () => {
+        loadProposals();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadProposals = async () => {
@@ -320,9 +336,9 @@ export default function ProposalsScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.header}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>Teklifler</Text>
-      </LinearGradient>
+      </View>
 
       <View style={styles.tabsContainer}>
         <TouchableOpacity
@@ -434,61 +450,57 @@ export default function ProposalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFF',
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFF',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#000',
   },
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
     paddingHorizontal: 16,
+    paddingTop: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
   tab: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   tabActive: {
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     borderBottomColor: '#8B5CF6',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#8E8E93',
   },
   tabTextActive: {
     color: '#8B5CF6',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 100,
+    backgroundColor: '#FFF',
+    paddingTop: 12,
   },
   requestCard: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   requestImage: {
     width: 90,
@@ -577,29 +589,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   proposalCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
   },
   proposalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
   proposalTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: -0.3,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    flex: 1,
   },
   proposalActions: {
     flexDirection: 'row',
@@ -607,61 +615,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deleteButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 8,
   },
   badge: {
     backgroundColor: '#8B5CF6',
-    minWidth: 32,
-    height: 32,
+    minWidth: 28,
+    height: 28,
     paddingHorizontal: 10,
-    borderRadius: 16,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 3,
   },
   badgeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFF',
   },
   proposalCategory: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: '#8B5CF6',
-    backgroundColor: '#F3E8FF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   proposalDescription: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 12,
+    marginBottom: 8,
     lineHeight: 20,
   },
   proposalDetails: {
-    gap: 6,
-    marginBottom: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 6,
   },
   proposalDetail: {
-    fontSize: 14,
-    color: '#4B5563',
+    fontSize: 13,
+    color: '#6B7280',
   },
   proposalDate: {
     fontSize: 12,
