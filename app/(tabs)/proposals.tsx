@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,57 +14,29 @@ import { Clock, Check, X as XIcon, Zap, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
-
-interface ProposalRequest {
-  id: string;
-  status: string;
-  is_super_like: boolean;
-  created_at: string;
-  requester_id: string;
-  proposal: {
-    id: string;
-    activity_name: string;
-    city: string;
-    creator: {
-      name: string;
-      profile_photo: string;
-      birth_date: string;
-    };
-  };
-  requester: {
-    name: string;
-    profile_photo: string;
-    birth_date: string;
-  };
-}
-
-interface MyProposal {
-  id: string;
-  activity_name: string;
-  description: string;
-  location_name: string;
-  participant_count: number;
-  is_group: boolean;
-  city: string;
-  status: string;
-  created_at: string;
-  interest: {
-    name: string;
-  };
-  requests_count: number;
-}
+import { useRouter, useFocusEffect } from 'expo-router';
+import { proposalsAPI, type Proposal, type ProposalRequest } from '@/api/proposals';
 
 export default function ProposalsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setProposalsCount } = useUnread();
   const [activeTab, setActiveTab] = useState<'my_proposals' | 'received' | 'sent'>('my_proposals');
-  const [myProposals, setMyProposals] = useState<MyProposal[]>([]);
+  const [myProposals, setMyProposals] = useState<Proposal[]>([]);
   const [received, setReceived] = useState<ProposalRequest[]>([]);
   const [sent, setSent] = useState<ProposalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Sayfa her açıldığında veri yükle
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Proposals screen focused');
+      if (user?.id) {
+        loadTabData();
+      }
+    }, [activeTab, user?.id])
+  );
 
   useEffect(() => {
     loadProposals();
@@ -76,105 +48,69 @@ export default function ProposalsScreen() {
         event: '*', 
         schema: 'public', 
         table: 'proposal_requests' 
-      }, () => {
-        loadProposals();
+      }, (payload) => {
+        console.log('Proposal request change:', payload);
+        // Sadece ilgili tab'ı güncelle
+        if (user?.id) {
+          if (payload.eventType === 'INSERT' && payload.new.requester_id === user.id) {
+            // Kullanıcı başvuru yaptı - sent tab'ı güncelle
+            if (activeTab === 'sent') {
+              loadTabData();
+            }
+          } else {
+            // Başka değişiklikler - tüm veriyi yükle
+            loadProposals();
+          }
+        }
+      })
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'proposals' 
+      }, (payload) => {
+        console.log('New proposal created:', payload);
+        // Yeni teklif oluşturulduğunda otomatik yükle
+        if (user?.id && payload.new.creator_id === user.id) {
+          // Kullanıcının kendi teklifi - my_proposals tab'ı güncelle
+          if (activeTab === 'my_proposals') {
+            loadTabData();
+          }
+        }
       })
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [activeTab, user?.id]);
+
+  // Tab değiştiğinde otomatik veri yükle
+  useEffect(() => {
+    if (user?.id) {
+      console.log('Tab changed to:', activeTab);
+      loadTabData();
+    }
+  }, [activeTab]);
 
   const loadProposals = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Load user's own proposals
-      const { data: myProposalsData } = await supabase
-        .from('proposals')
-        .select(`
-          id,
-          activity_name,
-          description,
-          location_name,
-          participant_count,
-          is_group,
-          city,
-          status,
-          created_at,
-          interest:interests(name)
-        `)
-        .eq('creator_id', user?.id)
-        .order('created_at', { ascending: false });
+      // API katmanından veri al
+      const [myProposalsData, receivedData, sentData, pendingCount] = await Promise.all([
+        proposalsAPI.getMyProposals(user.id),
+        proposalsAPI.getReceivedRequests(user.id),
+        proposalsAPI.getSentRequests(user.id),
+        proposalsAPI.getPendingCount(user.id),
+      ]);
 
-      // Get request counts for each proposal
-      if (myProposalsData) {
-        const proposalsWithCounts = await Promise.all(
-          myProposalsData.map(async (proposal: any) => {
-            const { count } = await supabase
-              .from('proposal_requests')
-              .select('*', { count: 'exact', head: true })
-              .eq('proposal_id', proposal.id)
-              .eq('status', 'pending');
-            return { ...proposal, requests_count: count || 0 };
-          })
-        );
-        setMyProposals(proposalsWithCounts as any);
-      }
-
-      // Load received requests for user's proposals
-      const { data: userProposals } = await supabase
-        .from('proposals')
-        .select('id')
-        .eq('creator_id', user?.id);
-
-      const proposalIds = userProposals?.map(p => p.id) || [];
-
-      const { data: receivedData } = await supabase
-        .from('proposal_requests')
-        .select(`
-          id,
-          status,
-          is_super_like,
-          created_at,
-          requester_id,
-          proposal:proposals!proposal_id(
-            id,
-            activity_name,
-            city,
-            creator:profiles!creator_id(name, profile_photo, birth_date)
-          ),
-          requester:profiles!requester_id(name, profile_photo, birth_date)
-        `)
-        .in('proposal_id', proposalIds)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      setReceived(receivedData as any || []);
-      
-      // Bekleyen başvuru sayısını hesapla
-      const pendingCount = (receivedData || []).filter((r: any) => r.status === 'pending').length;
+      setMyProposals(myProposalsData);
+      setReceived(receivedData);
+      setSent(sentData);
       setProposalsCount(pendingCount);
-
-      // Load sent requests (user's requests to other proposals)
-      const { data: sentData } = await supabase
-        .from('proposal_requests')
-        .select(`
-          id,
-          status,
-          is_super_like,
-          created_at,
-          proposal:proposals!proposal_id(
-            id,
-            activity_name,
-            city,
-            creator:profiles!creator_id(name, profile_photo, birth_date)
-          ),
-          requester:profiles!requester_id(name, profile_photo, birth_date)
-        `)
-        .eq('requester_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      setSent(sentData as any || []);
     } catch (error: any) {
       Alert.alert('Hata', error.message);
     } finally {
@@ -183,29 +119,35 @@ export default function ProposalsScreen() {
     }
   };
 
-  const handleAccept = async (requestId: string, proposalId: string, requesterId: string) => {
+  // Tab değiştiğinde sadece o tab'ın verisini yükle
+  const loadTabData = async () => {
+    if (!user?.id) return;
+
     try {
-      const { error: updateError } = await supabase
-        .from('proposal_requests')
-        .update({ status: 'accepted' })
-        .eq('id', requestId);
+      if (activeTab === 'my_proposals') {
+        const data = await proposalsAPI.getMyProposals(user.id);
+        setMyProposals(data);
+      } else if (activeTab === 'received') {
+        const [receivedData, pendingCount] = await Promise.all([
+          proposalsAPI.getReceivedRequests(user.id),
+          proposalsAPI.getPendingCount(user.id),
+        ]);
+        setReceived(receivedData);
+        setProposalsCount(pendingCount);
+      } else if (activeTab === 'sent') {
+        const data = await proposalsAPI.getSentRequests(user.id);
+        setSent(data);
+      }
+    } catch (error: any) {
+      console.error('Tab data load error:', error);
+    }
+  };
 
-      if (updateError) throw updateError;
+  const handleAccept = async (requestId: string, proposalId: string, requesterId: string) => {
+    if (!user?.id) return;
 
-      const user1 = user?.id! < requesterId ? user?.id! : requesterId;
-      const user2 = user?.id! < requesterId ? requesterId : user?.id!;
-
-      const { data: matchData, error: matchError } = await supabase
-        .from('matches')
-        .insert({
-          proposal_id: proposalId,
-          user1_id: user1,
-          user2_id: user2,
-        })
-        .select()
-        .single();
-
-      if (matchError) throw matchError;
+    try {
+      await proposalsAPI.acceptRequest(requestId, proposalId, requesterId, user.id);
 
       Alert.alert(
         'Başarılı',
@@ -228,12 +170,7 @@ export default function ProposalsScreen() {
 
   const handleReject = async (requestId: string) => {
     try {
-      const { error } = await supabase
-        .from('proposal_requests')
-        .update({ status: 'rejected' })
-        .eq('id', requestId);
-
-      if (error) throw error;
+      await proposalsAPI.rejectRequest(requestId);
       loadProposals();
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -251,12 +188,7 @@ export default function ProposalsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('proposals')
-                .delete()
-                .eq('id', proposalId);
-
-              if (error) throw error;
+              await proposalsAPI.deleteProposal(proposalId);
               Alert.alert('Başarılı', 'Teklif silindi');
               loadProposals();
             } catch (error: any) {

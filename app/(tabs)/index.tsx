@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,30 +16,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
 
 const { width, height } = Dimensions.get('window');
-
-interface Proposal {
-  id: string;
-  activity_name: string;
-  city: string;
-  is_boosted: boolean;
-  creator_id: string;
-  creator: {
-    name: string;
-    profile_photo: string;
-    birth_date: string;
-  };
-  interest: {
-    name: string;
-  };
-}
 
 export default function DiscoverScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,68 +34,76 @@ export default function DiscoverScreen() {
   const [selectedInterest, setSelectedInterest] = useState<string>('');
   const [interests, setInterests] = useState<any[]>([]);
 
+  // Sayfa her açıldığında veri yükle
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Discover screen focused');
+      if (user?.id) {
+        loadProposals();
+      }
+    }, [user?.id, selectedCity, selectedInterest])
+  );
+
   useEffect(() => {
     loadProposals();
     loadInterests();
-  }, []);
+
+    // Real-time yeni teklif dinleme
+    const subscription = supabase
+      .channel('proposals-changes')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'proposals' 
+      }, (payload) => {
+        console.log('New proposal in feed:', payload);
+        // Yeni teklif oluşturulduğunda otomatik yükle
+        loadProposals();
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'proposals' 
+      }, (payload) => {
+        console.log('Proposal deleted:', payload);
+        // Teklif silindiğinde yükle
+        loadProposals();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id]);
+
+  // Filtre değiştiğinde otomatik yükle
+  useEffect(() => {
+    if (user?.id) {
+      loadProposals();
+    }
+  }, [selectedCity, selectedInterest]);
 
   const loadInterests = async () => {
     try {
-      const { data, error } = await supabase
-        .from('interests')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setInterests(data || []);
+      const data = await interestsAPI.getAll();
+      setInterests(data);
     } catch (error: any) {
       console.error('Error loading interests:', error.message);
     }
   };
 
   const loadProposals = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data: myRequests } = await supabase
-        .from('proposal_requests')
-        .select('proposal_id')
-        .eq('requester_id', user?.id);
-
-      const requestedProposalIds = myRequests?.map(r => r.proposal_id) || [];
-
-      let query = supabase
-        .from('proposals')
-        .select(`
-          id,
-          activity_name,
-          city,
-          is_boosted,
-          interest_id,
-          creator_id,
-          creator:profiles!creator_id(name, profile_photo, birth_date),
-          interest:interests(name)
-        `)
-        .eq('status', 'active')
-        .neq('creator_id', user?.id);
-
-      if (requestedProposalIds.length > 0) {
-        query = query.not('id', 'in', `(${requestedProposalIds.join(',')})`);
-      }
-
-      if (selectedCity) {
-        query = query.ilike('city', `%${selectedCity}%`);
-      }
-
-      if (selectedInterest) {
-        query = query.eq('interest_id', selectedInterest);
-      }
-
-      const { data, error } = await query
-        .order('is_boosted', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      setProposals(data as any || []);
+      const data = await discoverAPI.getProposals(user.id, {
+        city: selectedCity,
+        interestId: selectedInterest,
+      });
+      setProposals(data);
       setCurrentIndex(0);
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -146,109 +139,45 @@ export default function DiscoverScreen() {
   };
 
   const handleLike = async (isSuperLike = false) => {
-    if (currentIndex >= proposals.length) return;
+    if (currentIndex >= proposals.length || !user?.id) return;
 
     const proposal = proposals[currentIndex];
 
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('daily_proposals_sent, daily_super_likes_used, is_premium, last_reset_date')
-        .eq('id', user?.id)
-        .single();
+      // Gösterildi olarak işaretle
+      await discoverAPI.markAsShown(user.id, proposal.id);
 
-      if (!profile) return;
-
-      const today = new Date().toISOString().split('T')[0];
-      if (profile.last_reset_date !== today) {
-        await supabase
-          .from('profiles')
-          .update({
-            daily_proposals_sent: 0,
-            daily_super_likes_used: 0,
-            last_reset_date: today,
-          })
-          .eq('id', user?.id);
-        profile.daily_proposals_sent = 0;
-        profile.daily_super_likes_used = 0;
+      const result = await discoverAPI.likeProposal(proposal.id, user.id, isSuperLike);
+      
+      if (result.matched) {
+        Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
       }
-
-      if (!profile.is_premium && profile.daily_proposals_sent >= 5) {
-        Alert.alert('Limit Doldu', 'Premium olarak sınırsız teklif gönderebilirsiniz');
-        return;
-      }
-
-      if (isSuperLike && !profile.is_premium && profile.daily_super_likes_used >= 1) {
-        Alert.alert('Limit Doldu', 'Günlük super like hakkınız doldu');
-        return;
-      }
-
-      const { data: existingRequest } = await supabase
-        .from('proposal_requests')
-        .select('id')
-        .eq('proposal_id', proposal.id)
-        .eq('requester_id', user?.id)
-        .maybeSingle();
-
-      if (existingRequest) {
-        Alert.alert('Zaten Gönderildi', 'Bu teklife daha önce başvurdunuz');
-        setCurrentIndex(currentIndex + 1);
-        return;
-      }
-
-      const { error } = await supabase.from('proposal_requests').insert({
-        proposal_id: proposal.id,
-        requester_id: user?.id,
-        is_super_like: isSuperLike,
-      });
-
-      if (error) throw error;
-
-      const { data: reverseRequest } = await supabase
-        .from('proposal_requests')
-        .select('id, proposal_id')
-        .eq('requester_id', proposal.creator_id)
-        .maybeSingle();
-
-      if (reverseRequest && reverseRequest.proposal_id) {
-        const { data: myProposal } = await supabase
-          .from('proposals')
-          .select('id')
-          .eq('creator_id', user?.id)
-          .eq('id', reverseRequest.proposal_id)
-          .maybeSingle();
-
-        if (myProposal) {
-          const user1 = user?.id! < proposal.creator_id ? user?.id! : proposal.creator_id;
-          const user2 = user?.id! < proposal.creator_id ? proposal.creator_id : user?.id!;
-
-          await supabase.from('matches').insert({
-            proposal_id: proposal.id,
-            user1_id: user1,
-            user2_id: user2,
-          });
-
-          Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
-        }
-      }
-
-      await supabase
-        .from('profiles')
-        .update({
-          daily_proposals_sent: profile.daily_proposals_sent + 1,
-          daily_super_likes_used: isSuperLike
-            ? profile.daily_super_likes_used + 1
-            : profile.daily_super_likes_used,
-        })
-        .eq('id', user?.id);
 
       setCurrentIndex(currentIndex + 1);
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      if (error.message.includes('limit') || error.message.includes('başvurdunuz')) {
+        Alert.alert('Bilgi', error.message);
+        if (error.message.includes('başvurdunuz')) {
+          setCurrentIndex(currentIndex + 1);
+        }
+      } else {
+        Alert.alert('Hata', error.message);
+      }
     }
   };
 
-  const handlePass = () => {
+  const handlePass = async () => {
+    if (currentIndex >= proposals.length || !user?.id) return;
+
+    const proposal = proposals[currentIndex];
+
+    try {
+      // Gösterildi olarak işaretle
+      await discoverAPI.markAsShown(user.id, proposal.id);
+    } catch (error) {
+      console.error('Mark as shown error:', error);
+    }
+
     setCurrentIndex(currentIndex + 1);
   };
 
@@ -265,7 +194,7 @@ export default function DiscoverScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logoText}>Teklif Et</Text>
+        <Text style={styles.logoText}>Test</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.iconButton}
@@ -511,7 +440,7 @@ function CreateProposalModal({
   };
 
   const handleCreate = async () => {
-    if (!activityName.trim() || !selectedInterest) {
+    if (!activityName.trim() || !selectedInterest || !user?.id) {
       Alert.alert('Hata', 'Lütfen aktivite adı ve kategori seçin');
       return;
     }
@@ -521,21 +450,19 @@ function CreateProposalModal({
       const { data: profile } = await supabase
         .from('profiles')
         .select('city')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single();
 
-      const { error } = await supabase.from('proposals').insert({
-        creator_id: user?.id,
+      await proposalsAPI.createProposal({
+        creator_id: user.id,
         activity_name: activityName.trim(),
-        description: description.trim() || null,
-        location_name: locationName.trim() || null,
+        description: description.trim() || undefined,
+        location_name: locationName.trim() || undefined,
         participant_count: participantCount,
         is_group: isGroup,
         interest_id: selectedInterest,
         city: currentCity || profile?.city || 'İstanbul',
       });
-
-      if (error) throw error;
 
       Alert.alert('Başarılı', 'Teklifiniz oluşturuldu');
       setActivityName('');

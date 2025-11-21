@@ -1,0 +1,210 @@
+import { supabase } from '@/lib/supabase';
+
+export interface DiscoverProposal {
+  id: string;
+  activity_name: string;
+  city: string;
+  is_boosted: boolean;
+  creator_id: string;
+  creator: {
+    name: string;
+    profile_photo: string;
+    birth_date: string;
+  };
+  interest: {
+    name: string;
+  };
+}
+
+export const discoverAPI = {
+  // Keşfet sayfası için teklifleri getir (optimize edilmiş - feed tablosundan)
+  getProposals: async (userId: string, filters?: { city?: string; interestId?: string }) => {
+    let query = supabase
+      .from('discover_feed')
+      .select(`
+        proposal_id,
+        proposals!inner(
+          id,
+          activity_name,
+          city,
+          is_boosted,
+          interest_id,
+          creator_id,
+          creator:profiles!creator_id(name, profile_photo, birth_date),
+          interest:interests(name)
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('shown', false)
+      .order('position', { ascending: true })
+      .limit(20);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Proposals'ı düzleştir
+    const proposals = (data || [])
+      .map((item: any) => item.proposals)
+      .filter((p: any) => {
+        // Filtreler
+        if (filters?.city && !p.city?.toLowerCase().includes(filters.city.toLowerCase())) {
+          return false;
+        }
+        if (filters?.interestId && p.interest_id !== filters.interestId) {
+          return false;
+        }
+        return true;
+      });
+
+    return proposals as any as DiscoverProposal[];
+  },
+
+  // Teklif gösterildi olarak işaretle
+  markAsShown: async (userId: string, proposalId: string) => {
+    const { error } = await supabase
+      .from('discover_feed')
+      .update({ shown: true })
+      .eq('user_id', userId)
+      .eq('proposal_id', proposalId);
+
+    if (error) throw error;
+  },
+
+  // Teklife başvur (like)
+  likeProposal: async (
+    proposalId: string,
+    userId: string,
+    isSuperLike: boolean = false
+  ) => {
+    // Kullanıcı limitlerini kontrol et
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('daily_proposals_sent, daily_super_likes_used, is_premium, last_reset_date')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) throw new Error('Profil bulunamadı');
+
+    // Günlük reset kontrolü
+    const today = new Date().toISOString().split('T')[0];
+    if (profile.last_reset_date !== today) {
+      await supabase
+        .from('profiles')
+        .update({
+          daily_proposals_sent: 0,
+          daily_super_likes_used: 0,
+          last_reset_date: today,
+        })
+        .eq('id', userId);
+      profile.daily_proposals_sent = 0;
+      profile.daily_super_likes_used = 0;
+    }
+
+    // Limit kontrolü
+    if (!profile.is_premium && profile.daily_proposals_sent >= 5) {
+      throw new Error('Günlük limit doldu. Premium olarak sınırsız teklif gönderebilirsiniz.');
+    }
+
+    if (isSuperLike && !profile.is_premium && profile.daily_super_likes_used >= 1) {
+      throw new Error('Günlük super like hakkınız doldu');
+    }
+
+    // Daha önce başvuru yapılmış mı kontrol et
+    const { data: existingRequest } = await supabase
+      .from('proposal_requests')
+      .select('id')
+      .eq('proposal_id', proposalId)
+      .eq('requester_id', userId)
+      .maybeSingle();
+
+    if (existingRequest) {
+      throw new Error('Bu teklife daha önce başvurdunuz');
+    }
+
+    // Başvuru oluştur
+    const { error } = await supabase
+      .from('proposal_requests')
+      .insert({
+        proposal_id: proposalId,
+        requester_id: userId,
+        is_super_like: isSuperLike,
+      });
+
+    if (error) throw error;
+
+    // Karşılıklı başvuru kontrolü (otomatik eşleşme)
+    const { data: proposal } = await supabase
+      .from('proposals')
+      .select('creator_id')
+      .eq('id', proposalId)
+      .single();
+
+    if (proposal) {
+      const { data: reverseRequest } = await supabase
+        .from('proposal_requests')
+        .select('id, proposal_id')
+        .eq('requester_id', proposal.creator_id)
+        .maybeSingle();
+
+      if (reverseRequest && reverseRequest.proposal_id) {
+        const { data: myProposal } = await supabase
+          .from('proposals')
+          .select('id')
+          .eq('creator_id', userId)
+          .eq('id', reverseRequest.proposal_id)
+          .maybeSingle();
+
+        if (myProposal) {
+          // Otomatik eşleşme oluştur (duplicate kontrolü ile)
+          const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
+          const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
+
+          // Önce var mı kontrol et
+          const { data: existingMatch } = await supabase
+            .from('matches')
+            .select('id')
+            .eq('user1_id', user1)
+            .eq('user2_id', user2)
+            .maybeSingle();
+
+          if (!existingMatch) {
+            await supabase
+              .from('matches')
+              .insert({
+                proposal_id: proposalId,
+                user1_id: user1,
+                user2_id: user2,
+              });
+          }
+
+          // Limitler güncelle
+          await supabase
+            .from('profiles')
+            .update({
+              daily_proposals_sent: profile.daily_proposals_sent + 1,
+              daily_super_likes_used: isSuperLike
+                ? profile.daily_super_likes_used + 1
+                : profile.daily_super_likes_used,
+            })
+            .eq('id', userId);
+
+          return { matched: true };
+        }
+      }
+    }
+
+    // Limitler güncelle
+    await supabase
+      .from('profiles')
+      .update({
+        daily_proposals_sent: profile.daily_proposals_sent + 1,
+        daily_super_likes_used: isSuperLike
+          ? profile.daily_super_likes_used + 1
+          : profile.daily_super_likes_used,
+      })
+      .eq('id', userId);
+
+    return { matched: false };
+  },
+};

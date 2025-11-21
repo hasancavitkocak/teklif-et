@@ -18,23 +18,7 @@ import { ArrowLeft, Send, MoreVertical, XCircle, Flag } from 'lucide-react-nativ
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
-interface Message {
-  id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  read: boolean;
-}
-
-interface MatchInfo {
-  id: string;
-  otherUser: {
-    name: string;
-    profile_photo: string;
-  };
-  activity: string;
-}
+import { messagesAPI, type Message, type MatchInfo } from '@/api/messages';
 
 export default function MessageDetailScreen() {
   const { user } = useAuth();
@@ -87,47 +71,23 @@ export default function MessageDetailScreen() {
   }, [matchId]);
 
   const loadMatchInfo = async () => {
+    if (!user?.id || !matchId) return;
+    
     try {
-      const { data: match, error } = await supabase
-        .from('matches')
-        .select('id, user1_id, user2_id, proposal:proposals(activity_name)')
-        .eq('id', matchId)
-        .single();
-
-      if (error) throw error;
-
-      const otherUserId = match.user1_id === user?.id ? match.user2_id : match.user1_id;
-
-      const { data: otherUser } = await supabase
-        .from('profiles')
-        .select('name, profile_photo')
-        .eq('id', otherUserId)
-        .single();
-
-      setMatchInfo({
-        id: match.id,
-        otherUser: otherUser || { name: '', profile_photo: '' },
-        activity: (match.proposal as any)?.activity_name || '',
-      });
+      const data = await messagesAPI.getMatchInfo(matchId as string, user.id);
+      setMatchInfo(data);
     } catch (error) {
       console.error('Match info error:', error);
     }
   };
 
   const handleDeleteMatch = async () => {
+    if (!matchId || !user?.id) return;
+    
     console.log('Delete match called, matchId:', matchId);
     
     try {
-      const { error } = await supabase
-        .from('matches')
-        .delete()
-        .eq('id', matchId);
-      
-      if (error) {
-        console.error('Supabase delete error:', error);
-        throw error;
-      }
-      
+      await messagesAPI.deleteMatch(matchId as string, user.id);
       console.log('Match deleted successfully');
       setShowDeleteConfirm(false);
       
@@ -148,45 +108,25 @@ export default function MessageDetailScreen() {
   };
 
   const loadMessages = async () => {
+    if (!user?.id || !matchId) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('match_id', matchId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      
-      setMessages(data || []);
-
-      // Mesajları okundu olarak işaretle
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('match_id', matchId)
-        .neq('sender_id', user?.id)
-        .eq('read', false);
+      const data = await messagesAPI.getMessages(matchId as string, user.id);
+      setMessages(data);
     } catch (error) {
       console.error('Messages error:', error);
     }
   };
 
   const sendMessage = async () => {
-    if (!messageText.trim() || sendingMessage) return;
+    if (!messageText.trim() || sendingMessage || !user?.id || !matchId) return;
 
     setSendingMessage(true);
     const tempMessage = messageText.trim();
     setMessageText('');
 
     try {
-      const { error } = await supabase.from('messages').insert({
-        match_id: matchId,
-        sender_id: user?.id,
-        content: tempMessage,
-      });
-
-      if (error) throw error;
-
+      await messagesAPI.sendMessage(matchId as string, user.id, tempMessage);
       await loadMessages();
     } catch (error) {
       console.error('Send message error:', error);

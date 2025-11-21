@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,59 +14,64 @@ import { MessageCircle, MoreVertical, XCircle, Flag } from 'lucide-react-native'
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
-
-interface Match {
-  id: string;
-  user1_id: string;
-  user2_id: string;
-  matched_at: string;
-  proposal: {
-    activity_name: string;
-  };
-  otherUser: {
-    name: string;
-    profile_photo: string;
-    birth_date: string;
-  };
-  lastMessage?: {
-    content: string;
-    created_at: string;
-  };
-  unreadCount?: number;
-}
-
-
+import { useRouter, useFocusEffect } from 'expo-router';
+import { matchesAPI, type Match as MatchType } from '@/api/matches';
 
 export default function MatchesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setUnreadCount } = useUnread();
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [matches, setMatches] = useState<MatchType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<Match | null>(null);
+  const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<MatchType | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
+  // Sayfa her açıldığında veri yükle
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Matches screen focused');
+      if (user?.id) {
+        loadMatches();
+      }
+    }, [user?.id])
+  );
+
   useEffect(() => {
+    // İlk yükleme
     loadMatches();
 
     // Real-time mesaj dinleme
     const messagesSubscription = supabase
       .channel('messages-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        console.log('New message:', payload);
         loadMatches();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        console.log('Message updated:', payload);
         loadMatches();
+      })
+      .subscribe();
+
+    // Match değişikliklerini de dinle
+    const matchesSubscription = supabase
+      .channel('matches-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches' }, (payload) => {
+        console.log('New match:', payload);
+        if (user?.id && (payload.new.user1_id === user.id || payload.new.user2_id === user.id)) {
+          // Kullanıcının yeni match'i - direkt yükle
+          loadMatches();
+        }
       })
       .subscribe();
 
     return () => {
       messagesSubscription.unsubscribe();
+      matchesSubscription.unsubscribe();
     };
-  }, []);
+  }, [user?.id]);
 
   const loadMatches = async () => {
     if (!user?.id) {
@@ -75,61 +80,12 @@ export default function MatchesScreen() {
     }
     
     try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select(`
-          id,
-          user1_id,
-          user2_id,
-          matched_at,
-          deleted_by,
-          proposal:proposals(activity_name)
-        `)
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-        .is('deleted_by', null)
-        .order('matched_at', { ascending: false });
-
-      if (error) throw error;
-
-      const matchesWithUsers = await Promise.all(
-        (data || []).map(async match => {
-          const otherUserId = match.user1_id === user?.id ? match.user2_id : match.user1_id;
-
-          const { data: otherUser } = await supabase
-            .from('profiles')
-            .select('name, profile_photo, birth_date')
-            .eq('id', otherUserId)
-            .single();
-
-          const { data: lastMsg } = await supabase
-            .from('messages')
-            .select('content, created_at')
-            .eq('match_id', match.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          // Okunmamış mesaj sayısı
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('match_id', match.id)
-            .eq('read', false)
-            .neq('sender_id', user.id);
-
-          return {
-            ...match,
-            otherUser,
-            lastMessage: lastMsg,
-            unreadCount: unreadCount || 0,
-          };
-        })
-      );
-
-      setMatches(matchesWithUsers as any);
+      // API katmanından veri al
+      const data = await matchesAPI.getMatches(user.id);
+      setMatches(data);
       
-      // Kaç kişiden okunmamış mesaj var (kişi bazında)
-      const unreadPeopleCount = matchesWithUsers.filter(match => (match.unreadCount || 0) > 0).length;
+      // Kaç kişiden okunmamış mesaj var
+      const unreadPeopleCount = data.filter(match => (match.unreadCount || 0) > 0).length;
       setUnreadCount(unreadPeopleCount);
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -171,7 +127,7 @@ export default function MatchesScreen() {
   };
 
   const handleDeleteMatch = async () => {
-    if (!selectedMatchForMenu) return;
+    if (!selectedMatchForMenu || !user?.id) return;
     
     const matchIdToDelete = selectedMatchForMenu.id;
     
@@ -180,18 +136,9 @@ export default function MatchesScreen() {
     setShowDeleteConfirm(false);
     setSelectedMatchForMenu(null);
     
-    // Soft delete - sadece flag güncelle
+    // API katmanından soft delete
     try {
-      const { error } = await supabase
-        .from('matches')
-        .update({ deleted_by: user?.id })
-        .eq('id', matchIdToDelete);
-      
-      if (error) {
-        console.error('Soft delete error:', error);
-        throw error;
-      }
-      
+      await matchesAPI.deleteMatch(matchIdToDelete, user.id);
       console.log('Match soft deleted successfully');
     } catch (error: any) {
       console.error('Delete error:', error);
