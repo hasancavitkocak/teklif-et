@@ -10,8 +10,8 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, MapPin, Heart, Crown, LogOut, X, Camera } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Settings, MapPin, Heart, Crown, LogOut, X, Camera, Zap } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
@@ -149,52 +149,51 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Profil</Text>
-          <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
-            <Settings size={24} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profil</Text>
+        <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsVisible(true)}>
+          <Settings size={22} color="#8B5CF6" />
+        </TouchableOpacity>
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.profileSection}>
-          <TouchableOpacity onPress={() => setPhotoManagementVisible(true)}>
-            <Image source={{ uri: profile.profile_photo }} style={styles.profileImage} />
-            <View style={styles.editPhotoButton}>
-              <Camera size={20} color="#FFF" />
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Hero Section - Clean White */}
+        <View style={styles.heroSection}>
+          <TouchableOpacity onPress={() => setPhotoManagementVisible(true)} style={styles.profileImageContainer}>
+            <Image source={{ uri: profile.profile_photo }} style={styles.profileImageLarge} />
+            <View style={styles.editPhotoButtonLarge}>
+              <Camera size={24} color="#FFF" />
             </View>
+            {isPremium && (
+              <View style={styles.premiumBadgeLarge}>
+                <Crown size={20} color="#FFF" fill="#FFF" />
+              </View>
+            )}
           </TouchableOpacity>
-          <View style={styles.profileInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.profileName}>
-                {profile.name}, {calculateAge(profile.birth_date)}
-              </Text>
-              {isPremium && (
-                <View style={styles.premiumBadge}>
-                  <Crown size={16} color="#FFF" fill="#FFF" />
-                </View>
-              )}
-            </View>
-            <View style={styles.locationRow}>
-              <MapPin size={16} color="#6B7280" />
-              <Text style={styles.locationText}>{profile.city}</Text>
-            </View>
+          
+          <Text style={styles.profileNameLarge}>
+            {profile.name}, {calculateAge(profile.birth_date)}
+          </Text>
+          
+          <View style={styles.locationRowLarge}>
+            <MapPin size={18} color="#8B5CF6" />
+            <Text style={styles.locationTextLarge}>{profile.city}</Text>
           </View>
         </View>
 
+        {/* Stats Section - Minimal */}
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{myProposals}</Text>
-            <Text style={styles.statLabel}>Aktif Tekliflerim</Text>
+            <Text style={styles.statLabel}>Aktif Teklif</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
               {profile.is_premium ? '∞' : Math.max(0, 5 - (profile.daily_proposals_sent || 0))}
             </Text>
-            <Text style={styles.statLabel}>Kalan Teklif</Text>
+            <Text style={styles.statLabel}>Kalan</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
@@ -203,6 +202,9 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Super Like</Text>
           </View>
         </View>
+
+        {/* Content Container */}
+        <View style={styles.contentContainer}>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Fotoğraflar</Text>
@@ -263,7 +265,8 @@ export default function ProfileScreen() {
           <Text style={styles.signOutText}>Çıkış Yap</Text>
         </TouchableOpacity>
 
-        <View style={{ height: 100 }} />
+          <View style={{ height: 100 }} />
+        </View>
       </ScrollView>
 
       <PhotoManagementModal
@@ -307,7 +310,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -322,123 +325,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-  },
-  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#8B5CF6',
   },
   settingsButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 16,
   },
-  profileSection: {
-    flexDirection: 'row',
+  heroSection: {
+    paddingTop: 24,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+    alignItems: 'center',
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 20,
+  },
+  profileImageLarge: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: '#F3E8FF',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 8,
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
-  },
-  editPhotoButton: {
+  editPhotoButtonLarge: {
     position: 'absolute',
     bottom: 0,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#FFF',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  profileInfo: {
-    flex: 1,
+  premiumBadgeLarge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#F59E0B',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  profileNameLarge: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1F2937',
     marginBottom: 8,
   },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  premiumBadge: {
-    backgroundColor: '#F59E0B',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  locationRow: {
+  locationRowLarge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  locationText: {
+  locationTextLarge: {
     fontSize: 15,
-    color: '#6B7280',
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
   statsSection: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statValue: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#8B5CF6',
+    fontWeight: '800',
+    color: '#FFF',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
     textAlign: 'center',
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
   },
   section: {
     marginBottom: 24,
