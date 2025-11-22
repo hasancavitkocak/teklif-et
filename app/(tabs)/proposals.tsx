@@ -10,23 +10,35 @@ import {
   Alert,
 } from 'react-native';
 
-import { Clock, Check, X as XIcon, Zap, Trash2 } from 'lucide-react-native';
+import { Clock, Check, X as XIcon, Zap, Trash2, UserPlus } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { proposalsAPI, type Proposal, type ProposalRequest } from '@/api/proposals';
+import { invitationsAPI } from '@/api/invitations';
+import InviteUsersModal from '@/components/InviteUsersModal';
+import InvitationsList from '@/components/InvitationsList';
 
 export default function ProposalsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setProposalsCount } = useUnread();
-  const [activeTab, setActiveTab] = useState<'my_proposals' | 'received' | 'sent'>('my_proposals');
+  const [activeTab, setActiveTab] = useState<'my_proposals' | 'received' | 'sent' | 'invitations'>('my_proposals');
   const [myProposals, setMyProposals] = useState<Proposal[]>([]);
   const [received, setReceived] = useState<ProposalRequest[]>([]);
   const [sent, setSent] = useState<ProposalRequest[]>([]);
+  const [sentInvitations, setSentInvitations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sentSubTab, setSentSubTab] = useState<'invitations' | 'requests'>('invitations');
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<{
+    id: string;
+    name: string;
+    city: string;
+    interestId: string;
+  } | null>(null);
 
   // Sayfa her açıldığında veri yükle
   useFocusEffect(
@@ -100,16 +112,18 @@ export default function ProposalsScreen() {
 
     try {
       // API katmanından veri al
-      const [myProposalsData, receivedData, sentData, pendingCount] = await Promise.all([
+      const [myProposalsData, receivedData, sentData, sentInvitationsData, pendingCount] = await Promise.all([
         proposalsAPI.getMyProposals(user.id),
         proposalsAPI.getReceivedRequests(user.id),
         proposalsAPI.getSentRequests(user.id),
+        invitationsAPI.getSentInvitations(user.id),
         proposalsAPI.getPendingCount(user.id),
       ]);
 
       setMyProposals(myProposalsData);
       setReceived(receivedData);
       setSent(sentData);
+      setSentInvitations(sentInvitationsData);
       setProposalsCount(pendingCount);
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -135,8 +149,12 @@ export default function ProposalsScreen() {
         setReceived(receivedData);
         setProposalsCount(pendingCount);
       } else if (activeTab === 'sent') {
-        const data = await proposalsAPI.getSentRequests(user.id);
-        setSent(data);
+        const [sentData, sentInvitationsData] = await Promise.all([
+          proposalsAPI.getSentRequests(user.id),
+          invitationsAPI.getSentInvitations(user.id),
+        ]);
+        setSent(sentData);
+        setSentInvitations(sentInvitationsData);
       }
     } catch (error: any) {
       console.error('Tab data load error:', error);
@@ -200,6 +218,21 @@ export default function ProposalsScreen() {
     );
   };
 
+  const handleInviteUsers = (proposal: Proposal) => {
+    setSelectedProposal({
+      id: proposal.id,
+      name: proposal.activity_name,
+      city: proposal.city,
+      interestId: proposal.interest.id || '',
+    });
+    setInviteModalVisible(true);
+  };
+
+  const handleCloseInviteModal = () => {
+    setInviteModalVisible(false);
+    setSelectedProposal(null);
+  };
+
   const calculateAge = (birthDate: string) => {
     const today = new Date();
     const birth = new Date(birthDate);
@@ -209,6 +242,61 @@ export default function ProposalsScreen() {
       age--;
     }
     return age;
+  };
+
+  const renderInvitation = (invitation: any) => {
+    const statusColor =
+      invitation.status === 'accepted'
+        ? '#10B981'
+        : invitation.status === 'declined'
+        ? '#EF4444'
+        : '#F59E0B';
+
+    const statusText =
+      invitation.status === 'pending'
+        ? '📤 Gönderildi'
+        : invitation.status === 'accepted'
+        ? '✓ Kabul Edildi'
+        : '✗ Reddedildi';
+
+    return (
+      <View key={invitation.id} style={styles.requestCard}>
+        {/* Davet Badge */}
+        <View style={styles.typeBadge}>
+          <Text style={styles.typeBadgeText}>Davet</Text>
+        </View>
+        
+        <Image 
+          source={{ uri: invitation.invited_user?.profile_photo || 'https://via.placeholder.com/90' }} 
+          style={styles.requestImage} 
+        />
+        <View style={styles.requestInfo}>
+          <View style={styles.requestHeader}>
+            <Text style={styles.requestName}>
+              {invitation.invited_user?.name || 'Kullanıcı'}, {calculateAge(invitation.invited_user?.birth_date || '2000-01-01')}
+            </Text>
+          </View>
+          <Text style={styles.requestActivity}>{invitation.proposal?.activity_name || 'Teklif'}</Text>
+          <Text style={styles.requestCity}>{invitation.proposal?.city || ''}</Text>
+          <Text style={[styles.requestStatus, { color: statusColor }]}>
+            {statusText}
+          </Text>
+        </View>
+        {invitation.status === 'accepted' && (
+          <View style={{
+            width: 40,
+            height: 40,
+            backgroundColor: '#D1FAE5',
+            borderRadius: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginLeft: 8,
+          }}>
+            <Check size={16} color="#10B981" />
+          </View>
+        )}
+      </View>
+    );
   };
 
   const renderRequest = (request: ProposalRequest, type: 'received' | 'sent') => {
@@ -235,6 +323,13 @@ export default function ProposalsScreen() {
 
     return (
       <View key={request.id} style={styles.requestCard}>
+        {/* İstek Badge - Sadece sent tab'ında göster */}
+        {type === 'sent' && (
+          <View style={[styles.typeBadge, styles.typeBadgeRequest]}>
+            <Text style={styles.typeBadgeText}>İstek</Text>
+          </View>
+        )}
+        
         <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
         <View style={styles.requestInfo}>
           <View style={styles.requestHeader}>
@@ -319,6 +414,14 @@ export default function ProposalsScreen() {
             Gönderilen
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'invitations' && styles.tabActive]}
+          onPress={() => setActiveTab('invitations')}
+        >
+          <Text style={[styles.tabText, activeTab === 'invitations' && styles.tabTextActive]}>
+            Davetler
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -341,6 +444,12 @@ export default function ProposalsScreen() {
                         <Text style={styles.badgeText}>{proposal.requests_count}</Text>
                       </View>
                     )}
+                    <TouchableOpacity
+                      onPress={() => handleInviteUsers(proposal)}
+                      style={styles.inviteButton}
+                    >
+                      <UserPlus size={18} color="#8B5CF6" />
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteProposal(proposal.id)}
                       style={styles.deleteButton}
@@ -388,15 +497,91 @@ export default function ProposalsScreen() {
               <Text style={styles.emptyText}>Henüz başvuru yok</Text>
             </View>
           )
-        ) : sent.length > 0 ? (
-          sent.map(request => renderRequest(request, 'sent'))
+        ) : activeTab === 'sent' ? (
+          <>
+            {/* Alt Tab'lar */}
+            <View style={styles.subTabsContainer}>
+              <TouchableOpacity
+                style={[styles.subTab, sentSubTab === 'invitations' && styles.subTabActive]}
+                onPress={() => setSentSubTab('invitations')}
+              >
+                <Text style={[styles.subTabText, sentSubTab === 'invitations' && styles.subTabTextActive]}>
+                  Davetler
+                </Text>
+                {sentInvitations.length > 0 && (
+                  <View style={[
+                    styles.subTabBadge,
+                    sentSubTab === 'invitations' && styles.subTabBadgeActive
+                  ]}>
+                    <Text style={[
+                      styles.subTabBadgeText,
+                      sentSubTab === 'invitations' && styles.subTabBadgeTextActive
+                    ]}>
+                      {sentInvitations.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.subTab, sentSubTab === 'requests' && styles.subTabActive]}
+                onPress={() => setSentSubTab('requests')}
+              >
+                <Text style={[styles.subTabText, sentSubTab === 'requests' && styles.subTabTextActive]}>
+                  İstekler
+                </Text>
+                {sent.length > 0 && (
+                  <View style={[
+                    styles.subTabBadge,
+                    sentSubTab === 'requests' && styles.subTabBadgeActive
+                  ]}>
+                    <Text style={[
+                      styles.subTabBadgeText,
+                      sentSubTab === 'requests' && styles.subTabBadgeTextActive
+                    ]}>
+                      {sent.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* İçerik */}
+            {sentSubTab === 'invitations' ? (
+              sentInvitations.length > 0 ? (
+                sentInvitations.map(invitation => renderInvitation(invitation))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Clock size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>Henüz gönderilen davet yok</Text>
+                </View>
+              )
+            ) : (
+              sent.length > 0 ? (
+                sent.map(request => renderRequest(request, 'sent'))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Clock size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>Henüz gönderilen istek yok</Text>
+                </View>
+              )
+            )}
+          </>
         ) : (
-          <View style={styles.emptyContainer}>
-            <Clock size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>Henüz gönderilen başvuru yok</Text>
-          </View>
+          <InvitationsList />
         )}
       </ScrollView>
+
+      {/* Invite Users Modal */}
+      {selectedProposal && (
+        <InviteUsersModal
+          visible={inviteModalVisible}
+          onClose={handleCloseInviteModal}
+          proposalId={selectedProposal.id}
+          proposalName={selectedProposal.name}
+          proposalCity={selectedProposal.city}
+          proposalInterestId={selectedProposal.interestId}
+        />
+      )}
     </View>
   );
 }
@@ -455,6 +640,31 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    position: 'relative',
+  },
+  typeBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    zIndex: 10,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeBadgeRequest: {
+    backgroundColor: '#6366F1',
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.5,
   },
   requestImage: {
     width: 90,
@@ -571,6 +781,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 8,
   },
+  inviteButton: {
+    padding: 8,
+  },
   badge: {
     backgroundColor: '#8B5CF6',
     minWidth: 28,
@@ -615,6 +828,66 @@ const styles = StyleSheet.create({
   proposalDate: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  subTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  subTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFF',
+    gap: 6,
+  },
+  subTabActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  subTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  subTabTextActive: {
+    color: '#FFF',
+  },
+  subTabBadge: {
+    backgroundColor: '#E5E7EB',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  subTabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  subTabBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  subTabBadgeTextActive: {
+    color: '#FFF',
   },
 });
 

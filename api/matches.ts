@@ -125,21 +125,18 @@ export const matchesAPI = {
 
     if (!matches || matches.length === 0) return 0;
 
-    let unreadPeopleCount = 0;
+    const matchIds = matches.map(m => m.id);
 
-    for (const match of matches) {
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('match_id', match.id)
-        .eq('read', false)
-        .neq('sender_id', userId);
+    // Tek sorguda tüm okunmamış mesajları al
+    const { data: unreadMessages } = await supabase
+      .from('messages')
+      .select('match_id')
+      .in('match_id', matchIds)
+      .eq('read', false)
+      .neq('sender_id', userId);
 
-      if (count && count > 0) {
-        unreadPeopleCount++;
-      }
-    }
-
-    return unreadPeopleCount;
+    // Kaç farklı match'te okunmamış mesaj var
+    const uniqueMatches = new Set(unreadMessages?.map(m => m.match_id) || []);
+    return uniqueMatches.size;
   },
 };

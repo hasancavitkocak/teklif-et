@@ -42,6 +42,13 @@ export default function NotificationsScreen() {
       case 'new_request':
         router.push('/(tabs)/proposals');
         break;
+      case 'proposal_invitation':
+        // Davetler için ayrı bir ekran veya proposals ekranı
+        router.push('/(tabs)/proposals');
+        break;
+      case 'invitation_accepted':
+        router.push('/(tabs)/matches');
+        break;
       default:
         break;
     }
@@ -70,6 +77,10 @@ export default function NotificationsScreen() {
         return <UserCheck size={24} color="#10B981" />;
       case 'new_request':
         return <Bell size={24} color="#F59E0B" />;
+      case 'proposal_invitation':
+        return <MessageCircle size={24} color="#EC4899" />;
+      case 'invitation_accepted':
+        return <UserCheck size={24} color="#10B981" />;
       default:
         return <Bell size={24} color="#6B7280" />;
     }

@@ -11,6 +11,7 @@ export interface Proposal {
   status: string;
   created_at: string;
   interest: {
+    id?: string;
     name: string;
   };
   requests_count?: number;
@@ -54,7 +55,7 @@ export const proposalsAPI = {
         city,
         status,
         created_at,
-        interest:interests(name)
+        interest:interests(id, name)
       `)
       .eq('creator_id', userId)
       .order('created_at', { ascending: false });
@@ -92,6 +93,11 @@ export const proposalsAPI = {
           activity_name,
           city,
           creator_id
+        ),
+        requester:profiles!requester_id(
+          name,
+          profile_photo,
+          birth_date
         )
       `)
       .eq('proposals.creator_id', userId)
@@ -100,36 +106,26 @@ export const proposalsAPI = {
 
     if (error) throw error;
 
-    // Requester ve creator bilgilerini ayrı olarak çek
-    const requestsWithProfiles = await Promise.all(
-      (data || [])
-        .filter((request: any) => request.proposal !== null) // Null proposal'ları filtrele
-        .map(async (request: any) => {
-          const [{ data: requester }, { data: creator }] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('name, profile_photo, birth_date')
-              .eq('id', request.requester_id)
-              .single(),
-            supabase
-              .from('profiles')
-              .select('name, profile_photo, birth_date')
-              .eq('id', request.proposal.creator_id)
-              .single(),
-          ]);
+    // Creator bilgilerini tek sorguda çek
+    const validRequests = (data || []).filter((request: any) => request.proposal !== null);
+    if (validRequests.length === 0) return [];
 
-          return {
-            ...request,
-            requester: requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
-            proposal: {
-              ...request.proposal,
-              creator: creator || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
-            },
-          };
-        })
-    );
+    const creatorIds = [...new Set(validRequests.map((r: any) => r.proposal.creator_id))];
+    const { data: creators } = await supabase
+      .from('profiles')
+      .select('id, name, profile_photo, birth_date')
+      .in('id', creatorIds);
 
-    return requestsWithProfiles as any as ProposalRequest[];
+    const creatorMap = new Map(creators?.map(c => [c.id, c]) || []);
+
+    return validRequests.map((request: any) => ({
+      ...request,
+      requester: request.requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+      proposal: {
+        ...request.proposal,
+        creator: creatorMap.get(request.proposal.creator_id) || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+      },
+    })) as any as ProposalRequest[];
   },
 
   // Gönderilen başvuruları getir
@@ -148,6 +144,11 @@ export const proposalsAPI = {
           activity_name,
           city,
           creator_id
+        ),
+        requester:profiles!requester_id(
+          name,
+          profile_photo,
+          birth_date
         )
       `)
       .eq('requester_id', userId)
@@ -156,36 +157,26 @@ export const proposalsAPI = {
 
     if (error) throw error;
 
-    // Requester ve creator bilgilerini ayrı olarak çek
-    const requestsWithProfiles = await Promise.all(
-      (data || [])
-        .filter((request: any) => request.proposal !== null) // Null proposal'ları filtrele
-        .map(async (request: any) => {
-          const [{ data: requester }, { data: creator }] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('name, profile_photo, birth_date')
-              .eq('id', request.requester_id)
-              .single(),
-            supabase
-              .from('profiles')
-              .select('name, profile_photo, birth_date')
-              .eq('id', request.proposal.creator_id)
-              .single(),
-          ]);
+    // Creator bilgilerini tek sorguda çek
+    const validRequests = (data || []).filter((request: any) => request.proposal !== null);
+    if (validRequests.length === 0) return [];
 
-          return {
-            ...request,
-            requester: requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
-            proposal: {
-              ...request.proposal,
-              creator: creator || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
-            },
-          };
-        })
-    );
+    const creatorIds = [...new Set(validRequests.map((r: any) => r.proposal.creator_id))];
+    const { data: creators } = await supabase
+      .from('profiles')
+      .select('id, name, profile_photo, birth_date')
+      .in('id', creatorIds);
 
-    return requestsWithProfiles as any as ProposalRequest[];
+    const creatorMap = new Map(creators?.map(c => [c.id, c]) || []);
+
+    return validRequests.map((request: any) => ({
+      ...request,
+      requester: request.requester || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+      proposal: {
+        ...request.proposal,
+        creator: creatorMap.get(request.proposal.creator_id) || { name: 'Unknown', profile_photo: '', birth_date: '2000-01-01' },
+      },
+    })) as any as ProposalRequest[];
   },
 
   // Teklif oluştur
