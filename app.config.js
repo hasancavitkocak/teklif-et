@@ -51,6 +51,11 @@ module.exports = {
     plugins: ["expo-router", "expo-font", "expo-web-browser"],
     experiments: {
       typedRoutes: true
+    },
+    extra: {
+      eas: {
+        projectId: "e641448f-0ea3-41cd-bd11-0add24fd7573"
+      }
     }
   }
 };
