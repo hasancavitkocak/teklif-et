@@ -43,8 +43,7 @@ export default function PhotosScreen() {
 
       // Kamerayı aç
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [3, 4],
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -86,8 +85,7 @@ export default function PhotosScreen() {
       // Galeriyi aç
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -249,57 +247,61 @@ export default function PhotosScreen() {
           </Text>
         </View>
 
-        <ScrollView
-          style={styles.photosContainer}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.photosContent}
-        >
-          <View style={styles.photosGrid}>
-            {photos.map((photo, index) => (
-              <View key={index} style={styles.photoWrapper}>
-                <Image source={{ uri: photo }} style={styles.photo} />
-                {index === 0 && (
-                  <View style={styles.primaryBadge}>
-                    <Text style={styles.primaryText}>Ana Fotoğraf</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => {
-                    console.log('Delete button clicked for index:', index);
-                    removePhoto(index);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <X size={16} color="#FFF" strokeWidth={3} />
-                </TouchableOpacity>
+        <View style={styles.uploadSection}>
+          <View style={styles.uploadButtons}>
+            <TouchableOpacity
+              style={styles.addPhotoCard}
+              onPress={openCamera}
+              activeOpacity={0.7}
+            >
+              <View style={styles.addPhotoContent}>
+                <View style={styles.addPhotoIconContainer}>
+                  <CameraIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                </View>
+                <Text style={styles.addPhotoText}>Kamera</Text>
               </View>
-            ))}
-            {photos.length < 6 && (
-              <View style={styles.addPhotoCard}>
-                <View style={styles.addPhotoButtons}>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addPhotoCard}
+              onPress={openGallery}
+              activeOpacity={0.7}
+            >
+              <View style={styles.addPhotoContent}>
+                <View style={styles.addPhotoIconContainer}>
+                  <ImageIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                </View>
+                <Text style={styles.addPhotoText}>Galeri</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {photos.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.photosScrollContainer}
+              contentContainerStyle={styles.photosScrollContent}
+            >
+              {photos.map((photo, index) => (
+                <View key={index} style={styles.photoThumbnail}>
+                  <Image source={{ uri: photo }} style={styles.thumbnailImage} />
+                  {index === 0 && (
+                    <View style={styles.primaryBadgeSmall}>
+                      <Text style={styles.primaryTextSmall}>Ana</Text>
+                    </View>
+                  )}
                   <TouchableOpacity
-                    style={styles.addPhotoButton}
-                    onPress={openCamera}
-                    activeOpacity={0.8}
+                    style={styles.removeButtonSmall}
+                    onPress={() => removePhoto(index)}
+                    activeOpacity={0.7}
                   >
-                    <CameraIcon size={32} color="#8B5CF6" strokeWidth={2} />
-                    <Text style={styles.addPhotoText}>Kamera</Text>
-                  </TouchableOpacity>
-                  <View style={styles.buttonDivider} />
-                  <TouchableOpacity
-                    style={styles.addPhotoButton}
-                    onPress={openGallery}
-                    activeOpacity={0.8}
-                  >
-                    <ImageIcon size={32} color="#8B5CF6" strokeWidth={2} />
-                    <Text style={styles.addPhotoText}>Galeri</Text>
+                    <X size={14} color="#FFF" strokeWidth={3} />
                   </TouchableOpacity>
                 </View>
-              </View>
-            )}
-          </View>
-        </ScrollView>
+              ))}
+            </ScrollView>
+          )}
+        </View>
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -373,96 +375,92 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontWeight: '400',
   },
-  photosContainer: {
+  uploadSection: {
     flex: 1,
     marginBottom: 16,
   },
-  photosContent: {
-    paddingBottom: 16,
-  },
-  photosGrid: {
+  uploadButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 20,
   },
-  photoWrapper: {
-    width: '48%',
-    aspectRatio: 3 / 4,
-    borderRadius: 16,
+  photosScrollContainer: {
+    maxHeight: 120,
+  },
+  photosScrollContent: {
+    gap: 12,
+    paddingRight: 12,
+  },
+  photoThumbnail: {
+    width: 90,
+    height: 120,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#F3F4F6',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 3,
   },
-  photo: {
+  thumbnailImage: {
     width: '100%',
     height: '100%',
   },
-  primaryBadge: {
+  primaryBadgeSmall: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: 8,
+    left: 8,
     backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  primaryText: {
-    fontSize: 12,
+  primaryTextSmall: {
+    fontSize: 10,
     fontWeight: '600',
     color: '#8B5CF6',
   },
-  removeButton: {
+  removeButtonSmall: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 8,
+    right: 8,
     backgroundColor: 'rgba(0,0,0,0.75)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   addPhotoCard: {
     width: '48%',
-    aspectRatio: 3 / 4,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
+    height: 120,
+    backgroundColor: '#F9F5FF',
+    borderRadius: 14,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
+    borderColor: '#E9D5FF',
+    borderStyle: 'solid',
   },
-  addPhotoButtons: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  addPhotoButton: {
+  addPhotoContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  buttonDivider: {
-    width: 1,
-    height: '100%',
-    backgroundColor: '#E5E7EB',
+  addPhotoIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F0FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addPhotoText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: '#6B7280',
   },
   footer: {
     paddingTop: 16,
