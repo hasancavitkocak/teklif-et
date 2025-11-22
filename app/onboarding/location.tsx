@@ -1,23 +1,18 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, MapPin, Navigation } from 'lucide-react-native';
+import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
-
-const TURKISH_CITIES = [
-  'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya', 'Adana', 'Konya', 'Gaziantep',
-  'Şanlıurfa', 'Mersin', 'Kocaeli', 'Diyarbakır', 'Hatay', 'Manisa', 'Kayseri',
-  'Samsun', 'Denizli', 'Eskişehir', 'Trabzon', 'Sakarya', 'Balıkesir', 'Malatya',
-];
 
 export default function LocationScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [city, setCity] = useState('');
   const [loading, setLoading] = useState(false);
-  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(true);
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -26,67 +21,63 @@ export default function LocationScreen() {
   };
 
   useEffect(() => {
-    // Sayfa açılınca otomatik konum tespiti başlat
-    if (Platform.OS !== 'web') {
-      detectLocation();
-    }
+    detectLocation();
   }, []);
 
   const detectLocation = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Web\'de Konum Tespiti',
-        'Web tarayıcısında konum tespiti şu anda desteklenmiyor. Lütfen şehrinizi manuel olarak seçin.'
-      );
-      return;
-    }
-
     try {
       setDetectingLocation(true);
-      triggerHaptic();
 
       const Location = require('expo-location');
-      console.log('Requesting location permission...');
-
+      
       const { status } = await Location.requestForegroundPermissionsAsync();
-      console.log('Location permission status:', status);
 
       if (status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Konumunuzu tespit etmek için konum iznine ihtiyacımız var.');
-        setDetectingLocation(false);
+        Alert.alert(
+          'İzin Gerekli', 
+          'Konumunuzu tespit etmek için konum iznine ihtiyacımız var.',
+          [{ text: 'Tamam', onPress: () => router.back() }]
+        );
         return;
       }
 
-      console.log('Getting current position...');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      console.log('Location:', location);
 
-      console.log('Reverse geocoding...');
       const results = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       });
-      console.log('Geocode results:', results);
 
       if (results && results.length > 0) {
         const result = results[0];
-        if (result.city) {
-          setCity(result.city);
-          triggerHaptic();
-        } else if (result.region) {
-          setCity(result.region);
+        const detectedCity = result.city || result.region || result.subregion;
+        
+        if (detectedCity) {
+          setCity(detectedCity);
           triggerHaptic();
         } else {
-          Alert.alert('Hata', 'Şehir bilgisi bulunamadı. Lütfen manuel olarak seçin.');
+          Alert.alert(
+            'Hata', 
+            'Şehir bilgisi bulunamadı.',
+            [{ text: 'Tamam', onPress: () => router.back() }]
+          );
         }
       } else {
-        Alert.alert('Hata', 'Konum bilgisi alınamadı. Lütfen manuel olarak seçin.');
+        Alert.alert(
+          'Hata', 
+          'Konum bilgisi alınamadı.',
+          [{ text: 'Tamam', onPress: () => router.back() }]
+        );
       }
     } catch (error: any) {
       console.error('Location error:', error);
-      Alert.alert('Hata', `Konumunuz tespit edilemedi: ${error.message}. Lütfen manuel olarak seçin.`);
+      Alert.alert(
+        'Hata', 
+        'Konumunuz tespit edilemedi.',
+        [{ text: 'Tamam', onPress: () => router.back() }]
+      );
     } finally {
       setDetectingLocation(false);
     }
@@ -94,7 +85,7 @@ export default function LocationScreen() {
 
   const handleContinue = async () => {
     if (!city.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen şehrinizi seçin veya girin');
+      Alert.alert('Eksik Bilgi', 'Konum tespit edilemedi');
       return;
     }
 
@@ -118,12 +109,8 @@ export default function LocationScreen() {
     }
   };
 
-  const filteredCities = TURKISH_CITIES.filter(c =>
-    c.toLowerCase().includes(city.toLowerCase()) || !city
-  ).slice(0, 12);
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
         <View style={[styles.progress, { width: '84%' }]} />
       </View>
@@ -141,80 +128,43 @@ export default function LocationScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.stepIndicator}>Adım 6/7</Text>
-          <Text style={styles.title}>Neredesiniz?</Text>
-          <Text style={styles.subtitle}>Şehrinizi seçin veya tespit edin</Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.detectButton}
-          onPress={detectLocation}
-          disabled={detectingLocation}
-          activeOpacity={0.8}
-        >
-          <View style={styles.detectButtonIcon}>
-            <Navigation size={20} color="#8B5CF6" strokeWidth={2.5} />
+        <View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.stepIndicator}>Adım 6/7</Text>
+            <Text style={styles.title}>Neredesiniz?</Text>
+            <Text style={styles.subtitle}>Konumunuz otomatik tespit ediliyor</Text>
           </View>
-          <Text style={styles.detectButtonText}>
-            {detectingLocation ? 'Konum tespit ediliyor...' : 'Konumumu Tespit Et'}
-          </Text>
-        </TouchableOpacity>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>veya</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <MapPin size={20} color="#8E8E93" strokeWidth={2} />
-          <TextInput
-            style={styles.input}
-            placeholder="Şehir ara..."
-            placeholderTextColor="#C7C7CC"
-            value={city}
-            onChangeText={setCity}
-            autoCapitalize="words"
-          />
-        </View>
-
-        <View style={styles.citiesContainer}>
-          {filteredCities.map(cityName => (
-            <TouchableOpacity
-              key={cityName}
-              style={[
-                styles.cityChip,
-                city === cityName && styles.cityChipSelected,
-              ]}
-              onPress={() => {
-                triggerHaptic();
-                setCity(cityName);
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.cityText,
-                  city === cityName && styles.cityTextSelected,
-                ]}
-              >
-                {cityName}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {detectingLocation ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Konumunuz tespit ediliyor...</Text>
+            </View>
+          ) : (
+            <View style={styles.locationContainer}>
+              <View style={styles.locationCard}>
+                <View style={styles.locationIcon}>
+                  <MapPin size={24} color="#8B5CF6" strokeWidth={2.5} />
+                </View>
+                <View style={styles.locationInfo}>
+                  <Text style={styles.locationLabel}>Tespit Edilen Konum</Text>
+                  <Text style={styles.locationText}>{city}</Text>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
-          style={[styles.button, (!city.trim() || loading) && styles.disabledButton]}
+          style={[styles.button, (!city.trim() || loading || detectingLocation) && styles.disabledButton]}
           onPress={handleContinue}
-          disabled={!city.trim() || loading}
+          disabled={!city.trim() || loading || detectingLocation}
           activeOpacity={0.8}
         >
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -246,6 +196,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 20,
+    justifyContent: 'space-between',
   },
   titleContainer: {
     marginBottom: 24,
@@ -270,101 +222,54 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontWeight: '400',
   },
-  detectButton: {
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 17,
+    color: '#8E8E93',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  locationContainer: {
+    paddingVertical: 20,
+  },
+  locationCard: {
     backgroundColor: '#FFF',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 14,
+    borderRadius: 16,
+    padding: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
+    gap: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  detectButtonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+  locationIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F0FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  detectButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#8B5CF6',
+  locationInfo: {
     flex: 1,
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    fontSize: 15,
+  locationLabel: {
+    fontSize: 14,
     color: '#8E8E93',
     fontWeight: '500',
+    marginBottom: 4,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 20,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  input: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '400',
+  locationText: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#111827',
-  },
-  citiesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
-  cityChip: {
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  cityChipSelected: {
-    backgroundColor: '#8B5CF6',
-    shadowColor: '#8B5CF6',
-    shadowOpacity: 0.3,
-  },
-  cityText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  cityTextSelected: {
-    color: '#FFF',
   },
   button: {
     backgroundColor: '#8B5CF6',

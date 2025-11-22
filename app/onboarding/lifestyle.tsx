@@ -88,6 +88,20 @@ export default function LifestyleScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.optionButton, smoking === 'occasionally' && styles.optionButtonSelected]}
+              onPress={() => {
+                triggerHaptic();
+                setSmoking('occasionally');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[styles.optionText, smoking === 'occasionally' && styles.optionTextSelected]}
+              >
+                Bazen
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.optionButton, smoking === 'never' && styles.optionButtonSelected]}
               onPress={() => {
                 triggerHaptic();
@@ -119,6 +133,20 @@ export default function LifestyleScreen() {
                 style={[styles.optionText, drinking === 'regularly' && styles.optionTextSelected]}
               >
                 Evet
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.optionButton, drinking === 'occasionally' && styles.optionButtonSelected]}
+              onPress={() => {
+                triggerHaptic();
+                setDrinking('occasionally');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[styles.optionText, drinking === 'occasionally' && styles.optionTextSelected]}
+              >
+                Bazen
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
