@@ -11,11 +11,12 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, MapPin, Heart, Crown, LogOut, X, Camera, Zap } from 'lucide-react-native';
+import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import PhotoManagementModal from '@/components/PhotoManagementModal';
+import { PROVINCES } from '@/constants/cities';
 
 interface Profile {
   name: string;
@@ -28,6 +29,7 @@ interface Profile {
   is_premium: boolean;
   daily_proposals_sent: number;
   daily_super_likes_used: number;
+  phone: string;
 }
 
 export default function ProfileScreen() {
@@ -41,6 +43,14 @@ export default function ProfileScreen() {
   const [photoManagementVisible, setPhotoManagementVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCity, setEditCity] = useState('');
+  const [editSmoking, setEditSmoking] = useState('');
+  const [editDrinking, setEditDrinking] = useState('');
+  const [editingCity, setEditingCity] = useState(false);
+  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
+  const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
+  const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -55,9 +65,13 @@ export default function ProfileScreen() {
         .single();
 
       if (profileData) {
-        setProfile(profileData);
+        // Telefon numarasını user metadata'dan al
+        const phoneNumber = user?.user_metadata?.phone || user?.phone || '';
+        setProfile({ ...profileData, phone: phoneNumber });
         setEditName(profileData.name);
         setEditCity(profileData.city);
+        setEditSmoking(profileData.smoking);
+        setEditDrinking(profileData.drinking);
       }
 
       const { data: interestsData } = await supabase
@@ -116,6 +130,8 @@ export default function ProfileScreen() {
         .update({
           name: editName,
           city: editCity,
+          smoking: editSmoking,
+          drinking: editDrinking,
         })
         .eq('id', user?.id);
 
@@ -127,6 +143,109 @@ export default function ProfileScreen() {
     } catch (error: any) {
       Alert.alert('Hata', error.message);
     }
+  };
+
+  const handleFreezeAccount = () => {
+    Alert.alert(
+      'Hesabı Dondur',
+      'Hesabınızı dondurmak istediğinize emin misiniz? Profiliniz başkaları tarafından görüntülenemeyecek.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Dondur',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('profiles')
+                .update({ is_active: false })
+                .eq('id', user?.id);
+
+              if (error) throw error;
+
+              Alert.alert('Başarılı', 'Hesabınız donduruldu');
+              setSettingsVisible(false);
+            } catch (error: any) {
+              Alert.alert('Hata', error.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Hesabı Sil',
+      'Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz silinecektir.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Son Uyarı',
+              'Hesabınızı kalıcı olarak silmek üzeresiniz. Devam etmek istiyor musunuz?',
+              [
+                { text: 'İptal', style: 'cancel' },
+                {
+                  text: 'Evet, Sil',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      // Önce profil fotoğraflarını sil
+                      await supabase
+                        .from('profile_photos')
+                        .delete()
+                        .eq('profile_id', user?.id);
+
+                      // Profili sil
+                      await supabase
+                        .from('profiles')
+                        .delete()
+                        .eq('id', user?.id);
+
+                      // Kullanıcıyı çıkış yap
+                      await signOut();
+                      router.replace('/auth/welcome');
+                    } catch (error: any) {
+                      Alert.alert('Hata', error.message);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleChangeLocation = () => {
+    if (!isPremium) {
+      setShowPremiumAlert(true);
+      return;
+    }
+    setEditingCity(true);
+  };
+
+  const handleCitySelectionComplete = () => {
+    if (selectedProvince && selectedDistrict) {
+      const provinceName = PROVINCES.find(p => p.id === selectedProvince)?.name;
+      setEditCity(`${selectedDistrict}, ${provinceName}`);
+      setEditingCity(false);
+      setShowProvinceDropdown(false);
+      setShowDistrictDropdown(false);
+    }
+  };
+
+  const handleCancelCityEdit = () => {
+    setEditingCity(false);
+    setShowProvinceDropdown(false);
+    setShowDistrictDropdown(false);
+    setSelectedProvince('');
+    setSelectedDistrict('');
   };
 
   const calculateAge = (birthDate: string) => {
@@ -246,15 +365,19 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={styles.lifestyleItem}>
+              <Text style={styles.lifestyleLabel}>Telefon</Text>
+              <Text style={styles.lifestyleValue}>{profile.phone}</Text>
+            </View>
+            <View style={styles.lifestyleItem}>
               <Text style={styles.lifestyleLabel}>Sigara</Text>
               <Text style={styles.lifestyleValue}>
-                {profile.smoking === 'never' ? 'İçmiyor' : profile.smoking === 'occasionally' ? 'Ara sıra' : profile.smoking === 'socially' ? 'Sosyal' : 'İçiyor'}
+                {profile.smoking === 'regularly' ? 'Evet' : profile.smoking === 'occasionally' ? 'Bazen' : 'Hayır'}
               </Text>
             </View>
             <View style={styles.lifestyleItem}>
               <Text style={styles.lifestyleLabel}>Alkol</Text>
               <Text style={styles.lifestyleValue}>
-                {profile.drinking === 'never' ? 'Kullanmıyor' : profile.drinking === 'occasionally' ? 'Ara sıra' : profile.drinking === 'socially' ? 'Sosyal' : 'Kullanıyor'}
+                {profile.drinking === 'regularly' ? 'Evet' : profile.drinking === 'occasionally' ? 'Bazen' : 'Hayır'}
               </Text>
             </View>
           </View>
@@ -280,36 +403,295 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Profil Ayarları</Text>
-              <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-                <X size={24} color="#000" />
+              <Text style={styles.modalTitle}>Ayarlar</Text>
+              <TouchableOpacity onPress={() => setSettingsVisible(false)} style={styles.closeIcon}>
+                <X size={24} color="#6B7280" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.label}>İsim</Text>
-              <TextInput
-                style={styles.input}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="İsminiz"
-              />
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Profil Bilgileri */}
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>Profil Bilgileri</Text>
+                
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>İsim</Text>
+                  <TextInput
+                    style={styles.settingInput}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="İsminiz"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
 
-              <Text style={styles.label}>Şehir</Text>
-              <TextInput
-                style={styles.input}
-                value={editCity}
-                onChangeText={setEditCity}
-                placeholder="Şehir"
-              />
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>Şehir</Text>
+                  
+                  {!editingCity ? (
+                    <View style={styles.cityDisplayContainer}>
+                      <View style={styles.cityDisplay}>
+                        <MapPin size={18} color="#8B5CF6" />
+                        <Text style={styles.cityDisplayText}>
+                          {selectedProvince && selectedDistrict
+                            ? `${selectedDistrict}, ${PROVINCES.find(p => p.id === selectedProvince)?.name}`
+                            : editCity || 'Şehir seçilmedi'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.editCityButton}
+                        onPress={handleChangeLocation}
+                      >
+                        <Crown size={14} color="#F59E0B" fill="#F59E0B" />
+                        <Text style={styles.editCityButtonText}>Değiştir</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.cityEditContainer}>
+                      {/* İl Seçimi */}
+                      <View style={styles.citySelectGroup}>
+                        <Text style={styles.citySelectLabel}>İl</Text>
+                        <TouchableOpacity
+                          style={styles.dropdownButton}
+                          onPress={() => {
+                            setShowProvinceDropdown(!showProvinceDropdown);
+                            setShowDistrictDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownButtonText}>
+                            {selectedProvince
+                              ? PROVINCES.find(p => p.id === selectedProvince)?.name || 'İl Seç'
+                              : 'İl Seç'}
+                          </Text>
+                          <ChevronDown size={20} color="#8B5CF6" />
+                        </TouchableOpacity>
+                        
+                        {showProvinceDropdown && (
+                          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                            {PROVINCES.map((province) => (
+                              <TouchableOpacity
+                                key={province.id}
+                                style={[
+                                  styles.dropdownItem,
+                                  selectedProvince === province.id && styles.dropdownItemActive,
+                                ]}
+                                onPress={() => {
+                                  setSelectedProvince(province.id);
+                                  setSelectedDistrict('');
+                                  setShowProvinceDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    selectedProvince === province.id && styles.dropdownItemTextActive,
+                                  ]}
+                                >
+                                  {province.name}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+
+                      {/* İlçe Seçimi */}
+                      {selectedProvince && (
+                        <View style={styles.citySelectGroup}>
+                          <Text style={styles.citySelectLabel}>İlçe</Text>
+                          <TouchableOpacity
+                            style={styles.dropdownButton}
+                            onPress={() => {
+                              setShowDistrictDropdown(!showDistrictDropdown);
+                              setShowProvinceDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownButtonText}>
+                              {selectedDistrict || 'İlçe Seç'}
+                            </Text>
+                            <ChevronDown size={20} color="#8B5CF6" />
+                          </TouchableOpacity>
+                          
+                          {showDistrictDropdown && (
+                            <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                              {PROVINCES.find(p => p.id === selectedProvince)?.districts.map((district) => (
+                                <TouchableOpacity
+                                  key={district}
+                                  style={[
+                                    styles.dropdownItem,
+                                    selectedDistrict === district && styles.dropdownItemActive,
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedDistrict(district);
+                                    setShowDistrictDropdown(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.dropdownItemText,
+                                      selectedDistrict === district && styles.dropdownItemTextActive,
+                                    ]}
+                                  >
+                                    {district}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Butonlar */}
+                      <View style={styles.cityEditButtons}>
+                        <TouchableOpacity
+                          style={styles.cityEditCancel}
+                          onPress={handleCancelCityEdit}
+                        >
+                          <Text style={styles.cityEditCancelText}>İptal</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.cityEditConfirm,
+                            (!selectedProvince || !selectedDistrict) && styles.cityEditConfirmDisabled,
+                          ]}
+                          onPress={handleCitySelectionComplete}
+                          disabled={!selectedProvince || !selectedDistrict}
+                        >
+                          <Text style={styles.cityEditConfirmText}>Tamam</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Yaşam Tarzı */}
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>Yaşam Tarzı</Text>
+                
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>Sigara içiyor musunuz?</Text>
+                  <View style={styles.optionsRow}>
+                    {[
+                      { value: 'regularly', label: 'Evet' },
+                      { value: 'occasionally', label: 'Bazen' },
+                      { value: 'never', label: 'Hayır' },
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.optionChip,
+                          editSmoking === option.value && styles.optionChipSelected,
+                        ]}
+                        onPress={() => setEditSmoking(option.value)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.optionChipText,
+                            editSmoking === option.value && styles.optionChipTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>Alkol kullanıyor musunuz?</Text>
+                  <View style={styles.optionsRow}>
+                    {[
+                      { value: 'regularly', label: 'Evet' },
+                      { value: 'occasionally', label: 'Bazen' },
+                      { value: 'never', label: 'Hayır' },
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.optionChip,
+                          editDrinking === option.value && styles.optionChipSelected,
+                        ]}
+                        onPress={() => setEditDrinking(option.value)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.optionChipText,
+                            editDrinking === option.value && styles.optionChipTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* Hesap İşlemleri */}
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>Hesap İşlemleri</Text>
+                
+                <TouchableOpacity style={styles.dangerButton} onPress={handleFreezeAccount}>
+                  <PauseCircle size={20} color="#F59E0B" />
+                  <Text style={styles.dangerButtonText}>Hesabı Dondur</Text>
+                  <ChevronRight size={20} color="#F59E0B" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.dangerButton, styles.deleteButton]} onPress={handleDeleteAccount}>
+                  <Trash2 size={20} color="#EF4444" />
+                  <Text style={[styles.dangerButtonText, styles.deleteButtonText]}>Hesabı Sil</Text>
+                  <ChevronRight size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
             </ScrollView>
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
-              <Text style={styles.saveButtonText}>Kaydet</Text>
-            </TouchableOpacity>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
+                <Text style={styles.saveButtonText}>Değişiklikleri Kaydet</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
+
+      {/* Premium Alert Modal */}
+      <Modal visible={showPremiumAlert} animationType="fade" transparent>
+        <View style={styles.premiumAlertOverlay}>
+          <View style={styles.premiumAlertContent}>
+            <View style={styles.premiumAlertIcon}>
+              <Crown size={40} color="#F59E0B" fill="#F59E0B" />
+            </View>
+            
+            <Text style={styles.premiumAlertTitle}>Premium Özellik</Text>
+            <Text style={styles.premiumAlertMessage}>
+              Şehir değiştirme özelliği sadece premium üyelerimize özeldir. Premium üye olarak konumunuzu dilediğiniz gibi değiştirebilirsiniz.
+            </Text>
+
+            <View style={styles.premiumAlertButtons}>
+              <TouchableOpacity
+                style={styles.premiumAlertCancelButton}
+                onPress={() => setShowPremiumAlert(false)}
+              >
+                <Text style={styles.premiumAlertCancelText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.premiumAlertUpgradeButton}
+                onPress={() => {
+                  setShowPremiumAlert(false);
+                  router.push('/premium');
+                }}
+              >
+                <Crown size={16} color="#FFF" fill="#FFF" />
+                <Text style={styles.premiumAlertUpgradeText}>Premium Ol</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -554,7 +936,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     paddingTop: 12,
     paddingBottom: 40,
-    maxHeight: '80%',
+    maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.15,
@@ -566,53 +948,326 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 20,
-    marginBottom: 20,
+    paddingBottom: 16,
   },
   modalTitle: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#1F2937',
+    fontWeight: '700',
+    color: '#111827',
     letterSpacing: -0.5,
+  },
+  closeIcon: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBody: {
     paddingHorizontal: 24,
     marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
+  settingsSection: {
+    marginBottom: 32,
+  },
+  settingsSectionTitle: {
+    fontSize: 18,
     fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  settingItem: {
+    marginBottom: 20,
+  },
+  settingLabel: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#6B7280',
     marginBottom: 10,
-    marginTop: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  input: {
+  settingInput: {
     backgroundColor: '#F9FAFB',
     borderWidth: 2,
     borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: '#1F2937',
   },
+  cityDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  cityDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  cityDisplayText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  editCityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 8,
+  },
+  editCityButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  cityEditContainer: {
+    gap: 12,
+  },
+  citySelectGroup: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  citySelectLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  dropdownList: {
+    maxHeight: 200,
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#F3E8FF',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  dropdownItemTextActive: {
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  cityEditButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  cityEditCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cityEditCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cityEditConfirm: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cityEditConfirmDisabled: {
+    opacity: 0.4,
+  },
+  cityEditConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionChip: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  optionChipSelected: {
+    backgroundColor: '#8B5CF6',
+    shadowColor: '#8B5CF6',
+    shadowOpacity: 0.3,
+  },
+  optionChipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  optionChipTextSelected: {
+    color: '#FFF',
+  },
+  dangerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#FED7AA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  deleteButton: {
+    borderColor: '#FEE2E2',
+  },
+  dangerButtonText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  deleteButtonText: {
+    color: '#EF4444',
+  },
+  modalFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
   saveButton: {
     backgroundColor: '#8B5CF6',
-    marginHorizontal: 24,
-    paddingVertical: 18,
-    borderRadius: 20,
+    paddingVertical: 17,
+    borderRadius: 14,
     alignItems: 'center',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveButtonText: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#FFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+  },
+  premiumAlertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  premiumAlertContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  premiumAlertIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  premiumAlertTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  premiumAlertMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  premiumAlertButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  premiumAlertCancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  premiumAlertCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  premiumAlertUpgradeButton: {
+    flex: 1,
+    backgroundColor: '#F59E0B',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  premiumAlertUpgradeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });
