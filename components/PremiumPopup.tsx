@@ -9,7 +9,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Crown, X, Zap, Heart, Eye, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -61,8 +60,9 @@ export default function PremiumPopup({ visible, onClose, feature = 'likes' }: Pr
       animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
+      presentationStyle="overFullScreen"
     >
-      <BlurView intensity={20} style={styles.overlay}>
+      <View style={styles.overlay}>
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
@@ -162,7 +162,7 @@ export default function PremiumPopup({ visible, onClose, feature = 'likes' }: Pr
             </ScrollView>
           </LinearGradient>
         </View>
-      </BlurView>
+      </View>
     </Modal>
   );
 }
@@ -172,10 +172,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 9998,
   },
   popupContainer: {
     width: width * 0.9,
@@ -187,7 +189,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.4,
     shadowRadius: 40,
-    elevation: 20,
+    elevation: 999,
+    zIndex: 10000,
   },
   popup: {
     flex: 1,

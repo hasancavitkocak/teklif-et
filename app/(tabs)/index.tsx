@@ -52,11 +52,22 @@ export default function DiscoverScreen() {
   const [interests, setInterests] = useState<any[]>([]);
   const [showInterestDropdown, setShowInterestDropdown] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [minAge, setMinAge] = useState<number>(18);
+  const [maxAge, setMaxAge] = useState<number>(50);
+  const [selectedGender, setSelectedGender] = useState<string>('all'); // 'all', 'male', 'female'
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const sliderWidth = useRef(0);
 
   // Slider için ref
   const sliderTrackRef = useRef<View>(null);
   const sliderStartX = useRef(0);
+  
+  // Yaş slider için ref
+  const ageSliderTrackRef = useRef<View>(null);
+  const ageSliderStartX = useRef(0);
+  const ageSliderWidth = useRef(0);
 
   // Slider PanResponder
   const panResponder = useRef(
@@ -79,6 +90,62 @@ export default function DiscoverScreen() {
           const percentage = Math.max(0, Math.min(1, relativeX / sliderWidth.current));
           const newDistance = Math.round(percentage * 99) + 1; // 1-100 km
           setMaxDistance(newDistance);
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
+  // Yaş Slider PanResponder (Min)
+  const ageMinPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (ageSliderTrackRef.current) {
+          ageSliderTrackRef.current.measure((x, y, width, height, pageX) => {
+            ageSliderStartX.current = pageX;
+            ageSliderWidth.current = width;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (ageSliderWidth.current > 0 && ageSliderStartX.current > 0) {
+          const touchX = evt.nativeEvent.pageX;
+          const relativeX = touchX - ageSliderStartX.current;
+          const percentage = Math.max(0, Math.min(1, relativeX / ageSliderWidth.current));
+          const newAge = Math.round(percentage * 82) + 18; // 18-100 yaş
+          if (newAge < maxAge) {
+            setMinAge(newAge);
+          }
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
+  // Yaş Slider PanResponder (Max)
+  const ageMaxPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (ageSliderTrackRef.current) {
+          ageSliderTrackRef.current.measure((x, y, width, height, pageX) => {
+            ageSliderStartX.current = pageX;
+            ageSliderWidth.current = width;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (ageSliderWidth.current > 0 && ageSliderStartX.current > 0) {
+          const touchX = evt.nativeEvent.pageX;
+          const relativeX = touchX - ageSliderStartX.current;
+          const percentage = Math.max(0, Math.min(1, relativeX / ageSliderWidth.current));
+          const newAge = Math.round(percentage * 82) + 18; // 18-100 yaş
+          if (newAge > minAge) {
+            setMaxAge(newAge);
+          }
         }
       },
       onPanResponderRelease: () => {},
@@ -441,10 +508,31 @@ export default function DiscoverScreen() {
               <Crown size={48} color="#F59E0B" fill="#F59E0B" />
             </View>
             
-            <Text style={styles.premiumModalTitle}>Premium Özellik</Text>
+            <Text style={styles.premiumModalTitle}>Gelişmiş Filtreler</Text>
             <Text style={styles.premiumModalMessage}>
-              Farklı şehirlerde arama yapmak için Premium üyelik gereklidir.
+              Gelişmiş filtreler ile şehir, yaş aralığı, cinsiyet ve tarih bazlı detaylı arama yapabilirsin. Bu özellik Premium üyelerimize özeldir.
             </Text>
+            
+            <View style={styles.premiumFeaturesList}>
+              <View style={styles.premiumFeatureItem}>
+                <View style={styles.premiumFeatureIcon}>
+                  <MapPin size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.premiumFeatureText}>Farklı şehirlerde ara</Text>
+              </View>
+              <View style={styles.premiumFeatureItem}>
+                <View style={styles.premiumFeatureIcon}>
+                  <Calendar size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.premiumFeatureText}>Yaş aralığı filtrele</Text>
+              </View>
+              <View style={styles.premiumFeatureItem}>
+                <View style={styles.premiumFeatureIcon}>
+                  <Sparkles size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.premiumFeatureText}>Cinsiyet tercihi belirle</Text>
+              </View>
+            </View>
             
             <View style={styles.premiumModalButtons}>
               <TouchableOpacity
@@ -474,12 +562,20 @@ export default function DiscoverScreen() {
         visible={filterModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setFilterModalVisible(false)}
+        onRequestClose={() => {
+          setFilterModalVisible(false);
+          setShowAdvancedFilters(false);
+          setEditingCity(false);
+        }}
       >
         <TouchableOpacity 
           style={styles.filterModalOverlay} 
           activeOpacity={1}
-          onPress={() => setFilterModalVisible(false)}
+          onPress={() => {
+            setFilterModalVisible(false);
+            setShowAdvancedFilters(false);
+            setEditingCity(false);
+          }}
         >
           <TouchableOpacity 
             style={styles.filterModalContent}
@@ -488,8 +584,23 @@ export default function DiscoverScreen() {
           >
             {/* Header */}
             <View style={styles.filterModalHeader}>
+              {showAdvancedFilters ? (
+                <TouchableOpacity
+                  style={styles.backToBasicButton}
+                  onPress={() => setShowAdvancedFilters(false)}
+                >
+                  <ChevronDown size={20} color="#8B5CF6" style={{ transform: [{ rotate: '90deg' }] }} />
+                  <Text style={styles.backToBasicButtonText}>Geri</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: 40 }} />
+              )}
               <Text style={styles.filterModalTitle}>Filtreler</Text>
-              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+              <TouchableOpacity onPress={() => {
+                setFilterModalVisible(false);
+                setShowAdvancedFilters(false);
+                setEditingCity(false);
+              }}>
                 <X size={22} color="#8B5CF6" />
               </TouchableOpacity>
             </View>
@@ -500,200 +611,391 @@ export default function DiscoverScreen() {
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
-              {/* Şehir */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Şehir</Text>
-                
-                {!editingCity ? (
-                  <View style={styles.cityDisplayContainer}>
-                    <View style={styles.cityDisplay}>
-                      <MapPin size={18} color="#8B5CF6" />
-                      <Text style={styles.cityDisplayText}>
-                        {selectedProvince && selectedDistrict
-                          ? `${selectedDistrict}, ${PROVINCES.find(p => p.id === selectedProvince)?.name}`
-                          : userCity || 'Konum alınıyor...'}
-                      </Text>
-                    </View>
+              {!showAdvancedFilters ? (
+                <>
+                  {/* Basit Filtreler */}
+                  {/* Kategori Dropdown */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Kategori</Text>
                     <TouchableOpacity
-                      style={styles.editCityButton}
-                      onPress={async () => {
-                        // Premium durumunu yenile ve kontrol et
-                        await refreshPremiumStatus();
-                        
-                        if (isPremium) {
-                          setEditingCity(true);
+                      style={styles.dropdownButton}
+                      onPress={() => setShowInterestDropdown(!showInterestDropdown)}
+                    >
+                      <Text style={styles.dropdownButtonText}>
+                        {selectedInterest
+                          ? interests.find((i) => i.id === selectedInterest)?.name || 'Kategori Seç'
+                          : 'Tümü'}
+                      </Text>
+                      <ChevronDown size={20} color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Tarih Filtresi */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Tarih</Text>
+                    <TouchableOpacity
+                      style={styles.dateFilterButton}
+                      onPress={() => {
+                        if (Platform.OS === 'android') {
+                          DateTimePickerAndroid.open({
+                            value: selectedDate || new Date(),
+                            mode: 'date',
+                            is24Hour: true,
+                            minimumDate: new Date(),
+                            onChange: (event, date) => {
+                              if (event.type === 'set' && date) {
+                                setSelectedDate(date);
+                              }
+                            },
+                          });
                         } else {
-                          setShowPremiumModal(true);
+                          setShowDatePicker(true);
                         }
                       }}
                     >
-                      <Crown size={14} color="#F59E0B" fill="#F59E0B" />
-                      <Text style={styles.editCityButtonText}>Değiştir</Text>
+                      <Calendar size={18} color="#8B5CF6" />
+                      <Text style={styles.dateFilterButtonText}>
+                        {selectedDate
+                          ? selectedDate.toLocaleDateString('tr-TR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : 'Tüm Tarihler'}
+                      </Text>
+                      {selectedDate && (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedDate(null);
+                          }}
+                          style={styles.clearDateButton}
+                        >
+                          <X size={16} color="#6B7280" />
+                        </TouchableOpacity>
+                      )}
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  <View style={styles.cityEditContainer}>
-                    {/* İl Seçimi */}
-                    <View style={styles.citySelectGroup}>
-                      <Text style={styles.citySelectLabel}>İl</Text>
-                      <TouchableOpacity
-                        style={styles.dropdownButton}
-                        onPress={() => {
-                          setShowProvinceDropdown(!showProvinceDropdown);
-                          setShowDistrictDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownButtonText}>
-                          {selectedProvince
-                            ? PROVINCES.find(p => p.id === selectedProvince)?.name || 'İl Seç'
-                            : 'İl Seç'}
-                        </Text>
-                        <ChevronDown size={20} color="#8B5CF6" />
-                      </TouchableOpacity>
-                      
-                      {showProvinceDropdown && (
-                        <ScrollView style={styles.dropdownList} nestedScrollEnabled>
-                          {PROVINCES.map((province) => (
+
+                  {/* Gelişmiş Filtre Butonu */}
+                  <TouchableOpacity
+                    style={styles.advancedFilterButton}
+                    onPress={async () => {
+                      await refreshPremiumStatus();
+                      if (isPremium) {
+                        setShowAdvancedFilters(true);
+                      } else {
+                        setShowPremiumModal(true);
+                      }
+                    }}
+                  >
+                    <View style={styles.advancedFilterButtonContent}>
+                      <SlidersHorizontal size={20} color="#8B5CF6" />
+                      <Text style={styles.advancedFilterButtonText}>Gelişmiş Filtreler</Text>
+                    </View>
+                    <Crown size={18} color="#F59E0B" fill="#F59E0B" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {/* Gelişmiş Filtreler */}
+                  {/* Şehir */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Şehir</Text>
+                    
+                    {!editingCity ? (
+                      <View style={styles.cityDisplayContainer}>
+                        <View style={styles.cityDisplay}>
+                          <MapPin size={18} color="#8B5CF6" />
+                          <Text style={styles.cityDisplayText}>
+                            {selectedProvince && selectedDistrict
+                              ? `${selectedDistrict}, ${PROVINCES.find(p => p.id === selectedProvince)?.name}`
+                              : userCity || 'Konum alınıyor...'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.editCityButton}
+                          onPress={() => setEditingCity(true)}
+                        >
+                          <Text style={styles.editCityButtonText}>Değiştir</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={styles.cityEditContainer}>
+                        {/* İl Seçimi */}
+                        <View style={styles.citySelectGroup}>
+                          <Text style={styles.citySelectLabel}>İl</Text>
+                          <TouchableOpacity
+                            style={styles.dropdownButton}
+                            onPress={() => {
+                              setShowProvinceDropdown(!showProvinceDropdown);
+                              setShowDistrictDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownButtonText}>
+                              {selectedProvince
+                                ? PROVINCES.find(p => p.id === selectedProvince)?.name || 'İl Seç'
+                                : 'İl Seç'}
+                            </Text>
+                            <ChevronDown size={20} color="#8B5CF6" />
+                          </TouchableOpacity>
+                          
+                          {showProvinceDropdown && (
+                            <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                              {PROVINCES.map((province) => (
+                                <TouchableOpacity
+                                  key={province.id}
+                                  style={[
+                                    styles.dropdownItem,
+                                    selectedProvince === province.id && styles.dropdownItemActive,
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedProvince(province.id);
+                                    setSelectedDistrict('');
+                                    setShowProvinceDropdown(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.dropdownItemText,
+                                      selectedProvince === province.id && styles.dropdownItemTextActive,
+                                    ]}
+                                  >
+                                    {province.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          )}
+                        </View>
+
+                        {/* İlçe Seçimi */}
+                        {selectedProvince && (
+                          <View style={styles.citySelectGroup}>
+                            <Text style={styles.citySelectLabel}>İlçe</Text>
                             <TouchableOpacity
-                              key={province.id}
-                              style={[
-                                styles.dropdownItem,
-                                selectedProvince === province.id && styles.dropdownItemActive,
-                              ]}
+                              style={styles.dropdownButton}
                               onPress={() => {
-                                setSelectedProvince(province.id);
-                                setSelectedDistrict('');
+                                setShowDistrictDropdown(!showDistrictDropdown);
                                 setShowProvinceDropdown(false);
                               }}
                             >
-                              <Text
-                                style={[
-                                  styles.dropdownItemText,
-                                  selectedProvince === province.id && styles.dropdownItemTextActive,
-                                ]}
-                              >
-                                {province.name}
+                              <Text style={styles.dropdownButtonText}>
+                                {selectedDistrict || 'İlçe Seç'}
                               </Text>
+                              <ChevronDown size={20} color="#8B5CF6" />
                             </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      )}
-                    </View>
-
-                    {/* İlçe Seçimi */}
-                    {selectedProvince && (
-                      <View style={styles.citySelectGroup}>
-                        <Text style={styles.citySelectLabel}>İlçe</Text>
-                        <TouchableOpacity
-                          style={styles.dropdownButton}
-                          onPress={() => {
-                            setShowDistrictDropdown(!showDistrictDropdown);
-                            setShowProvinceDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownButtonText}>
-                            {selectedDistrict || 'İlçe Seç'}
-                          </Text>
-                          <ChevronDown size={20} color="#8B5CF6" />
-                        </TouchableOpacity>
-                        
-                        {showDistrictDropdown && (
-                          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
-                            {PROVINCES.find(p => p.id === selectedProvince)?.districts.map((district) => (
-                              <TouchableOpacity
-                                key={district}
-                                style={[
-                                  styles.dropdownItem,
-                                  selectedDistrict === district && styles.dropdownItemActive,
-                                ]}
-                                onPress={() => {
-                                  setSelectedDistrict(district);
-                                  setShowDistrictDropdown(false);
-                                }}
-                              >
-                                <Text
-                                  style={[
-                                    styles.dropdownItemText,
-                                    selectedDistrict === district && styles.dropdownItemTextActive,
-                                  ]}
-                                >
-                                  {district}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
+                            
+                            {showDistrictDropdown && (
+                              <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                                {PROVINCES.find(p => p.id === selectedProvince)?.districts.map((district) => (
+                                  <TouchableOpacity
+                                    key={district}
+                                    style={[
+                                      styles.dropdownItem,
+                                      selectedDistrict === district && styles.dropdownItemActive,
+                                    ]}
+                                    onPress={() => {
+                                      setSelectedDistrict(district);
+                                      setShowDistrictDropdown(false);
+                                    }}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.dropdownItemText,
+                                        selectedDistrict === district && styles.dropdownItemTextActive,
+                                      ]}
+                                    >
+                                      {district}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+                            )}
+                          </View>
                         )}
+
+                        {/* Butonlar */}
+                        <View style={styles.cityEditButtons}>
+                          <TouchableOpacity
+                            style={styles.cityEditCancel}
+                            onPress={() => {
+                              setEditingCity(false);
+                              setShowProvinceDropdown(false);
+                              setShowDistrictDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.cityEditCancelText}>İptal</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.cityEditDone}
+                            onPress={() => {
+                              if (selectedProvince && selectedDistrict) {
+                                const provinceName = PROVINCES.find(p => p.id === selectedProvince)?.name;
+                                setSelectedCity(`${selectedDistrict}, ${provinceName}`);
+                                setEditingCity(false);
+                                setShowProvinceDropdown(false);
+                                setShowDistrictDropdown(false);
+                              } else {
+                                Alert.alert('Uyarı', 'Lütfen il ve ilçe seçin');
+                              }
+                            }}
+                          >
+                            <Text style={styles.cityEditDoneText}>Tamam</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     )}
+                  </View>
 
-                    {/* Butonlar */}
-                    <View style={styles.cityEditButtons}>
-                      <TouchableOpacity
-                        style={styles.cityEditCancel}
-                        onPress={() => {
-                          setEditingCity(false);
-                          setShowProvinceDropdown(false);
-                          setShowDistrictDropdown(false);
-                        }}
+                  {/* Yaş Aralığı */}
+                  <View style={styles.filterSection}>
+                    <View style={styles.filterLabelRow}>
+                      <Text style={styles.filterLabel}>Yaş Aralığı</Text>
+                      <Text style={styles.filterValue}>{minAge} - {maxAge}</Text>
+                    </View>
+                    <View style={styles.ageSliderContainer}>
+                      <Text style={styles.sliderMinMax}>18</Text>
+                      <View
+                        ref={ageSliderTrackRef}
+                        style={styles.sliderTrack}
                       >
-                        <Text style={styles.cityEditCancelText}>İptal</Text>
+                        {/* Fill between min and max */}
+                        <View style={[
+                          styles.sliderFill,
+                          {
+                            left: `${((minAge - 18) / 82) * 100}%`,
+                            width: `${((maxAge - minAge) / 82) * 100}%`,
+                          }
+                        ]} />
+                        {/* Min Thumb */}
+                        <View
+                          style={[styles.sliderThumb, { left: `${((minAge - 18) / 82) * 100}%` }]}
+                          {...ageMinPanResponder.panHandlers}
+                        />
+                        {/* Max Thumb */}
+                        <View
+                          style={[styles.sliderThumb, { left: `${((maxAge - 18) / 82) * 100}%` }]}
+                          {...ageMaxPanResponder.panHandlers}
+                        />
+                      </View>
+                      <Text style={styles.sliderMinMax}>100</Text>
+                    </View>
+                  </View>
+
+                  {/* Cinsiyet */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Cinsiyet</Text>
+                    <View style={styles.genderButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.genderButton,
+                          selectedGender === 'all' && styles.genderButtonActive,
+                        ]}
+                        onPress={() => setSelectedGender('all')}
+                      >
+                        <Text style={[
+                          styles.genderButtonText,
+                          selectedGender === 'all' && styles.genderButtonTextActive,
+                        ]}>
+                          Hepsi
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.cityEditDone}
-                        onPress={() => {
-                          if (selectedProvince && selectedDistrict) {
-                            const provinceName = PROVINCES.find(p => p.id === selectedProvince)?.name;
-                            setSelectedCity(`${selectedDistrict}, ${provinceName}`);
-                            setEditingCity(false);
-                            setShowProvinceDropdown(false);
-                            setShowDistrictDropdown(false);
-                          } else {
-                            Alert.alert('Uyarı', 'Lütfen il ve ilçe seçin');
-                          }
-                        }}
+                        style={[
+                          styles.genderButton,
+                          selectedGender === 'male' && styles.genderButtonActive,
+                        ]}
+                        onPress={() => setSelectedGender('male')}
                       >
-                        <Text style={styles.cityEditDoneText}>Tamam</Text>
+                        <Text style={[
+                          styles.genderButtonText,
+                          selectedGender === 'male' && styles.genderButtonTextActive,
+                        ]}>
+                          Erkek
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.genderButton,
+                          selectedGender === 'female' && styles.genderButtonActive,
+                        ]}
+                        onPress={() => setSelectedGender('female')}
+                      >
+                        <Text style={[
+                          styles.genderButtonText,
+                          selectedGender === 'female' && styles.genderButtonTextActive,
+                        ]}>
+                          Kadın
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                )}
-              </View>
 
-              {/* Mesafe */}
-              <View style={styles.filterSection}>
-                <View style={styles.filterLabelRow}>
-                  <Text style={styles.filterLabel}>Mesafe</Text>
-                  <Text style={styles.filterValue}>Max. {maxDistance} km</Text>
-                </View>
-                <View style={styles.sliderContainer}>
-                  <Text style={styles.sliderMinMax}>1 km</Text>
-                  <View
-                    ref={sliderTrackRef}
-                    style={styles.sliderTrack}
-                    {...panResponder.panHandlers}
-                  >
-                    <View style={[styles.sliderFill, { width: `${(maxDistance / 100) * 100}%` }]} />
-                    <View style={[styles.sliderThumb, { left: `${(maxDistance / 100) * 100}%` }]} />
+                  {/* Kategori Dropdown */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Kategori</Text>
+                    <TouchableOpacity
+                      style={styles.dropdownButton}
+                      onPress={() => setShowInterestDropdown(!showInterestDropdown)}
+                    >
+                      <Text style={styles.dropdownButtonText}>
+                        {selectedInterest
+                          ? interests.find((i) => i.id === selectedInterest)?.name || 'Kategori Seç'
+                          : 'Tümü'}
+                      </Text>
+                      <ChevronDown size={20} color="#8B5CF6" />
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.sliderMinMax}>100 km</Text>
-                </View>
-              </View>
 
-              {/* Kategori Dropdown */}
-              <View style={styles.filterSectionLast}>
-                <Text style={styles.filterLabel}>Kategori</Text>
-                <TouchableOpacity
-                  style={styles.dropdownButton}
-                  onPress={() => setShowInterestDropdown(!showInterestDropdown)}
-                >
-                  <Text style={styles.dropdownButtonText}>
-                    {selectedInterest
-                      ? interests.find((i) => i.id === selectedInterest)?.name || 'Kategori Seç'
-                      : 'Kategori Seç'}
-                  </Text>
-                  <ChevronDown size={20} color="#8B5CF6" />
-                </TouchableOpacity>
-              </View>
+                  {/* Tarih Filtresi */}
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Tarih</Text>
+                    <TouchableOpacity
+                      style={styles.dateFilterButton}
+                      onPress={() => {
+                        if (Platform.OS === 'android') {
+                          DateTimePickerAndroid.open({
+                            value: selectedDate || new Date(),
+                            mode: 'date',
+                            is24Hour: true,
+                            minimumDate: new Date(),
+                            onChange: (event, date) => {
+                              if (event.type === 'set' && date) {
+                                setSelectedDate(date);
+                              }
+                            },
+                          });
+                        } else {
+                          setShowDatePicker(true);
+                        }
+                      }}
+                    >
+                      <Calendar size={18} color="#8B5CF6" />
+                      <Text style={styles.dateFilterButtonText}>
+                        {selectedDate
+                          ? selectedDate.toLocaleDateString('tr-TR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : 'Tüm Tarihler'}
+                      </Text>
+                      {selectedDate && (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedDate(null);
+                          }}
+                          style={styles.clearDateButton}
+                        >
+                          <X size={16} color="#6B7280" />
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </ScrollView>
 
             {/* Kategori Dropdown - Modal Seviyesinde */}
@@ -737,19 +1039,32 @@ export default function DiscoverScreen() {
 
             {/* Footer */}
             <View style={styles.filterModalFooter}>
-              {(selectedCity || selectedInterest || maxDistance !== 50) && (
-                <TouchableOpacity
-                  style={styles.filterClearButton}
-                  onPress={() => {
+              <TouchableOpacity
+                style={[
+                  styles.filterClearButton,
+                  (!selectedCity && !selectedInterest && minAge === 18 && maxAge === 50 && selectedGender === 'all' && !selectedDate) && styles.filterClearButtonDisabled
+                ]}
+                onPress={() => {
+                  if (selectedCity || selectedInterest || minAge !== 18 || maxAge !== 50 || selectedGender !== 'all' || selectedDate) {
                     setSelectedCity('');
                     setSelectedInterest('');
-                    setMaxDistance(50);
+                    setMinAge(18);
+                    setMaxAge(50);
+                    setSelectedGender('all');
+                    setSelectedDate(null);
                     setShowInterestDropdown(false);
-                  }}
-                >
-                  <Text style={styles.filterClearButtonText}>Temizle</Text>
-                </TouchableOpacity>
-              )}
+                    setShowAdvancedFilters(false);
+                  }
+                }}
+                disabled={!selectedCity && !selectedInterest && minAge === 18 && maxAge === 50 && selectedGender === 'all' && !selectedDate}
+              >
+                <Text style={[
+                  styles.filterClearButtonText,
+                  (!selectedCity && !selectedInterest && minAge === 18 && maxAge === 50 && selectedGender === 'all') && styles.filterClearButtonTextDisabled
+                ]}>
+                  Temizle
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.filterApplyButton,
@@ -759,6 +1074,7 @@ export default function DiscoverScreen() {
                   if (!editingCity) {
                     setFilterModalVisible(false);
                     setShowInterestDropdown(false);
+                    setShowAdvancedFilters(false);
                     applyFilters();
                   }
                 }}
@@ -772,6 +1088,45 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* DateTimePicker - iOS için */}
+      {Platform.OS === 'ios' && showDatePicker && (
+        <Modal transparent animationType="slide">
+          <View style={styles.datePickerOverlay}>
+            <TouchableOpacity
+              style={styles.datePickerBackdrop}
+              activeOpacity={1}
+              onPress={() => setShowDatePicker(false)}
+            />
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => {
+                  setSelectedDate(null);
+                  setShowDatePicker(false);
+                }}>
+                  <Text style={styles.datePickerCancel}>İptal</Text>
+                </TouchableOpacity>
+                <Text style={styles.datePickerTitle}>Tarih Seç</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.datePickerDone}>Tamam</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={selectedDate || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(event, date) => {
+                  if (date) {
+                    setSelectedDate(date);
+                  }
+                }}
+                minimumDate={new Date()}
+                textColor="#000"
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1582,7 +1937,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
-    overflow: 'visible',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   filterModalHeader: {
     flexDirection: 'row',
@@ -1593,6 +1950,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFF',
+    zIndex: 10,
   },
   filterModalTitle: {
     fontSize: 20,
@@ -1672,7 +2031,6 @@ const styles = StyleSheet.create({
   },
   citySelectGroup: {
     gap: 8,
-    position: 'relative',
     marginBottom: 16,
   },
   citySelectLabel: {
@@ -1778,10 +2136,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
     marginTop: 8,
     backgroundColor: '#FFF',
     borderRadius: 12,
@@ -1792,8 +2146,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 999,
-    zIndex: 9999,
+    elevation: 5,
   },
   dropdownOverlay: {
     position: 'absolute',
@@ -1839,7 +2192,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    zIndex: 1,
+    backgroundColor: '#FFF',
+    zIndex: 10,
   },
   filterClearButton: {
     flex: 1,
@@ -1848,10 +2202,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  filterClearButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+    opacity: 0.5,
+  },
   filterClearButtonText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#6B7280',
+  },
+  filterClearButtonTextDisabled: {
+    color: '#9CA3AF',
   },
   filterApplyButton: {
     flex: 2,
@@ -1911,7 +2272,35 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 22,
+    marginBottom: 20,
+  },
+  premiumFeaturesList: {
+    width: '100%',
+    gap: 12,
     marginBottom: 24,
+  },
+  premiumFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  premiumFeatureIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumFeatureText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
   },
   premiumModalButtons: {
     flexDirection: 'row',
@@ -1944,5 +2333,127 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFF',
+  },
+  // Gelişmiş Filtre Stilleri
+  advancedFilterButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderWidth: 2,
+    borderColor: '#E9D5FF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  advancedFilterButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  advancedFilterButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  backToBasicButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  backToBasicButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  ageSliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  genderButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  genderButton: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  genderButtonActive: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  genderButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  genderButtonTextActive: {
+    color: '#FFF',
+  },
+  dateFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dateFilterButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+  },
+  clearDateButton: {
+    padding: 4,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  datePickerBackdrop: {
+    flex: 1,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  datePickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  datePickerDone: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
 });
