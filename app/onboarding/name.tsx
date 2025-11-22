@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -25,7 +25,9 @@ export default function NameScreen() {
 
     triggerHaptic();
     setLoading(true);
+
     try {
+      // İsmi kaydet
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
@@ -56,6 +58,7 @@ export default function NameScreen() {
         if (error) throw error;
       }
 
+      // Yaşınız sayfasına git (popup orada açılacak)
       router.push('/onboarding/birthdate');
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -93,7 +96,9 @@ export default function NameScreen() {
           disabled={!name.trim() || loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>Devam Et</Text>
+          <Text style={styles.buttonText}>
+            {loading ? 'Kaydediliyor...' : 'Devam Et'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

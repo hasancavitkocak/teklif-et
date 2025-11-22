@@ -18,7 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Clock, Store, ChevronDown, Crown } from 'lucide-react-native';
+import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Store, ChevronDown, Crown } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -336,27 +336,16 @@ export default function DiscoverScreen() {
                 {/* Sağ Taraf - Tarih/Saat/Mekan/Konum */}
                 {(currentProposal.event_datetime || currentProposal.venue_name || currentProposal.city) && (
                   <View style={styles.cardRightInfo}>
-                    {/* Tarih ve Saat - Yan Yana */}
+                    {/* Tarih */}
                     {currentProposal.event_datetime && (
-                      <View style={styles.dateTimeRow}>
-                        <View style={styles.infoItem}>
-                          <Calendar size={12} color="#FFF" />
-                          <Text style={styles.infoText}>
-                            {new Date(currentProposal.event_datetime).toLocaleDateString('tr-TR', {
-                              day: 'numeric',
-                              month: 'short',
-                            })}
-                          </Text>
-                        </View>
-                        <View style={styles.infoItem}>
-                          <Clock size={12} color="#FFF" />
-                          <Text style={styles.infoText}>
-                            {new Date(currentProposal.event_datetime).toLocaleTimeString('tr-TR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </Text>
-                        </View>
+                      <View style={styles.infoItem}>
+                        <Calendar size={12} color="#FFF" />
+                        <Text style={styles.infoText}>
+                          {new Date(currentProposal.event_datetime).toLocaleDateString('tr-TR', {
+                            day: 'numeric',
+                            month: 'long',
+                          })}
+                        </Text>
                       </View>
                     )}
                     
@@ -834,17 +823,7 @@ function CreateProposalModal({
         is24Hour: true,
         onChange: (event, date) => {
           if (event.type === 'set' && date) {
-            // Tarih seçildikten sonra saat seçiciyi aç
-            DateTimePickerAndroid.open({
-              value: date,
-              mode: 'time',
-              is24Hour: true,
-              onChange: (timeEvent, time) => {
-                if (timeEvent.type === 'set' && time) {
-                  setEventDate(time);
-                }
-              },
-            });
+            setEventDate(date);
           }
         },
       });
@@ -950,9 +929,9 @@ function CreateProposalModal({
               />
             </View>
 
-            {/* Tarih ve Saat */}
+            {/* Tarih */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tarih ve Saat Seç</Text>
+              <Text style={styles.inputLabel}>Tarih Seç</Text>
               <TouchableOpacity
                 style={styles.dateTimeButton}
                 onPress={showDateTimePicker}
@@ -964,15 +943,6 @@ function CreateProposalModal({
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
-                    })}
-                  </Text>
-                </View>
-                <View style={styles.dateTimeDisplay}>
-                  <Clock size={18} color="#8B5CF6" />
-                  <Text style={styles.dateTimeDisplayText}>
-                    {eventDate.toLocaleTimeString('tr-TR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
                     })}
                   </Text>
                 </View>
@@ -1026,7 +996,7 @@ function CreateProposalModal({
       {Platform.OS === 'ios' && showDatePicker && (
         <DateTimePicker
           value={eventDate}
-          mode="datetime"
+          mode="date"
           display="spinner"
           onChange={(event, date) => {
             if (event.type === 'set' && date) {

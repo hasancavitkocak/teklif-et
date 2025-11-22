@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Calendar } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 
 export default function BirthdateScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [date, setDate] = useState(new Date(2000, 0, 1));
-  const [show, setShow] = useState(Platform.OS === 'ios');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const triggerHaptic = () => {
@@ -29,6 +29,26 @@ export default function BirthdateScreen() {
       age--;
     }
     return age;
+  };
+
+  const showDatePickerModal = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: date,
+        mode: 'date',
+        is24Hour: true,
+        onChange: (event, selectedDate) => {
+          if (event.type === 'set' && selectedDate) {
+            triggerHaptic();
+            setDate(selectedDate);
+          }
+        },
+        maximumDate: new Date(),
+        minimumDate: new Date(1940, 0, 1),
+      });
+    } else {
+      setShowDatePicker(true);
+    }
   };
 
   const handleContinue = async () => {
@@ -84,26 +104,19 @@ export default function BirthdateScreen() {
             <Text style={styles.subtitle}>Yaşınız: {calculateAge(date)}</Text>
           </View>
 
-          <View style={styles.pickerContainer}>
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                if (Platform.OS === 'android') {
-                  setShow(false);
-                }
-                if (selectedDate) {
-                  triggerHaptic();
-                  setDate(selectedDate);
-                }
-              }}
-              maximumDate={new Date()}
-              minimumDate={new Date(1940, 0, 1)}
-              textColor="#000"
-              themeVariant="light"
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={showDatePickerModal}
+          >
+            <Calendar size={20} color="#8B5CF6" />
+            <Text style={styles.dateButtonText}>
+              {date.toLocaleDateString('tr-TR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -112,9 +125,55 @@ export default function BirthdateScreen() {
           disabled={loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>Devam Et</Text>
+          <Text style={styles.buttonText}>
+            {loading ? 'Kaydediliyor...' : 'Devam Et'}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* iOS Date Picker Modal */}
+      {Platform.OS === 'ios' && showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Doğum Tarihiniz</Text>
+              </View>
+
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    triggerHaptic();
+                    setDate(selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+                minimumDate={new Date(1940, 0, 1)}
+                textColor="#000"
+                themeVariant="light"
+              />
+
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => {
+                  triggerHaptic();
+                  setShowDatePicker(false);
+                }}
+              >
+                <Text style={styles.confirmButtonText}>Tamam</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -173,16 +232,21 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontWeight: '400',
   },
-  pickerContainer: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    overflow: 'hidden',
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
+  dateButton: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dateButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
   },
   button: {
     backgroundColor: '#8B5CF6',
@@ -203,5 +267,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFF',
     letterSpacing: 0.2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  modalHeader: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  confirmButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
