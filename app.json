@@ -1,19 +1,43 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "Teklif Et",
+    "slug": "teklif-et",
+    "owner": "hasancavitkocak",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon-new.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/images/app-icon-new.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#8B5CF6"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.teklifet.app"
     },
     "android": {
-      "softwareKeyboardLayoutMode": "resize",
-      "package": "Teklif.ET"
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.teklifet.app",
+      "versionCode": 2,
+      "minSdkVersion": 23,
+      "targetSdkVersion": 34,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon-new.png",
+        "backgroundColor": "#8B5CF6"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ],
+      "blockedPermissions": []
     },
     "web": {
       "bundler": "metro",
@@ -26,12 +50,12 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRouNames": true
     },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ff86ae2a-fa70-40cd-9df1-e610f9779ef7"
+        "projectId": "e641448f-0ea3-41cd-bd11-0add24fd7573"
       }
     }
   }
