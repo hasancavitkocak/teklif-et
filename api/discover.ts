@@ -19,60 +19,87 @@ export interface DiscoverProposal {
 }
 
 export const discoverAPI = {
-  // Keşfet sayfası için teklifleri getir (optimize edilmiş - feed tablosundan)
+  // Keşfet sayfası için teklifleri getir (yeni kullanıcılar için de çalışır)
   getProposals: async (userId: string, filters?: { city?: string; interestId?: string }) => {
-    let query = supabase
+    // Daha önce gösterilmiş teklif ID'lerini al
+    const { data: shownData } = await supabase
       .from('discover_feed')
-      .select(`
-        proposal_id,
-        proposals!inner(
-          id,
-          activity_name,
-          city,
-          is_boosted,
-          interest_id,
-          creator_id,
-          event_datetime,
-          venue_name,
-          creator:profiles!creator_id(name, profile_photo, birth_date),
-          interest:interests(name)
-        )
-      `)
+      .select('proposal_id')
       .eq('user_id', userId)
-      .eq('shown', false)
-      .order('position', { ascending: true })
-      .limit(20);
+      .eq('shown', true);
+
+    const shownProposalIds = (shownData || []).map((item: any) => item.proposal_id);
+
+    // Tüm aktif teklifleri getir (gösterilmemiş olanlar)
+    let query = supabase
+      .from('proposals')
+      .select(`
+        id,
+        activity_name,
+        city,
+        is_boosted,
+        interest_id,
+        creator_id,
+        event_datetime,
+        venue_name,
+        creator:profiles!creator_id(name, profile_photo, birth_date),
+        interest:interests(name)
+      `)
+      .eq('status', 'active')
+      .neq('creator_id', userId); // Kendi tekliflerini gösterme
+
+    // Daha önce gösterilmiş teklifleri hariç tut
+    if (shownProposalIds.length > 0) {
+      query = query.not('id', 'in', `(${shownProposalIds.join(',')})`);
+    }
+
+    // Filtreler
+    if (filters?.city) {
+      query = query.ilike('city', `%${filters.city}%`);
+    }
+    if (filters?.interestId) {
+      query = query.eq('interest_id', filters.interestId);
+    }
+
+    // Boost edilenler önce, sonra rastgele
+    query = query.order('is_boosted', { ascending: false }).limit(20);
 
     const { data, error } = await query;
 
     if (error) throw error;
 
-    // Proposals'ı düzleştir
-    const proposals = (data || [])
-      .map((item: any) => item.proposals)
-      .filter((p: any) => {
-        // Filtreler
-        if (filters?.city && !p.city?.toLowerCase().includes(filters.city.toLowerCase())) {
-          return false;
-        }
-        if (filters?.interestId && p.interest_id !== filters.interestId) {
-          return false;
-        }
-        return true;
-      });
-
-    return proposals as any as DiscoverProposal[];
+    return (data || []) as any as DiscoverProposal[];
   },
 
   // Teklif gösterildi olarak işaretle
   markAsShown: async (userId: string, proposalId: string) => {
-    const { error } = await supabase
+    // Önce güncellemeyi dene
+    const { data: updated, error: updateError } = await supabase
       .from('discover_feed')
       .update({ shown: true })
       .eq('user_id', userId)
-      .eq('proposal_id', proposalId);
+      .eq('proposal_id', proposalId)
+      .select();
 
-    if (error) throw error;
+    // Eğer güncelleme başarılıysa veya kayıt varsa, işlem tamam
+    if (!updateError && updated && updated.length > 0) {
+      return;
+    }
+
+    // Eğer kayıt yoksa, eklemeyi dene
+    const { error: insertError } = await supabase
+      .from('discover_feed')
+      .insert({
+        user_id: userId,
+        proposal_id: proposalId,
+        shown: true,
+        position: 0,
+      });
+
+    // Duplicate key hatası görmezden gel (başka bir işlem eklemiş olabilir)
+    if (insertError && insertError.code !== '23505') {
+      throw insertError;
+    }
   },
 
   // Teklife başvur (like)
