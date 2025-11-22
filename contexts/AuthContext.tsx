@@ -6,6 +6,8 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isPremium: boolean;
+  refreshPremiumStatus: () => Promise<void>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -17,7 +19,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
   const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+
+  const refreshPremiumStatus = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_premium')
+        .eq('id', user.id)
+        .single();
+      
+      setIsPremium(profile?.is_premium || false);
+    } catch (error) {
+      console.error('Error loading premium status:', error);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -35,6 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // User değiştiğinde premium durumunu yükle
+  useEffect(() => {
+    if (user?.id) {
+      refreshPremiumStatus();
+    } else {
+      setIsPremium(false);
+    }
+  }, [user?.id]);
 
   const signInWithPhone = async (phone: string) => {
     setPendingPhone(phone);
@@ -99,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user,
         loading,
+        isPremium,
+        refreshPremiumStatus,
         signInWithPhone,
         verifyOtp,
         signOut,

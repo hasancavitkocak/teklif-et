@@ -3,9 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, Zap, Filter, Eye, Check } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 
 export default function PremiumScreen() {
-  const { user } = useAuth();
+  const { user, refreshPremiumStatus } = useAuth();
+  const router = useRouter();
 
   const features = [
     { icon: Zap, title: 'Sınırsız Teklif', description: 'Günde 5 yerine sınırsız teklif gönder' },
@@ -39,7 +41,20 @@ export default function PremiumScreen() {
                 .eq('id', user?.id);
 
               if (error) throw error;
-              Alert.alert('Başarılı', 'Premium üyeliğiniz aktif edildi!');
+              
+              // Premium durumunu güncelle
+              await refreshPremiumStatus();
+              
+              Alert.alert(
+                'Başarılı', 
+                'Premium üyeliğiniz aktif edildi! Artık tüm özelliklere erişebilirsiniz.',
+                [
+                  {
+                    text: 'Tamam',
+                    onPress: () => router.push('/(tabs)'),
+                  }
+                ]
+              );
             } catch (error: any) {
               Alert.alert('Hata', error.message);
             }

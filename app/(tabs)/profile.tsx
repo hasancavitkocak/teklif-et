@@ -31,7 +31,7 @@ interface Profile {
 }
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPremium } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
@@ -172,7 +172,7 @@ export default function ProfileScreen() {
               <Text style={styles.profileName}>
                 {profile.name}, {calculateAge(profile.birth_date)}
               </Text>
-              {profile.is_premium && (
+              {isPremium && (
                 <View style={styles.premiumBadge}>
                   <Crown size={16} color="#FFF" fill="#FFF" />
                 </View>

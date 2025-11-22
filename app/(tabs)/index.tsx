@@ -30,7 +30,7 @@ import { PROVINCES } from '@/constants/cities';
 const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { user } = useAuth();
+  const { user, isPremium, refreshPremiumStatus } = useAuth();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -40,7 +40,6 @@ export default function DiscoverScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [userCity, setUserCity] = useState<string>('');
-  const [isPremium, setIsPremium] = useState<boolean>(false); // TODO: Gerçek premium kontrolü
   const [editingCity, setEditingCity] = useState(false);
   const [premiumPopupVisible, setPremiumPopupVisible] = useState(false);
   const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'boost' | 'filters'>('likes');
@@ -92,6 +91,8 @@ export default function DiscoverScreen() {
       console.log('Discover screen focused');
       if (user?.id) {
         loadProposals();
+        loadUserCity();
+        refreshPremiumStatus(); // Premium durumunu yenile
       }
     }, [user?.id, selectedCity, selectedInterest])
   );
@@ -515,7 +516,10 @@ export default function DiscoverScreen() {
                     </View>
                     <TouchableOpacity
                       style={styles.editCityButton}
-                      onPress={() => {
+                      onPress={async () => {
+                        // Premium durumunu yenile ve kontrol et
+                        await refreshPremiumStatus();
+                        
                         if (isPremium) {
                           setEditingCity(true);
                         } else {
