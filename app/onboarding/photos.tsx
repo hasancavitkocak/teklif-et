@@ -134,6 +134,38 @@ export default function PhotosScreen() {
     });
   };
 
+  const uploadPhotoToStorage = async (uri: string, index: number): Promise<string> => {
+    try {
+      const fileExt = 'jpg';
+      const fileName = `${user?.id}/${Date.now()}_${index}.${fileExt}`;
+      const filePath = `profile-photos/${fileName}`;
+
+      // Fetch ile ArrayBuffer al (hem web hem mobile çalışır)
+      const response = await fetch(uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(filePath, fileData, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Public URL al
+      const { data } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
+  };
+
   const handleComplete = async () => {
     if (photos.length < 2) {
       Alert.alert('En Az 2 Fotoğraf', 'Devam etmek için en az 2 fotoğraf eklemelisiniz');
@@ -142,7 +174,13 @@ export default function PhotosScreen() {
 
     setLoading(true);
     try {
-      const photoInserts = photos.map((url, index) => ({
+      // Fotoğrafları Supabase Storage'a yükle
+      const uploadedUrls = await Promise.all(
+        photos.map((uri, index) => uploadPhotoToStorage(uri, index))
+      );
+
+      // Database'e kaydet
+      const photoInserts = uploadedUrls.map((url, index) => ({
         profile_id: user?.id,
         photo_url: url,
         order: index,
@@ -154,10 +192,11 @@ export default function PhotosScreen() {
 
       if (photosError) throw photosError;
 
+      // Profil fotoğrafını güncelle (ilk fotoğraf)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          profile_photo: photos[0],
+          profile_photo: uploadedUrls[0],
           onboarding_completed: true,
           updated_at: new Date().toISOString(),
         })
@@ -167,7 +206,8 @@ export default function PhotosScreen() {
 
       router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      console.error('Complete error:', error);
+      Alert.alert('Hata', error.message || 'Fotoğraflar yüklenemedi');
     } finally {
       setLoading(false);
     }
