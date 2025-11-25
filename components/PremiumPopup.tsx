@@ -172,12 +172,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999,
+    zIndex: 10001,
+    elevation: 11,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 9998,
+    zIndex: 10000,
+    elevation: 10,
   },
   popupContainer: {
     width: width * 0.9,
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 40,
     elevation: 999,
-    zIndex: 10000,
+    zIndex: 10002,
   },
   popup: {
     flex: 1,

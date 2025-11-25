@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
 import PremiumPopup from '@/components/PremiumPopup';
+import SimplePremiumAlert from '@/components/SimplePremiumAlert';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -495,68 +496,11 @@ export default function DiscoverScreen() {
         feature={premiumFeature}
       />
 
-      {/* Premium Modal - Şehir değiştirme için */}
-      <Modal
+      {/* Simple Premium Alert */}
+      <SimplePremiumAlert
         visible={showPremiumModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPremiumModal(false)}
-      >
-        <View style={styles.premiumModalOverlay}>
-          <View style={styles.premiumModalContent}>
-            <View style={styles.premiumModalIcon}>
-              <Crown size={48} color="#F59E0B" fill="#F59E0B" />
-            </View>
-            
-            <Text style={styles.premiumModalTitle}>Gelişmiş Filtreler</Text>
-            <Text style={styles.premiumModalMessage}>
-              Gelişmiş filtreler ile şehir, yaş aralığı, cinsiyet ve tarih bazlı detaylı arama yapabilirsin. Bu özellik Premium üyelerimize özeldir.
-            </Text>
-            
-            <View style={styles.premiumFeaturesList}>
-              <View style={styles.premiumFeatureItem}>
-                <View style={styles.premiumFeatureIcon}>
-                  <MapPin size={20} color="#8B5CF6" />
-                </View>
-                <Text style={styles.premiumFeatureText}>Farklı şehirlerde ara</Text>
-              </View>
-              <View style={styles.premiumFeatureItem}>
-                <View style={styles.premiumFeatureIcon}>
-                  <Calendar size={20} color="#8B5CF6" />
-                </View>
-                <Text style={styles.premiumFeatureText}>Yaş aralığı filtrele</Text>
-              </View>
-              <View style={styles.premiumFeatureItem}>
-                <View style={styles.premiumFeatureIcon}>
-                  <Sparkles size={20} color="#8B5CF6" />
-                </View>
-                <Text style={styles.premiumFeatureText}>Cinsiyet tercihi belirle</Text>
-              </View>
-            </View>
-            
-            <View style={styles.premiumModalButtons}>
-              <TouchableOpacity
-                style={styles.premiumModalCancelButton}
-                onPress={() => setShowPremiumModal(false)}
-              >
-                <Text style={styles.premiumModalCancelText}>İptal</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.premiumModalUpgradeButton}
-                onPress={() => {
-                  setShowPremiumModal(false);
-                  setFilterModalVisible(false);
-                  router.push('/(tabs)/premium');
-                }}
-              >
-                <Crown size={18} color="#FFF" fill="#FFF" />
-                <Text style={styles.premiumModalUpgradeText}>Premium Ol</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowPremiumModal(false)}
+      />
 
       <Modal
         visible={filterModalVisible}
@@ -680,8 +624,7 @@ export default function DiscoverScreen() {
                   {/* Gelişmiş Filtre Butonu */}
                   <TouchableOpacity
                     style={styles.advancedFilterButton}
-                    onPress={async () => {
-                      await refreshPremiumStatus();
+                    onPress={() => {
                       if (isPremium) {
                         setShowAdvancedFilters(true);
                       } else {
@@ -692,8 +635,9 @@ export default function DiscoverScreen() {
                     <View style={styles.advancedFilterButtonContent}>
                       <SlidersHorizontal size={20} color="#8B5CF6" />
                       <Text style={styles.advancedFilterButtonText}>Gelişmiş Filtreler</Text>
+                      {!isPremium && <Crown size={16} color="#F59E0B" fill="#F59E0B" />}
                     </View>
-                    <Crown size={18} color="#F59E0B" fill="#F59E0B" />
+                    <ChevronDown size={18} color="#8B5CF6" style={{ transform: [{ rotate: '-90deg' }] }} />
                   </TouchableOpacity>
                 </>
               ) : (

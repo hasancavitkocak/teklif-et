@@ -12,11 +12,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ChevronDown, X, MapPin, SlidersHorizontal } from 'lucide-react-native';
+import { ChevronDown, X, MapPin, SlidersHorizontal, Crown } from 'lucide-react-native';
 import { invitationsAPI } from '@/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PROVINCES } from '@/constants/cities';
 import { supabase } from '@/lib/supabase';
+import SimplePremiumAlert from './SimplePremiumAlert';
 
 interface User {
   id: string;
@@ -46,7 +47,7 @@ export default function InviteUsersModal({
   proposalCity,
   proposalInterestId,
 }: InviteUsersModalProps) {
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -55,6 +56,7 @@ export default function InviteUsersModal({
   // Filtreleme state'leri
   const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [editingCity, setEditingCity] = useState(false);
@@ -396,11 +398,18 @@ export default function InviteUsersModal({
                   {/* Gelişmiş Filtre Butonu */}
                   <TouchableOpacity
                     style={styles.advancedFilterButton}
-                    onPress={() => setShowAdvancedFilters(true)}
+                    onPress={() => {
+                      if (isPremium) {
+                        setShowAdvancedFilters(true);
+                      } else {
+                        setShowPremiumAlert(true);
+                      }
+                    }}
                   >
                     <View style={styles.advancedFilterButtonContent}>
                       <SlidersHorizontal size={20} color="#8B5CF6" />
                       <Text style={styles.advancedFilterButtonText}>Gelişmiş Filtreler</Text>
+                      {!isPremium && <Crown size={16} color="#F59E0B" fill="#F59E0B" />}
                     </View>
                     <ChevronDown size={18} color="#8B5CF6" style={{ transform: [{ rotate: '-90deg' }] }} />
                   </TouchableOpacity>
@@ -561,31 +570,29 @@ export default function InviteUsersModal({
                       <Text style={styles.filterLabel}>Yaş Aralığı</Text>
                       <Text style={styles.filterValue}>{minAge} - {maxAge}</Text>
                     </View>
-                    <View style={styles.ageRangeContainer}>
-                      <View style={styles.ageInputRow}>
-                        <Text style={styles.ageLabel}>Min:</Text>
-                        <View style={styles.ageButtons}>
-                          <TouchableOpacity onPress={() => setMinAge(Math.max(18, minAge - 1))} style={styles.ageButton}>
-                            <Ionicons name="remove" size={20} color="#8B5CF6" />
-                          </TouchableOpacity>
-                          <Text style={styles.ageValue}>{minAge}</Text>
-                          <TouchableOpacity onPress={() => setMinAge(Math.min(maxAge - 1, minAge + 1))} style={styles.ageButton}>
-                            <Ionicons name="add" size={20} color="#8B5CF6" />
-                          </TouchableOpacity>
-                        </View>
+                    <View style={styles.ageSliderContainer}>
+                      <Text style={styles.sliderMinMax}>18</Text>
+                      <View style={styles.sliderTrack}>
+                        {/* Fill between min and max */}
+                        <View style={[
+                          styles.sliderFill,
+                          {
+                            left: `${((minAge - 18) / 82) * 100}%`,
+                            width: `${((maxAge - minAge) / 82) * 100}%`,
+                          }
+                        ]} />
+                        {/* Min Thumb */}
+                        <TouchableOpacity
+                          style={[styles.sliderThumb, { left: `${((minAge - 18) / 82) * 100}%` }]}
+                          onPress={() => {}}
+                        />
+                        {/* Max Thumb */}
+                        <TouchableOpacity
+                          style={[styles.sliderThumb, { left: `${((maxAge - 18) / 82) * 100}%` }]}
+                          onPress={() => {}}
+                        />
                       </View>
-                      <View style={styles.ageInputRow}>
-                        <Text style={styles.ageLabel}>Max:</Text>
-                        <View style={styles.ageButtons}>
-                          <TouchableOpacity onPress={() => setMaxAge(Math.max(minAge + 1, maxAge - 1))} style={styles.ageButton}>
-                            <Ionicons name="remove" size={20} color="#8B5CF6" />
-                          </TouchableOpacity>
-                          <Text style={styles.ageValue}>{maxAge}</Text>
-                          <TouchableOpacity onPress={() => setMaxAge(Math.min(100, maxAge + 1))} style={styles.ageButton}>
-                            <Ionicons name="add" size={20} color="#8B5CF6" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                      <Text style={styles.sliderMinMax}>100</Text>
                     </View>
                   </View>
 
@@ -758,6 +765,12 @@ export default function InviteUsersModal({
         </View>
       </View>
     </Modal>
+
+      {/* Premium Alert */}
+      <SimplePremiumAlert
+        visible={showPremiumAlert}
+        onClose={() => setShowPremiumAlert(false)}
+      />
     </>
   );
 }
@@ -1188,42 +1201,76 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
-  ageRangeContainer: {
-    gap: 16,
-  },
-  ageInputRow: {
+  ageSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
   },
-  ageLabel: {
-    fontSize: 15,
+  sliderMinMax: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#6b7280',
-    width: 50,
+    color: '#9CA3AF',
+    width: 30,
+    textAlign: 'center',
   },
-  ageButtons: {
+  sliderTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    position: 'relative',
+  },
+  sliderFill: {
+    position: 'absolute',
+    height: '100%',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 3,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    top: -7,
+    marginLeft: -10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  ageButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  ageControl: {
+    flex: 1,
+  },
+  ageControlButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: '#f3f4f6',
+    gap: 12,
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    justifyContent: 'center',
   },
-  ageButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  ageControlButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ageValue: {
-    fontSize: 18,
+  ageControlValue: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-    minWidth: 40,
+    minWidth: 35,
     textAlign: 'center',
   },
   genderButtons: {
