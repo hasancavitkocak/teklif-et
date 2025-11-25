@@ -234,6 +234,8 @@ export const invitationsAPI = {
     currentUserId: string,
     filters?: {
       city?: string;
+      latitude?: number;
+      longitude?: number;
       interestId?: string;
       minAge?: number;
       maxAge?: number;
@@ -286,12 +288,23 @@ export const invitationsAPI = {
       return [];
     }
 
-    // Teklif koordinatlarını al
-    const { data: proposalData } = await supabase
-      .from('proposals')
-      .select('latitude, longitude')
-      .eq('id', proposalId)
-      .single();
+    // Koordinatları belirle (filtre > teklif)
+    let targetLatitude = filters?.latitude;
+    let targetLongitude = filters?.longitude;
+    
+    // Filtre koordinatı yoksa teklif koordinatını kullan
+    if (!targetLatitude || !targetLongitude) {
+      const { data: proposalData } = await supabase
+        .from('proposals')
+        .select('latitude, longitude')
+        .eq('id', proposalId)
+        .single();
+      
+      targetLatitude = proposalData?.latitude;
+      targetLongitude = proposalData?.longitude;
+    }
+
+    console.log('🎯 Target coordinates:', { targetLatitude, targetLongitude });
 
     // Mesafe hesaplama fonksiyonu (Haversine)
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -312,17 +325,18 @@ export const invitationsAPI = {
       
       // Eğer her ikisinin de koordinatı varsa mesafe bazlı filtrele (50km)
       if (
-        proposalData?.latitude && 
-        proposalData?.longitude && 
+        targetLatitude && 
+        targetLongitude && 
         user.latitude && 
         user.longitude
       ) {
         const distance = calculateDistance(
-          proposalData.latitude,
-          proposalData.longitude,
+          targetLatitude,
+          targetLongitude,
           user.latitude,
           user.longitude
         );
+        console.log(`📏 Distance to ${user.name}:`, distance.toFixed(1), 'km');
         return distance <= 50; // 50 km yarıçap
       }
       

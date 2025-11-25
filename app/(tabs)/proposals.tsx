@@ -218,11 +218,18 @@ export default function ProposalsScreen() {
     );
   };
 
-  const handleInviteUsers = (proposal: Proposal) => {
+  const handleInviteUsers = async (proposal: Proposal) => {
+    // Kullanıcının güncel konumunu al (profil)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('city')
+      .eq('id', user?.id)
+      .single();
+
     setSelectedProposal({
       id: proposal.id,
       name: proposal.activity_name,
-      city: proposal.city,
+      city: profile?.city || proposal.city, // Profil konumu öncelikli
       interestId: proposal.interest.id || '',
     });
     setInviteModalVisible(true);

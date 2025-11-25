@@ -75,15 +75,44 @@ export default function InviteUsersModal({
     
     setLoading(true);
     try {
+      console.log('📋 loadInvitableUsers çağrıldı');
+      console.log('State:', { selectedProvince, selectedDistrict, proposalCity });
+      
       // Şehir bilgisini hazırla
       let cityFilter = proposalCity;
+      let filterCoordinates = null;
+      
       if (selectedProvince && selectedDistrict) {
         const provinceName = PROVINCES.find(p => p.id === selectedProvince)?.name;
         cityFilter = `${selectedDistrict}, ${provinceName}`;
+        
+        // Seçilen şehir için koordinat al
+        console.log('🔍 Filtre şehri için koordinat alınıyor:', cityFilter);
+        
+        // Önce cache'den dene
+        const { getCityCoordinates } = await import('@/constants/cityCoordinates');
+        let coordinates = getCityCoordinates(cityFilter);
+        
+        // Bulunamazsa Geocoding API'den al
+        if (!coordinates) {
+          console.log('📍 Geocoding API kullanılıyor...');
+          const { geocodeCity } = await import('@/utils/geocoding');
+          const geocoded = await geocodeCity(cityFilter);
+          
+          if (geocoded) {
+            coordinates = { lat: geocoded.latitude, lon: geocoded.longitude };
+          }
+        }
+        
+        if (coordinates) {
+          filterCoordinates = coordinates;
+          console.log('✅ Filtre koordinatları:', coordinates);
+        }
       }
 
       console.log('Loading users with filters:', {
         city: cityFilter,
+        coordinates: filterCoordinates,
         interestId: proposalInterestId,
         minAge,
         maxAge,
@@ -92,6 +121,8 @@ export default function InviteUsersModal({
 
       const data = await invitationsAPI.getInvitableUsers(proposalId, user.id, {
         city: cityFilter,
+        latitude: filterCoordinates?.lat,
+        longitude: filterCoordinates?.lon,
         interestId: proposalInterestId,
         minAge,
         maxAge,
