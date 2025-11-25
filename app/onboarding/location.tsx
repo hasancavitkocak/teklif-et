@@ -92,10 +92,18 @@ export default function LocationScreen() {
     triggerHaptic();
     setLoading(true);
     try {
+      // Koordinatları da kaydet
+      const Location = require('expo-location');
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
       const { error } = await supabase
         .from('profiles')
         .update({
           city: city.trim(),
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user?.id);

@@ -264,7 +264,7 @@ export const invitationsAPI = {
     // Aynı şehirdeki TÜM kullanıcıları getir (ilgi alanı kontrolü YOK)
     let query = supabase
       .from('profiles')
-      .select('id, name, profile_photo, birth_date, city, gender')
+      .select('id, name, profile_photo, birth_date, city, gender, latitude, longitude')
       .neq('id', currentUserId);
 
     // Cinsiyet filtresi

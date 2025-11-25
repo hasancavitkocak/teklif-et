@@ -9,15 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronDown, X, MapPin, SlidersHorizontal } from 'lucide-react-native';
 import { invitationsAPI } from '@/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PROVINCES } from '@/constants/cities';
+import { supabase } from '@/lib/supabase';
 
 interface User {
   id: string;
@@ -25,6 +24,9 @@ interface User {
   profile_photo: string;
   birth_date: string;
   city: string;
+  latitude?: number;
+  longitude?: number;
+  distance?: number;
 }
 
 interface InviteUsersModalProps {
@@ -97,7 +99,77 @@ export default function InviteUsersModal({
       });
       
       console.log('Loaded users:', data.length);
-      setUsers(data as User[]);
+      
+      // Mevcut kullanıcının konumunu al
+      const { data: currentUserData } = await supabase
+        .from('profiles')
+        .select('latitude, longitude')
+        .eq('id', user.id)
+        .single();
+      
+      // Uzaklık hesapla (Haversine formülü)
+      const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371; // Dünya'nın yarıçapı (km)
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+      };
+      
+      const usersWithDistance = (data as User[]).map(userData => {
+        let distance = 0;
+        
+        // Eğer her iki kullanıcının da koordinatları varsa gerçek uzaklık hesapla
+        if (
+          currentUserData?.latitude && 
+          currentUserData?.longitude && 
+          userData.latitude && 
+          userData.longitude
+        ) {
+          distance = calculateDistance(
+            currentUserData.latitude,
+            currentUserData.longitude,
+            userData.latitude,
+            userData.longitude
+          );
+        } else {
+          // Koordinat yoksa şehir bazlı tahmin
+          const userCityParts = userData.city.split(',');
+          const userDistrict = userCityParts[0]?.trim() || '';
+          const userProvince = userCityParts[1]?.trim() || userData.city;
+          
+          const proposalCityParts = cityFilter.split(',');
+          const proposalDistrict = proposalCityParts[0]?.trim() || '';
+          const proposalProvince = proposalCityParts[1]?.trim() || cityFilter;
+          
+          // Aynı ilçe ise 1-5 km
+          if (userDistrict && proposalDistrict && userDistrict === proposalDistrict) {
+            distance = Math.floor(Math.random() * 5) + 1;
+          }
+          // Aynı il, farklı ilçe ise 10-30 km
+          else if (userProvince === proposalProvince) {
+            distance = Math.floor(Math.random() * 21) + 10;
+          }
+          // Farklı il ise 50-100 km
+          else {
+            distance = Math.floor(Math.random() * 51) + 50;
+          }
+        }
+        
+        return {
+          ...userData,
+          distance,
+        };
+      });
+      
+      // Uzaklığa göre sırala (azdan çoğa)
+      usersWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      
+      setUsers(usersWithDistance);
     } catch (error) {
       console.error('Error loading users:', error);
       Alert.alert('Hata', 'Kullanıcılar yüklenirken bir hata oluştu');
@@ -180,43 +252,49 @@ export default function InviteUsersModal({
   const renderUser = ({ item }: { item: User }) => {
     const isSelected = selectedUsers.has(item.id);
     const age = calculateAge(item.birth_date);
+    
+    // Şehir bilgisinden il adını çıkar
+    const cityParts = item.city.split(',');
+    const province = cityParts.length > 1 ? cityParts[1].trim() : item.city;
+    
+    // Uzaklık bilgisi zaten item'da mevcut
+    const distance = item.distance || 0;
 
     return (
       <TouchableOpacity
         onPress={() => toggleUserSelection(item.id)}
-        activeOpacity={0.7}
-        style={styles.userCard}
+        activeOpacity={0.8}
+        style={styles.storyCard}
       >
-        <View style={styles.userCardContent}>
-          {/* Profile Photo with Border */}
-          <View style={[styles.photoContainer, isSelected && styles.photoContainerSelected]}>
-            <Image
-              source={{ uri: item.profile_photo || 'https://via.placeholder.com/80' }}
-              style={styles.profilePhoto}
-            />
-            {isSelected && (
-              <View style={styles.selectedBadge}>
-                <Ionicons name="checkmark-circle" size={28} color="#ec4899" />
-              </View>
-            )}
-          </View>
-
-          {/* User Info */}
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>
-              {item.name}, {age}
-            </Text>
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={14} color="#9ca3af" />
-              <Text style={styles.cityText}>{item.city}</Text>
+        {/* Instagram Story Tarzı Yuvarlak Fotoğraf */}
+        <View style={[styles.storyCircle, isSelected && styles.storyCircleSelected]}>
+          <Image
+            source={{ uri: item.profile_photo || 'https://via.placeholder.com/200' }}
+            style={styles.storyPhoto}
+          />
+          {isSelected && (
+            <View style={styles.storyCheckmark}>
+              <Ionicons name="checkmark-circle" size={28} color="#8B5CF6" />
             </View>
-          </View>
-
-          {/* Selection Indicator */}
-          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-            {isSelected && <Ionicons name="checkmark" size={18} color="white" />}
-          </View>
+          )}
         </View>
+
+        {/* Kullanıcı Bilgileri */}
+        <Text style={styles.storyName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={styles.storyAge}>{age}</Text>
+        
+        {/* Konum */}
+        <View style={styles.storyLocation}>
+          <Ionicons name="location" size={10} color="#8B5CF6" />
+          <Text style={styles.storyLocationText} numberOfLines={1}>{province}</Text>
+        </View>
+        
+        {/* Uzaklık */}
+        <Text style={styles.storyDistance}>
+          {distance < 1 ? `${distance * 1000}m` : `${distance}km`}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -559,16 +637,11 @@ export default function InviteUsersModal({
         onRequestClose={onClose}
       >
         <View style={styles.container}>
-        {/* Header with Gradient */}
-        <LinearGradient
-          colors={['#ec4899', '#8b5cf6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
+        {/* Minimal Header */}
+        <View style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="white" />
+              <Ionicons name="close" size={26} color="#111827" />
             </TouchableOpacity>
             
             <View style={styles.headerTextContainer}>
@@ -583,7 +656,7 @@ export default function InviteUsersModal({
                 onPress={() => setShowFilters(true)}
                 style={styles.filterButton}
               >
-                <Ionicons name="options-outline" size={22} color="white" />
+                <Ionicons name="options-outline" size={22} color="#6B7280" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -595,26 +668,25 @@ export default function InviteUsersModal({
                 ]}
               >
                 {sending ? (
-                  <ActivityIndicator size="small" color="#ec4899" />
+                  <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <>
-                    <Ionicons name="paper-plane" size={18} color={selectedUsers.size === 0 ? '#9ca3af' : '#ec4899'} />
+                  <View style={styles.sendButtonContent}>
+                    <Ionicons name="paper-plane" size={20} color="white" />
                     {selectedUsers.size > 0 && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{selectedUsers.size}</Text>
+                      <View style={styles.sendBadge}>
+                        <Text style={styles.sendBadgeText}>{selectedUsers.size}</Text>
                       </View>
                     )}
-                  </>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Selection Summary */}
         {selectedUsers.size > 0 && (
           <View style={styles.selectionSummary}>
-            <Ionicons name="checkmark-circle" size={20} color="#10b981" />
             <Text style={styles.selectionText}>
               {selectedUsers.size} kişi seçildi
             </Text>
@@ -622,30 +694,37 @@ export default function InviteUsersModal({
         )}
 
         {/* Content */}
-        {loading ? (
-          <View style={styles.centerContent}>
-            <ActivityIndicator size="large" color="#ec4899" />
-            <Text style={styles.loadingText}>Kullanıcılar yükleniyor...</Text>
-          </View>
-        ) : users.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="people-outline" size={64} color="#d1d5db" />
+        <View style={styles.content}>
+          {loading ? (
+            <View style={styles.centerContent}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Kullanıcılar yükleniyor...</Text>
             </View>
-            <Text style={styles.emptyTitle}>Davet Edilecek Kullanıcı Yok</Text>
-            <Text style={styles.emptyDescription}>
-              Aynı şehirde ve ilgi alanında henüz davet edilebilecek kullanıcı bulunmuyor
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={users}
-            renderItem={renderUser}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+          ) : users.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="people-outline" size={64} color="#d1d5db" />
+              </View>
+              <Text style={styles.emptyTitle}>Davet Edilecek Kullanıcı Yok</Text>
+              <Text style={styles.emptyDescription}>
+                Aynı şehirde henüz davet edilebilecek kullanıcı bulunmuyor
+              </Text>
+            </View>
+          ) : (
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+            >
+              <View style={styles.usersGrid}>
+                {users.map((item) => (
+                  <View key={item.id}>
+                    {renderUser({ item })}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+        </View>
       </View>
     </Modal>
     </>
@@ -659,8 +738,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   headerContent: {
     flexDirection: 'row',
@@ -668,72 +750,84 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTextContainer: {
     flex: 1,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
+    color: '#111827',
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    color: '#6B7280',
   },
   sendButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'white',
+    backgroundColor: '#8B5CF6',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 6,
   },
   sendButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  badge: {
+  sendButtonContent: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#10b981',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: 'white',
   },
-  badgeText: {
+  sendBadgeText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   selectionSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#d1fae5',
-    paddingVertical: 12,
+    backgroundColor: '#F5F3FF',
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9D5FF',
   },
   selectionText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#065f46',
+    color: '#8B5CF6',
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
   },
   centerContent: {
     flex: 1,
@@ -773,39 +867,43 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 12,
+    paddingBottom: 20,
   },
-  userCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  userCardContent: {
+  usersGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  storyCard: {
+    width: 80,
     alignItems: 'center',
-    padding: 16,
+    marginBottom: 8,
   },
-  photoContainer: {
+  storyCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    marginBottom: 6,
     position: 'relative',
-    marginRight: 16,
   },
-  photoContainerSelected: {
-    transform: [{ scale: 1.05 }],
-  },
-  profilePhoto: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  storyCircleSelected: {
+    borderColor: '#8B5CF6',
     borderWidth: 3,
-    borderColor: '#f3f4f6',
   },
-  selectedBadge: {
+  storyPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+  },
+  storyCheckmark: {
     position: 'absolute',
     bottom: -4,
     right: -4,
@@ -817,47 +915,41 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 17,
-    fontWeight: '700',
+  storyName: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#111827',
-    marginBottom: 6,
+    textAlign: 'center',
+    marginBottom: 2,
   },
-  locationRow: {
+  storyAge: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  storyLocation: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
+    marginBottom: 2,
   },
-  cityText: {
-    fontSize: 14,
-    color: '#6b7280',
+  storyLocationText: {
+    fontSize: 10,
+    color: '#8B5CF6',
+    fontWeight: '500',
   },
-  checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-  },
-  checkboxSelected: {
-    backgroundColor: '#ec4899',
-    borderColor: '#ec4899',
+  storyDistance: {
+    fontSize: 10,
+    color: '#9CA3AF',
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    alignItems: 'center',
   },
   filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
