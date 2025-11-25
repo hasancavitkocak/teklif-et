@@ -189,6 +189,8 @@ export const proposalsAPI = {
     is_group: boolean;
     interest_id: string;
     city: string;
+    latitude?: number;
+    longitude?: number;
     event_datetime?: string;
     venue_name?: string;
   }) => {

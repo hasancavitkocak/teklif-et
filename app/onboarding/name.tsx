@@ -34,11 +34,15 @@ export default function NameScreen() {
         .eq('id', user?.id)
         .maybeSingle();
 
+      // Telefon numarasını user metadata'dan al
+      const phone = user?.user_metadata?.phone || null;
+
       if (existingProfile) {
         const { error } = await supabase
           .from('profiles')
           .update({
             name: name.trim(),
+            phone: phone,
             updated_at: new Date().toISOString(),
           })
           .eq('id', user?.id);
@@ -48,6 +52,7 @@ export default function NameScreen() {
         const { error } = await supabase.from('profiles').insert({
           id: user?.id,
           name: name.trim(),
+          phone: phone,
           birth_date: '2000-01-01',
           gender: 'male',
           drinking: 'occasionally',

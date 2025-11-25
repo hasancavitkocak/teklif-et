@@ -1204,6 +1204,13 @@ function CreateProposalModal({
 
     setLoading(true);
     try {
+      // Kullanıcının koordinatlarını al
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('latitude, longitude')
+        .eq('id', user!.id)
+        .single();
+
       await proposalsAPI.createProposal({
         creator_id: user!.id,
         activity_name: activityName.trim(),
@@ -1211,6 +1218,8 @@ function CreateProposalModal({
         is_group: false,
         interest_id: selectedInterest,
         city: userCity || 'İstanbul',
+        latitude: userData?.latitude,
+        longitude: userData?.longitude,
         event_datetime: eventDate.toISOString(),
         venue_name: venueName.trim() || undefined,
       });

@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let authResult = signInResult;
 
     if (signInResult.error && signInResult.error.message.includes('Invalid')) {
-      authResult = await supabase.auth.signUp({
+      const signUpResult = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -94,13 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (authResult.error) throw authResult.error;
+      if (signUpResult.error) throw signUpResult.error;
 
-      if (authResult.data.user && !authResult.data.session) {
+      if (signUpResult.data.user && !signUpResult.data.session) {
         authResult = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+      } else {
+        authResult = signUpResult as any;
       }
     }
 
@@ -114,10 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setSession(null);
-    setUser(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        // Hata olsa bile local state'i temizle
+      }
+    } catch (error) {
+      console.error('SignOut catch error:', error);
+    } finally {
+      // Her durumda local state'i temizle
+      setSession(null);
+      setUser(null);
+    }
   };
 
   return (

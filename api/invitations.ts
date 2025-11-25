@@ -286,21 +286,57 @@ export const invitationsAPI = {
       return [];
     }
 
-    // Şehir filtresi - client side (esnek eşleşme)
+    // Teklif koordinatlarını al
+    const { data: proposalData } = await supabase
+      .from('proposals')
+      .select('latitude, longitude')
+      .eq('id', proposalId)
+      .single();
+
+    // Mesafe hesaplama fonksiyonu (Haversine)
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371; // Dünya'nın yarıçapı (km)
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    // Koordinat bazlı veya şehir bazlı filtreleme
     const users = allUsers.filter(user => {
       if (!user.city) return false;
       
+      // Eğer her ikisinin de koordinatı varsa mesafe bazlı filtrele (50km)
+      if (
+        proposalData?.latitude && 
+        proposalData?.longitude && 
+        user.latitude && 
+        user.longitude
+      ) {
+        const distance = calculateDistance(
+          proposalData.latitude,
+          proposalData.longitude,
+          user.latitude,
+          user.longitude
+        );
+        return distance <= 50; // 50 km yarıçap
+      }
+      
+      // Koordinat yoksa şehir bazlı filtrele (eski yöntem)
       const userCity = user.city.toLowerCase().trim();
       const targetProvince = provinceName.toLowerCase().trim();
       const targetCityLower = targetCity.toLowerCase().trim();
       
-      // Çeşitli eşleşme kontrolleri
       return (
-        userCity === targetProvince ||                    // Tam il adı: "kocaeli"
-        userCity.includes(targetProvince) ||              // İl adı içeriyor: "izmit, kocaeli"
-        targetCityLower.includes(userCity) ||             // Teklif şehri kullanıcı şehrini içeriyor
-        userCity.includes(targetCityLower) ||             // Kullanıcı şehri teklif şehrini içeriyor
-        userCity.split(',').some((part: string) =>        // Virgülle ayrılmış parçalardan biri eşleşiyor
+        userCity === targetProvince ||
+        userCity.includes(targetProvince) ||
+        targetCityLower.includes(userCity) ||
+        userCity.includes(targetCityLower) ||
+        userCity.split(',').some((part: string) =>
           part.trim() === targetProvince
         )
       );

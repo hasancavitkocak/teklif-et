@@ -23,6 +23,8 @@ interface Profile {
   birth_date: string;
   gender: string;
   city: string;
+  latitude?: number;
+  longitude?: number;
   smoking: string;
   drinking: string;
   profile_photo: string;
@@ -116,7 +118,8 @@ export default function ProfileScreen() {
             await signOut();
             router.replace('/auth/welcome');
           } catch (error: any) {
-            Alert.alert('Hata', 'Çıkış yapılırken bir hata oluştu');
+            console.error('Sign out error:', error);
+            Alert.alert('Hata', error.message || 'Çıkış yapılırken bir hata oluştu');
           }
         },
       },
@@ -125,14 +128,45 @@ export default function ProfileScreen() {
 
   const handleSaveSettings = async () => {
     try {
+      const updateData: any = {
+        name: editName,
+        city: editCity,
+        smoking: editSmoking,
+        drinking: editDrinking,
+      };
+
+      // Şehir değiştiyse koordinatları da güncelle
+      if (editCity !== profile?.city) {
+        console.log('🔄 Şehir değişti, koordinat alınıyor:', editCity);
+        
+        // Önce local cache'den dene
+        const { getCityCoordinates } = await import('@/constants/cityCoordinates');
+        let coordinates = getCityCoordinates(editCity);
+
+        // Bulunamazsa Geocoding API'den al
+        if (!coordinates) {
+          console.log('📍 Geocoding API kullanılıyor...');
+          const { geocodeCity } = await import('@/utils/geocoding');
+          const geocoded = await geocodeCity(editCity);
+          
+          if (geocoded) {
+            coordinates = { lat: geocoded.latitude, lon: geocoded.longitude };
+          }
+        }
+
+        // Koordinat bulunduysa ekle
+        if (coordinates) {
+          updateData.latitude = coordinates.lat;
+          updateData.longitude = coordinates.lon;
+          console.log('✅ Koordinatlar güncelleniyor:', coordinates);
+        } else {
+          console.warn('⚠️ Koordinat bulunamadı, mevcut koordinatlar korunuyor');
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          name: editName,
-          city: editCity,
-          smoking: editSmoking,
-          drinking: editDrinking,
-        })
+        .update(updateData)
         .eq('id', user?.id);
 
       if (error) throw error;
@@ -141,6 +175,7 @@ export default function ProfileScreen() {
       setSettingsVisible(false);
       loadProfile();
     } catch (error: any) {
+      console.error('Save settings error:', error);
       Alert.alert('Hata', error.message);
     }
   };
