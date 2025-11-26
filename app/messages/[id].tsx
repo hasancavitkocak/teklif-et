@@ -193,7 +193,12 @@ export default function MessageDetailScreen() {
           >
             <ArrowLeft size={24} color="#000" />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
+          <TouchableOpacity 
+            style={styles.headerCenter}
+            onPress={() => matchInfo && router.push(`/profile/${matchInfo.otherUser.id}` as any)}
+            activeOpacity={0.7}
+            disabled={!matchInfo}
+          >
             {matchInfo ? (
               <>
                 <Image
@@ -212,7 +217,7 @@ export default function MessageDetailScreen() {
                 <View style={styles.loadingPlaceholder} />
               </View>
             )}
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity 
             onPress={(event) => {
               event.currentTarget.measure((x, y, width, height, pageX, pageY) => {

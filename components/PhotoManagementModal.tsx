@@ -13,6 +13,7 @@ import {
 import { X, Camera as CameraIcon, Image as ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 
 interface Photo {
   id: string;
@@ -147,7 +148,7 @@ export default function PhotoManagementModal({
     }
   };
 
-  const addPhoto = async (url: string) => {
+  const addPhoto = async (uri: string) => {
     if (photos.length >= 6) {
       Alert.alert('Limit', 'En fazla 6 fotoğraf ekleyebilirsiniz');
       return;
@@ -155,20 +156,92 @@ export default function PhotoManagementModal({
 
     try {
       setLoading(true);
+      
+      let uploadedUrl = uri;
+
+      // Eğer local file ise (file:// ile başlıyorsa), Supabase storage'a yükle
+      if (uri.startsWith('file://')) {
+        // Dosya adı oluştur
+        const timestamp = Date.now();
+        const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
+        
+        // Dosyayı base64 olarak oku
+        const base64 = await readAsStringAsync(uri, {
+          encoding: 'base64',
+        });
+        
+        // Base64'ü ArrayBuffer'a çevir
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        
+        // Supabase storage'a yükle
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('profile-photos')
+          .upload(`profile-photos/${fileName}`, byteArray, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Public URL'i al
+        const { data: urlData } = supabase.storage
+          .from('profile-photos')
+          .getPublicUrl(`profile-photos/${fileName}`);
+        
+        uploadedUrl = urlData.publicUrl;
+      } else if (uri.startsWith('data:')) {
+        // Web için base64 data URL
+        const timestamp = Date.now();
+        const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
+        
+        // Base64 string'den data kısmını al
+        const base64Data = uri.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        
+        // Supabase storage'a yükle
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('profile-photos')
+          .upload(`profile-photos/${fileName}`, byteArray, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Public URL'i al
+        const { data: urlData } = supabase.storage
+          .from('profile-photos')
+          .getPublicUrl(`profile-photos/${fileName}`);
+        
+        uploadedUrl = urlData.publicUrl;
+      }
+
+      // Database'e kaydet
       const { error } = await supabase
         .from('profile_photos')
         .insert({
           profile_id: userId,
-          photo_url: url,
+          photo_url: uploadedUrl,
           order: photos.length,
         });
 
       if (error) throw error;
 
+      // İlk fotoğraf ise profil fotoğrafı olarak da kaydet
       if (photos.length === 0) {
         await supabase
           .from('profiles')
-          .update({ profile_photo: url })
+          .update({ profile_photo: uploadedUrl })
           .eq('id', userId);
       }
 
@@ -176,7 +249,8 @@ export default function PhotoManagementModal({
       onPhotosUpdated();
       Alert.alert('Başarılı', 'Fotoğraf eklendi');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      console.error('Photo upload error:', error);
+      Alert.alert('Hata', error.message || 'Fotoğraf yüklenemedi');
     } finally {
       setLoading(false);
     }

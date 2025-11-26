@@ -369,7 +369,11 @@ export default function DiscoverScreen() {
 
       {currentProposal ? (
         <View style={styles.cardContainer}>
-          <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => router.push(`/profile/${currentProposal.creator_id}` as any)}
+            activeOpacity={0.95}
+          >
             <Image
               source={{ uri: currentProposal.creator.profile_photo }}
               style={styles.cardImage}
@@ -438,7 +442,7 @@ export default function DiscoverScreen() {
                 </View>
               )}
             </LinearGradient>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.passButton} onPress={handlePass}>

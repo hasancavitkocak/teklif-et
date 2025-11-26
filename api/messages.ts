@@ -11,6 +11,7 @@ export interface Message {
 export interface MatchInfo {
   id: string;
   otherUser: {
+    id: string;
     name: string;
     profile_photo: string;
   };
@@ -30,8 +31,8 @@ export const messagesAPI = {
           user1_id,
           user2_id,
           proposal:proposals(activity_name),
-          user1:profiles!user1_id(name, profile_photo),
-          user2:profiles!user2_id(name, profile_photo)
+          user1:profiles!user1_id(id, name, profile_photo),
+          user2:profiles!user2_id(id, name, profile_photo)
         `)
         .eq('id', matchId)
         .single(),
@@ -63,7 +64,7 @@ export const messagesAPI = {
     return {
       matchInfo: {
         id: match.id,
-        otherUser: otherUser || { name: '', profile_photo: '' },
+        otherUser: otherUser || { id: '', name: '', profile_photo: '' },
         activity: (match.proposal as any)?.activity_name || '',
       } as MatchInfo,
       messages: messagesResult.data as Message[],

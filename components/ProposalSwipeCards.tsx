@@ -10,6 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Check, Zap, MapPin, Calendar, Store } from 'lucide-react-native';
 import { type ProposalRequest } from '@/api/proposals';
+import { useRouter } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ export default function ProposalSwipeCards({
   onReject,
   onEmpty,
 }: ProposalSwipeCardsProps) {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const calculateAge = (birthDate: string) => {
@@ -78,7 +80,11 @@ export default function ProposalSwipeCards({
   return (
     <View style={styles.container}>
       <View style={styles.cardWrapper}>
-        <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          activeOpacity={0.95}
+          onPress={() => router.push(`/profile/${currentRequest.requester_id}`)}
+        >
           <Image
             source={{ uri: profile.profile_photo }}
             style={styles.cardImage}
@@ -147,7 +153,7 @@ export default function ProposalSwipeCards({
               </View>
             )}
           </LinearGradient>
-        </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.actionsContainer}>
