@@ -260,7 +260,7 @@ export default function InviteUsersModal({
       setSelectedUsers(new Set());
       
       // Kullanıcı listesini yenile (davet edilenleri çıkar)
-      loadUsers();
+      loadInvitableUsers();
       
       Alert.alert(
         'Başarılı! 🎉',

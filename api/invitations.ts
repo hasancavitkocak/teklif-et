@@ -394,14 +394,14 @@ export const invitationsAPI = {
       });
     }
 
-    // Davet edilmiş ve başvuru yapmış kullanıcıları tek sorguda al
+    // Davet edilmiş, başvuru yapmış ve eşleşmiş kullanıcıları tek sorguda al
     const userIds = filteredUsers.map(u => u.id);
     if (userIds.length === 0) {
       console.log('No users after age filter');
       return [];
     }
     
-    const [{ data: invitedUsers }, { data: requestedUsers }] = await Promise.all([
+    const [{ data: invitedUsers }, { data: requestedUsers }, { data: matchedUsers }] = await Promise.all([
       supabase
         .from('proposal_invitations')
         .select('invited_user_id')
@@ -412,16 +412,30 @@ export const invitationsAPI = {
         .select('requester_id')
         .eq('proposal_id', proposalId)
         .in('requester_id', userIds),
+      supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .is('deleted_by', null)
+        .or(`user1_id.eq.${currentUserId},user2_id.eq.${currentUserId}`),
     ]);
+
+    // Eşleşmiş kullanıcı ID'lerini çıkar
+    const matchedUserIds = (matchedUsers || []).flatMap(match => {
+      if (match.user1_id === currentUserId) return [match.user2_id];
+      if (match.user2_id === currentUserId) return [match.user1_id];
+      return [];
+    });
 
     console.log('Exclusions:', {
       invited: invitedUsers?.length || 0,
       requested: requestedUsers?.length || 0,
+      matched: matchedUserIds.length,
     });
 
     const excludedIds = new Set([
       ...(invitedUsers || []).map(inv => inv.invited_user_id),
       ...(requestedUsers || []).map(req => req.requester_id),
+      ...matchedUserIds,
     ]);
 
     // Client-side filtreleme
