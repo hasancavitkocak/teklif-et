@@ -431,13 +431,14 @@ export default function ProposalsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
-        }
-      >
-        {activeTab === 'my_proposals' ? (
+      {activeTab !== 'invitations' && (
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
+          }
+        >
+          {activeTab === 'my_proposals' ? (
           myProposals.length > 0 ? (
             myProposals.map(proposal => (
               <View key={proposal.id} style={styles.proposalCard}>
@@ -575,8 +576,9 @@ export default function ProposalsScreen() {
               )
             )}
           </>
-        ) : null}
-      </ScrollView>
+          ) : null}
+        </ScrollView>
+      )}
 
       {activeTab === 'invitations' && <InvitationsList />}
 
@@ -589,6 +591,7 @@ export default function ProposalsScreen() {
           proposalName={selectedProposal.name}
           proposalCity={selectedProposal.city}
           proposalInterestId={selectedProposal.interestId}
+          onInviteSent={loadTabData}
         />
       )}
     </View>

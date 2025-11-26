@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { useUnread } from './UnreadContext';
 import { notificationsAPI, type Notification } from '@/api/notifications';
 import { supabase } from '@/lib/supabase';
 
@@ -17,14 +18,21 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { setUnreadCount: setGlobalUnreadCount } = useUnread();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Sync unreadCount to global UnreadContext
+  useEffect(() => {
+    setGlobalUnreadCount(unreadCount);
+  }, [unreadCount]);
+
   useEffect(() => {
     if (user?.id) {
       loadNotifications();
-      subscribeToNotifications();
+      const unsubscribe = subscribeToNotifications();
+      return unsubscribe;
     } else {
       setNotifications([]);
       setUnreadCount(0);
@@ -71,6 +79,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         'postgres_changes',
         {
           event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          loadNotifications();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,

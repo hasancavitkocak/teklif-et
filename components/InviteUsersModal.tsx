@@ -37,6 +37,7 @@ interface InviteUsersModalProps {
   proposalName: string;
   proposalCity: string;
   proposalInterestId: string;
+  onInviteSent?: () => void;
 }
 
 export default function InviteUsersModal({
@@ -46,6 +47,7 @@ export default function InviteUsersModal({
   proposalName,
   proposalCity,
   proposalInterestId,
+  onInviteSent,
 }: InviteUsersModalProps) {
   const { user, isPremium } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
@@ -251,13 +253,19 @@ export default function InviteUsersModal({
         Array.from(selectedUsers)
       );
       
+      // Listeyi yenile
+      onInviteSent?.();
+      
+      // Seçili kullanıcıları temizle
+      setSelectedUsers(new Set());
+      
+      // Kullanıcı listesini yenile (davet edilenleri çıkar)
+      loadUsers();
+      
       Alert.alert(
         'Başarılı! 🎉',
-        `${selectedUsers.size} kullanıcıya davet gönderildi`,
-        [{ text: 'Tamam', onPress: onClose }]
+        `${selectedUsers.size} kullanıcıya davet gönderildi`
       );
-      
-      setSelectedUsers(new Set());
     } catch (error: any) {
       console.error('Error sending invitations:', error);
       

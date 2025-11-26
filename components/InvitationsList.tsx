@@ -236,6 +236,7 @@ export default function InvitationsList() {
 
   return (
     <FlatList
+      style={{ flex: 1 }}
       data={invitations}
       renderItem={renderInvitation}
       keyExtractor={(item) => item.id}
@@ -276,20 +277,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listContent: {
-    padding: 12,
+    padding: 16,
+    paddingTop: 0,
   },
   invitationCard: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 0,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   header: {
     flexDirection: 'row',
@@ -297,11 +298,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#F3F4F6',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: '#E9D5FF',
   },
   headerInfo: {
     flex: 1,
@@ -346,12 +347,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   proposalInfo: {
-    backgroundColor: '#F5F3FF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
   },
   activityName: {
     fontSize: 16,
@@ -380,9 +381,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
     gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   declineButtonText: {
     fontSize: 15,
@@ -395,9 +398,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#8B5CF6',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
     gap: 6,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   acceptButtonText: {
     fontSize: 15,
