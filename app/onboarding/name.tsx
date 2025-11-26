@@ -7,9 +7,14 @@ import * as Haptics from 'expo-haptics';
 
 export default function NameScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/auth/welcome');
+  };
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -105,6 +110,13 @@ export default function NameScreen() {
             {loading ? 'Kaydediliyor...' : 'Devam Et'}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutText}>Çıkış Yap (Debug)</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -183,5 +195,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  logoutButton: {
+    marginTop: 20,
+    padding: 12,
+    alignItems: 'center',
+  },
+  logoutText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '600',
   },
 });

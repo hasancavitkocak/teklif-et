@@ -13,7 +13,10 @@ export default function Index() {
     if (loading) return;
 
     const checkProfile = async () => {
+      console.log('🔍 Checking profile, user:', user?.id);
+      
       if (!user) {
+        console.log('❌ No user, redirecting to welcome');
         setTimeout(() => {
           router.replace('/auth/welcome');
         }, 100);
@@ -26,17 +29,23 @@ export default function Index() {
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('onboarding_completed')
         .eq('id', user.id)
         .maybeSingle();
 
+      console.log('👤 Profile data:', profile);
+      console.log('❗ Profile error:', error);
+
       if (!profile) {
+        console.log('➡️ No profile, going to onboarding');
         router.replace('/onboarding/name');
       } else if (!profile.onboarding_completed) {
+        console.log('➡️ Onboarding not completed, going to onboarding');
         router.replace('/onboarding/name');
       } else {
+        console.log('✅ Profile complete, going to tabs');
         router.replace('/(tabs)');
       }
     };

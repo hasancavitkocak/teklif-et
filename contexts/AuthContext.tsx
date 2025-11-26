@@ -75,14 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const email = `${phone.replace(/\+/g, '')}@teklif.et`;
     const password = phone + '_demo_password';
 
+    console.log('🔑 Attempting sign in with:', email);
     const signInResult = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    console.log('📝 Sign in result:', signInResult.error?.message || 'Success');
     let authResult = signInResult;
 
     if (signInResult.error && signInResult.error.message.includes('Invalid')) {
+      console.log('👤 User not found, creating new account...');
       const signUpResult = await supabase.auth.signUp({
         email,
         password,
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
+      console.log('✨ Sign up result:', signUpResult.error?.message || 'Success');
       if (signUpResult.error) throw signUpResult.error;
 
       if (signUpResult.data.user && !signUpResult.data.session) {

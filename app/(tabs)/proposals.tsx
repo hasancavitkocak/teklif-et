@@ -465,7 +465,9 @@ export default function ProposalsScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={styles.proposalCategory}>{proposal.interest.name}</Text>
+                {proposal.interest && (
+                  <Text style={styles.proposalCategory}>{proposal.interest.name}</Text>
+                )}
                 {proposal.description && (
                   <Text style={styles.proposalDescription}>{proposal.description}</Text>
                 )}
@@ -573,10 +575,10 @@ export default function ProposalsScreen() {
               )
             )}
           </>
-        ) : (
-          <InvitationsList />
-        )}
+        ) : null}
       </ScrollView>
+
+      {activeTab === 'invitations' && <InvitationsList />}
 
       {/* Invite Users Modal */}
       {selectedProposal && (

@@ -170,33 +170,24 @@ export default function DiscoverScreen() {
     loadInterests();
     loadUserCity();
 
-    // Real-time yeni teklif dinleme
+    // Real-time yeni teklif dinleme - yeni teklifleri listeye ekle
     const subscription = supabase
       .channel('proposals-changes')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'proposals' 
-      }, (payload) => {
+      }, async (payload) => {
         console.log('New proposal in feed:', payload);
-        // Yeni teklif oluşturulduğunda otomatik yükle
-        loadProposals();
-      })
-      .on('postgres_changes', { 
-        event: 'DELETE', 
-        schema: 'public', 
-        table: 'proposals' 
-      }, (payload) => {
-        console.log('Proposal deleted:', payload);
-        // Teklif silindiğinde yükle
-        loadProposals();
+        // Yeni teklifi arka planda yükle - index'i koruyarak
+        loadProposals(false);
       })
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id]);
+  }, [user?.id, selectedCity, selectedInterest]);
 
   // Filtre değiştiğinde otomatik yükle
   useEffect(() => {
@@ -233,7 +224,7 @@ export default function DiscoverScreen() {
     }
   };
 
-  const loadProposals = async () => {
+  const loadProposals = async (resetIndex = true) => {
     if (!user?.id) {
       setLoading(false);
       return;
@@ -245,7 +236,10 @@ export default function DiscoverScreen() {
         interestId: selectedInterest,
       });
       setProposals(data);
-      setCurrentIndex(0);
+      // Sadece manuel yüklemede veya filtre değişiminde index'i sıfırla
+      if (resetIndex) {
+        setCurrentIndex(0);
+      }
     } catch (error: any) {
       Alert.alert('Hata', error.message);
     } finally {
@@ -438,9 +432,11 @@ export default function DiscoverScreen() {
               </View>
               
               {/* Kategori - En Alt */}
-              <View style={styles.interestChip}>
-                <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
-              </View>
+              {currentProposal.interest && (
+                <View style={styles.interestChip}>
+                  <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
+                </View>
+              )}
             </LinearGradient>
           </View>
 

@@ -1,7 +1,6 @@
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,8 +14,12 @@ export default function WelcomeScreen() {
     >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Heart size={64} color="#FFF" fill="#FFF" />
-          <Text style={styles.logo}>Teklif.et</Text>
+          <Image 
+            source={require('@/assets/images/puzzle-icon.png')} 
+            style={styles.logoIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.logo}>Teklif Et</Text>
         </View>
 
         <View style={styles.taglineContainer}>
@@ -33,9 +36,19 @@ export default function WelcomeScreen() {
             <Text style={styles.startButtonText}>Başlayalım</Text>
           </TouchableOpacity>
 
-          <Text style={styles.terms}>
-            Devam ederek Kullanım Koşulları ve{'\n'}Gizlilik Politikasını kabul ediyorsunuz
-          </Text>
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              Devam ederek{' '}
+              <Text style={styles.termsLink} onPress={() => router.push('/legal/terms')}>
+                Kullanım Koşulları
+              </Text>
+              {' '}ve{' '}
+              <Text style={styles.termsLink} onPress={() => router.push('/legal/privacy')}>
+                Gizlilik Politikası
+              </Text>
+              'nı kabul ediyorsunuz
+            </Text>
+          </View>
         </View>
       </View>
     </LinearGradient>
@@ -55,13 +68,19 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    gap: 16,
+    gap: 8,
+  },
+  logoIcon: {
+    width: 140,
+    height: 140,
+    tintColor: '#FFF',
   },
   logo: {
-    fontSize: 48,
-    fontWeight: '700',
+    fontSize: 38,
+    fontWeight: '800',
     color: '#FFF',
-    letterSpacing: -1,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   taglineContainer: {
     alignItems: 'center',
@@ -92,11 +111,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#8B5CF6',
   },
-  terms: {
-    fontSize: 13,
+  termsContainer: {
+    paddingHorizontal: 16,
+  },
+  termsText: {
+    fontSize: 12,
     color: '#FFF',
-    textAlign: 'center',
-    opacity: 0.8,
+    opacity: 0.75,
     lineHeight: 18,
+    textAlign: 'center',
+  },
+  termsLink: {
+    fontSize: 12,
+    color: '#FFF',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    opacity: 1,
   },
 });

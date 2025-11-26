@@ -36,9 +36,11 @@ export default function VerifyScreen() {
   };
 
   const verifyCode = async (code: string) => {
+    console.log('🔐 Verifying code:', code, 'for phone:', phone);
     setLoading(true);
     try {
       const success = await verifyOtp(phone, code);
+      console.log('✅ Verify result:', success);
       if (success) {
         const { data: session } = await supabase.auth.getSession();
         if (session?.session?.user) {
@@ -58,6 +60,7 @@ export default function VerifyScreen() {
         }
       }
     } catch (error: any) {
+      console.log('❌ Verify error:', error.message);
       Alert.alert('Hata', 'Doğrulama kodu hatalı');
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
