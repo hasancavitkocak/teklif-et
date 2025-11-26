@@ -19,6 +19,7 @@ import { proposalsAPI, type Proposal, type ProposalRequest } from '@/api/proposa
 import { invitationsAPI } from '@/api/invitations';
 import InviteUsersModal from '@/components/InviteUsersModal';
 import InvitationsList from '@/components/InvitationsList';
+import ProposalSwipeCards from '@/components/ProposalSwipeCards';
 
 export default function ProposalsScreen() {
   const { user } = useAuth();
@@ -431,15 +432,14 @@ export default function ProposalsScreen() {
         </TouchableOpacity>
       </View>
 
-      {activeTab !== 'invitations' && (
+      {activeTab === 'my_proposals' && (
         <ScrollView
           style={styles.content}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
           }
         >
-          {activeTab === 'my_proposals' ? (
-          myProposals.length > 0 ? (
+          {myProposals.length > 0 ? (
             myProposals.map(proposal => (
               <View key={proposal.id} style={styles.proposalCard}>
                 <View style={styles.proposalHeader}>
@@ -497,17 +497,27 @@ export default function ProposalsScreen() {
               <Clock size={48} color="#9CA3AF" />
               <Text style={styles.emptyText}>Henüz teklif oluşturmadınız</Text>
             </View>
-          )
-        ) : activeTab === 'received' ? (
-          received.length > 0 ? (
-            received.map(request => renderRequest(request, 'received'))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Clock size={48} color="#9CA3AF" />
-              <Text style={styles.emptyText}>Henüz başvuru yok</Text>
-            </View>
-          )
-        ) : activeTab === 'sent' ? (
+          )}
+        </ScrollView>
+      )}
+
+      {/* Başvurular Tab - Swipe Cards */}
+      {activeTab === 'received' && (
+        <ProposalSwipeCards
+          requests={received.filter(r => r.status === 'pending')}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          onEmpty={() => loadTabData()}
+        />
+      )}
+
+      {activeTab === 'sent' && (
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
+          }
+        >
           <>
             {/* Alt Tab'lar */}
             <View style={styles.subTabsContainer}>
@@ -576,7 +586,6 @@ export default function ProposalsScreen() {
               )
             )}
           </>
-          ) : null}
         </ScrollView>
       )}
 

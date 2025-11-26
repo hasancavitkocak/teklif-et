@@ -27,6 +27,12 @@ export interface ProposalRequest {
     id: string;
     activity_name: string;
     city: string;
+    event_datetime?: string;
+    venue_name?: string;
+    interest?: {
+      id: string;
+      name: string;
+    };
     creator: {
       name: string;
       profile_photo: string;
