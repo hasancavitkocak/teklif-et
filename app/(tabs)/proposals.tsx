@@ -268,12 +268,12 @@ export default function ProposalsScreen() {
         : '✗ Reddedildi';
 
     return (
-      <View key={invitation.id} style={styles.requestCard}>
-        {/* Davet Badge */}
-        <View style={styles.typeBadge}>
-          <Text style={styles.typeBadgeText}>Davet</Text>
-        </View>
-        
+      <TouchableOpacity 
+        key={invitation.id} 
+        style={styles.requestCard}
+        onPress={() => invitation.invited_user_id && router.push(`/profile/${invitation.invited_user_id}` as any)}
+        activeOpacity={0.7}
+      >
         <Image 
           source={{ uri: invitation.invited_user?.profile_photo || 'https://via.placeholder.com/90' }} 
           style={styles.requestImage} 
@@ -303,7 +303,7 @@ export default function ProposalsScreen() {
             <Check size={16} color="#10B981" />
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -329,15 +329,15 @@ export default function ProposalsScreen() {
         ? 'Başka Biri Kabul Edildi'
         : 'Beklemede';
 
+    const userId = request.requester_id;
+
     return (
-      <View key={request.id} style={styles.requestCard}>
-        {/* İstek Badge - Sadece sent tab'ında göster */}
-        {type === 'sent' && (
-          <View style={[styles.typeBadge, styles.typeBadgeRequest]}>
-            <Text style={styles.typeBadgeText}>İstek</Text>
-          </View>
-        )}
-        
+      <TouchableOpacity 
+        key={request.id} 
+        style={styles.requestCard}
+        onPress={() => userId && router.push(`/profile/${userId}` as any)}
+        activeOpacity={0.7}
+      >
         <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
         <View style={styles.requestInfo}>
           <View style={styles.requestHeader}>
@@ -360,15 +360,19 @@ export default function ProposalsScreen() {
           <View style={styles.requestActions}>
             <TouchableOpacity
               style={styles.rejectButton}
-              onPress={() => handleReject(request.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleReject(request.id);
+              }}
             >
               <XIcon size={20} color="#FFF" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.acceptButton}
-              onPress={() =>
-                handleAccept(request.id, request.proposal.id, request.requester_id)
-              }
+              onPress={(e) => {
+                e.stopPropagation();
+                handleAccept(request.id, request.proposal.id, request.requester_id);
+              }}
             >
               <Check size={20} color="#FFF" />
             </TouchableOpacity>
@@ -387,7 +391,7 @@ export default function ProposalsScreen() {
             <Check size={16} color="#10B981" />
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 

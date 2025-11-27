@@ -12,6 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, MapPin, Heart, X } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -195,7 +196,8 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header with back button */}
         <TouchableOpacity style={styles.backButtonTop} onPress={() => router.back()}>
@@ -242,10 +244,12 @@ export default function UserProfileScreen() {
         {/* Full Screen Photo Modal */}
         <Modal
           visible={selectedPhotoIndex !== null}
-          transparent={true}
+          transparent={false}
           animationType="fade"
           onRequestClose={() => setSelectedPhotoIndex(null)}
+          statusBarTranslucent={true}
         >
+          <StatusBar style="light" hidden={true} />
           <View style={styles.modalContainer}>
             <TouchableOpacity 
               style={styles.closeButton}
@@ -407,7 +411,7 @@ const styles = StyleSheet.create({
   },
   backButtonTop: {
     position: 'absolute',
-    top: 16,
+    top: 50,
     left: 16,
     width: 40,
     height: 40,
