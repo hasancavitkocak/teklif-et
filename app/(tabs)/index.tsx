@@ -456,7 +456,7 @@ export default function DiscoverScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.likeButton} onPress={() => handleLike()}>
               <Image 
-                source={require('@/assets/images/puzzle-icon.png')} 
+                source={require('@/assets/images/puzzle-iconnew.png')} 
                 style={{ width: 48, height: 48, tintColor: '#8B5CF6' }}
                 resizeMode="contain"
               />

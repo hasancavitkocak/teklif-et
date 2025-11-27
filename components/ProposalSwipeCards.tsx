@@ -83,7 +83,7 @@ export default function ProposalSwipeCards({
         <TouchableOpacity 
           style={styles.card}
           activeOpacity={0.95}
-          onPress={() => router.push(`/profile/${currentRequest.requester_id}`)}
+          onPress={() => router.push(`/profile/${currentRequest.requester_id}` as any)}
         >
           <Image
             source={{ uri: profile.profile_photo }}
@@ -162,7 +162,7 @@ export default function ProposalSwipeCards({
         </TouchableOpacity>
         <TouchableOpacity style={styles.likeButton} onPress={handleAccept}>
           <Image 
-            source={require('@/assets/images/puzzle-icon.png')} 
+            source={require('@/assets/images/puzzle-iconnew.png')} 
             style={{ width: 48, height: 48, tintColor: '#8B5CF6' }}
             resizeMode="contain"
           />

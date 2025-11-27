@@ -117,10 +117,12 @@ export default function UserProfileScreen() {
       // Local file path'leri filtrele (sadece http/https URL'leri göster)
       allPhotos = allPhotos.filter(url => url.startsWith('http://') || url.startsWith('https://'));
 
+      const interests = interestsData?.map((item: any) => item.interest).filter(Boolean) || [];
+
       setProfile({
         ...profileData,
         photos: allPhotos.length > 0 ? allPhotos : [profileData.profile_photo],
-        interests: interestsData?.map((item: any) => item.interest) || [],
+        interests: interests,
         lifestyle: {
           drinking: profileData.drinking,
           smoking: profileData.smoking,
@@ -307,21 +309,6 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* Interests */}
-        {profile.interests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>İlgi Alanları</Text>
-            <View style={styles.interestsContainer}>
-              {profile.interests.map((interest) => (
-                <View key={interest.id} style={styles.interestChip}>
-                  <Heart size={14} color="#8B5CF6" />
-                  <Text style={styles.interestText}>{interest.name}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Info Grid */}
         <View style={styles.section}>
           <View style={styles.infoGrid}>
@@ -361,14 +348,23 @@ export default function UserProfileScreen() {
                 <Text style={styles.infoValue}>{translateValue('smoking', profile.lifestyle.smoking)}</Text>
               </View>
             )}
-            {profile.lifestyle?.exercise && (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoLabel}>Spor</Text>
-                <Text style={styles.infoValue}>{translateValue('exercise', profile.lifestyle.exercise)}</Text>
-              </View>
-            )}
           </View>
         </View>
+
+        {/* Interests */}
+        {profile.interests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>İlgi Alanları</Text>
+            <View style={styles.interestsContainer}>
+              {profile.interests.map((interest) => (
+                <View key={interest.id} style={styles.interestChip}>
+                  <Heart size={14} color="#8B5CF6" />
+                  <Text style={styles.interestText}>{interest.name}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

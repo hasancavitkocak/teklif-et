@@ -28,6 +28,7 @@ interface Invitation {
     };
   };
   inviter?: {
+    id: string;
     name: string;
     profile_photo: string;
     birth_date: string;
@@ -64,6 +65,7 @@ export default function InvitationSwipeCards({
   const handleAccept = () => {
     if (currentIndex >= invitations.length) return;
     const invitation = invitations[currentIndex];
+    if (!invitation.proposal) return;
     onAccept(invitation.id, invitation.proposal.id);
     setCurrentIndex(currentIndex + 1);
     
@@ -103,7 +105,7 @@ export default function InvitationSwipeCards({
         <TouchableOpacity 
           style={styles.card}
           activeOpacity={0.95}
-          onPress={() => router.push(`/profile/${currentInvitation.inviter_id}`)}
+          onPress={() => router.push(`/profile/${inviter.id}` as any)}
         >
           <Image
             source={{ uri: inviter.profile_photo }}
@@ -142,7 +144,7 @@ export default function InvitationSwipeCards({
         </TouchableOpacity>
         <TouchableOpacity style={styles.likeButton} onPress={handleAccept}>
           <Image 
-            source={require('@/assets/images/puzzle-icon.png')} 
+            source={require('@/assets/images/puzzle-iconnew.png')} 
             style={{ width: 48, height: 48, tintColor: '#8B5CF6' }}
             resizeMode="contain"
           />

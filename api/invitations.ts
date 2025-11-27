@@ -118,6 +118,7 @@ export const invitationsAPI = {
           interest:interests(name)
         ),
         inviter:profiles!inviter_id(
+          id,
           name,
           profile_photo,
           birth_date
