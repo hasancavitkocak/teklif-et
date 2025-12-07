@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   StyleSheet,
   ScrollView,
+  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChevronDown, X, MapPin, SlidersHorizontal, Crown } from 'lucide-react-native';
@@ -67,6 +68,67 @@ export default function InviteUsersModal({
   const [minAge, setMinAge] = useState<number>(18);
   const [maxAge, setMaxAge] = useState<number>(50);
   const [selectedGender, setSelectedGender] = useState<'all' | 'male' | 'female'>('all');
+
+  // Yaş slider refs
+  const ageSliderTrackRef = useRef<View>(null);
+  const ageSliderStartX = useRef(0);
+  const ageSliderWidth = useRef(0);
+
+  // Yaş Slider PanResponder (Min)
+  const ageMinPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (ageSliderTrackRef.current) {
+          ageSliderTrackRef.current.measure((x, y, width, height, pageX) => {
+            ageSliderStartX.current = pageX;
+            ageSliderWidth.current = width;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (ageSliderWidth.current > 0 && ageSliderStartX.current > 0) {
+          const touchX = evt.nativeEvent.pageX;
+          const relativeX = touchX - ageSliderStartX.current;
+          const percentage = Math.max(0, Math.min(1, relativeX / ageSliderWidth.current));
+          const newAge = Math.round(percentage * 82) + 18;
+          if (newAge < maxAge) {
+            setMinAge(newAge);
+          }
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
+  // Yaş Slider PanResponder (Max)
+  const ageMaxPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (ageSliderTrackRef.current) {
+          ageSliderTrackRef.current.measure((x, y, width, height, pageX) => {
+            ageSliderStartX.current = pageX;
+            ageSliderWidth.current = width;
+          });
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (ageSliderWidth.current > 0 && ageSliderStartX.current > 0) {
+          const touchX = evt.nativeEvent.pageX;
+          const relativeX = touchX - ageSliderStartX.current;
+          const percentage = Math.max(0, Math.min(1, relativeX / ageSliderWidth.current));
+          const newAge = Math.round(percentage * 82) + 18;
+          if (newAge > minAge) {
+            setMaxAge(newAge);
+          }
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
 
   useEffect(() => {
     if (visible && user) {
@@ -580,7 +642,7 @@ export default function InviteUsersModal({
                     </View>
                     <View style={styles.ageSliderContainer}>
                       <Text style={styles.sliderMinMax}>18</Text>
-                      <View style={styles.sliderTrack}>
+                      <View style={styles.sliderTrack} ref={ageSliderTrackRef}>
                         {/* Fill between min and max */}
                         <View style={[
                           styles.sliderFill,
@@ -590,14 +652,14 @@ export default function InviteUsersModal({
                           }
                         ]} />
                         {/* Min Thumb */}
-                        <TouchableOpacity
+                        <View
                           style={[styles.sliderThumb, { left: `${((minAge - 18) / 82) * 100}%` }]}
-                          onPress={() => {}}
+                          {...ageMinPanResponder.panHandlers}
                         />
                         {/* Max Thumb */}
-                        <TouchableOpacity
+                        <View
                           style={[styles.sliderThumb, { left: `${((maxAge - 18) / 82) * 100}%` }]}
-                          onPress={() => {}}
+                          {...ageMaxPanResponder.panHandlers}
                         />
                       </View>
                       <Text style={styles.sliderMinMax}>100</Text>
