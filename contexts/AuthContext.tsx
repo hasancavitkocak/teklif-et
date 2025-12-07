@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import * as Location from 'expo-location';
 
 interface AuthContextType {
   session: Session | null;
@@ -54,14 +55,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // User değiştiğinde premium durumunu yükle
+  // User değiştiğinde premium durumunu yükle ve konumu güncelle
   useEffect(() => {
     if (user?.id) {
       refreshPremiumStatus();
+      updateUserLocation();
     } else {
       setIsPremium(false);
     }
   }, [user?.id]);
+
+  const updateUserLocation = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Konum izni iste
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        return;
+      }
+
+      // Mevcut konumu al
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Reverse geocoding ile şehir bilgisini al
+      const [geocode] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      
+      if (geocode?.city) {
+        // Profildeki şehir bilgisini güncelle
+        await supabase
+          .from('profiles')
+          .update({
+            city: geocode.city,
+            latitude,
+            longitude,
+          })
+          .eq('id', user.id);
+
+        console.log('✅ Location updated:', geocode.city);
+      }
+    } catch (error) {
+      console.error('Location update error:', error);
+    }
+  };
 
   const signInWithPhone = async (phone: string) => {
     setPendingPhone(phone);

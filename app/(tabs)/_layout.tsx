@@ -78,31 +78,7 @@ export default function TabLayout() {
         name="matches"
         options={{
           title: 'Sohbet',
-          tabBarIcon: ({ size, color }) => (
-            <View style={{ position: 'relative' }}>
-              <MessageCircle size={size} color={color} />
-              {(unreadCount || 0) > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -8,
-                    backgroundColor: '#EF4444',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                    {(unreadCount || 0) > 9 ? '9+' : String(unreadCount || 0)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
+          tabBarIcon: ({ size, color }) => <MessageCircle size={size} color={color} />,
         }}
       />
       <Tabs.Screen

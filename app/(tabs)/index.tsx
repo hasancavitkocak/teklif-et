@@ -234,6 +234,9 @@ export default function DiscoverScreen() {
       const data = await discoverAPI.getProposals(user.id, {
         city: selectedCity,
         interestId: selectedInterest,
+        minAge: isPremium ? minAge : undefined,
+        maxAge: isPremium ? maxAge : undefined,
+        gender: isPremium ? selectedGender : undefined,
       });
       setProposals(data);
       // Sadece manuel yüklemede veya filtre değişiminde index'i sıfırla
