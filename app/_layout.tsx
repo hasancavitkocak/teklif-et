@@ -28,6 +28,7 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding/location" />
               <Stack.Screen name="onboarding/photos" />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="account-frozen" />
               <Stack.Screen name="notifications" />
               <Stack.Screen name="+not-found" />
             </Stack>

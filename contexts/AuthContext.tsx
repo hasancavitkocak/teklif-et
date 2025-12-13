@@ -10,7 +10,10 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isPremium: boolean;
+  isAccountFrozen: boolean;
   refreshPremiumStatus: () => Promise<void>;
+  refreshAccountStatus: () => Promise<void>;
+  unfreezeAccount: () => Promise<boolean>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -23,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
+  const [isAccountFrozen, setIsAccountFrozen] = useState(false);
   const [pendingPhone, setPendingPhone] = useState<string | null>(null);
 
   const refreshPremiumStatus = async () => {
@@ -37,6 +41,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsPremium(profile?.is_premium || false);
     } catch (error) {
       console.error('Error loading premium status:', error);
+    }
+  };
+
+  const refreshAccountStatus = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', user.id)
+        .single();
+      
+      setIsAccountFrozen(!(profile?.is_active ?? true));
+    } catch (error) {
+      console.error('Error loading account status:', error);
+    }
+  };
+
+  const unfreezeAccount = async (): Promise<boolean> => {
+    if (!user?.id) return false;
+    
+    try {
+      console.log('🔥 Hesap dondurmayı kaldırma işlemi başlatılıyor...');
+      
+      // Hesabı aktif hale getir
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_active: true })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // Dondurulmuş teklifleri aktif yap
+      const { error: proposalsError } = await supabase
+        .from('proposals')
+        .update({ status: 'active' })
+        .eq('creator_id', user.id)
+        .eq('status', 'frozen');
+
+      if (proposalsError) {
+        console.warn('⚠️ Teklifler aktif edilirken hata:', proposalsError);
+      }
+
+      // Dondurulmuş eşleşmeleri aktif yap
+      const { error: matchesError } = await supabase
+        .from('matches')
+        .update({ is_active: true })
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .eq('is_active', false);
+
+      if (matchesError) {
+        console.warn('⚠️ Eşleşmeler aktif edilirken hata:', matchesError);
+      }
+
+      setIsAccountFrozen(false);
+      console.log('✅ Hesap başarıyla aktif hale getirildi');
+      return true;
+    } catch (error) {
+      console.error('❌ Hesap aktif etme hatası:', error);
+      return false;
     }
   };
 
@@ -61,11 +125,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user?.id) {
       refreshPremiumStatus();
+      refreshAccountStatus();
       updateUserLocation();
     } else {
       setIsPremium(false);
+      setIsAccountFrozen(false);
     }
   }, [user?.id]);
+
+  // Real-time hesap durumu dinleme
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('👂 Hesap durumu dinleme başlatılıyor...');
+    
+    const subscription = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔄 Profil güncellendi:', payload);
+          
+          const newProfile = payload.new as any;
+          
+          // Hesap dondurulmuşsa otomatik çıkış yap
+          if (newProfile.is_active === false && !isAccountFrozen) {
+            console.log('🥶 Hesap donduruldu, otomatik çıkış yapılıyor...');
+            setIsAccountFrozen(true);
+            
+            // Kısa bir gecikme ile çıkış yap (UI güncellemesi için)
+            setTimeout(async () => {
+              try {
+                await signOut();
+                console.log('✅ Otomatik çıkış tamamlandı');
+              } catch (error) {
+                console.error('❌ Otomatik çıkış hatası:', error);
+              }
+            }, 1000);
+          }
+          
+          // Premium durumu değişmişse güncelle
+          if (newProfile.is_premium !== undefined) {
+            setIsPremium(newProfile.is_premium);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('👂 Hesap durumu dinleme durduruldu');
+      subscription.unsubscribe();
+    };
+  }, [user?.id, isAccountFrozen]);
 
   // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle
   useEffect(() => {
@@ -268,6 +385,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authResult.data?.session) {
       setSession(authResult.data.session);
       setUser(authResult.data.user);
+      
+      // Login başarılıysa, hesap donmuş mu kontrol et ve otomatik aktif et
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', authResult.data.user.id)
+          .single();
+
+        if (profile && profile.is_active === false) {
+          console.log('🔥 Donmuş hesap tespit edildi, otomatik aktif ediliyor...');
+          
+          // Hesabı aktif hale getir
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ is_active: true })
+            .eq('id', authResult.data.user.id);
+
+          if (profileError) {
+            console.warn('⚠️ Hesap aktif edilirken hata:', profileError);
+          } else {
+            // Dondurulmuş teklifleri aktif yap
+            await supabase
+              .from('proposals')
+              .update({ status: 'active' })
+              .eq('creator_id', authResult.data.user.id)
+              .eq('status', 'frozen');
+
+            // Dondurulmuş eşleşmeleri aktif yap
+            await supabase
+              .from('matches')
+              .update({ is_active: true })
+              .or(`user1_id.eq.${authResult.data.user.id},user2_id.eq.${authResult.data.user.id}`)
+              .eq('is_active', false);
+
+            console.log('✅ Hesap login sırasında otomatik aktif edildi');
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Login sırasında hesap durumu kontrol hatası:', error);
+      }
+      
       return true;
     }
 
@@ -297,7 +456,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         isPremium,
+        isAccountFrozen,
         refreshPremiumStatus,
+        refreshAccountStatus,
+        unfreezeAccount,
         signInWithPhone,
         verifyOtp,
         signOut,

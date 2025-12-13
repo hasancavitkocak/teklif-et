@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export default function Index() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAccountFrozen } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -31,7 +31,7 @@ export default function Index() {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('onboarding_completed, is_active')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -44,6 +44,9 @@ export default function Index() {
       } else if (!profile.onboarding_completed) {
         console.log('➡️ Onboarding not completed, going to onboarding');
         router.replace('/onboarding/name');
+      } else if (profile.is_active === false) {
+        console.log('🥶 Account is frozen, going to frozen screen');
+        router.replace('/account-frozen');
       } else {
         console.log('✅ Profile complete, going to tabs');
         router.replace('/(tabs)');

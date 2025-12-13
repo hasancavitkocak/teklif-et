@@ -36,7 +36,7 @@ export const discoverAPI = {
 
     const shownProposalIds = (shownData || []).map((item: any) => item.proposal_id);
 
-    // Tüm aktif teklifleri getir (gösterilmemiş olanlar)
+    // Tüm aktif teklifleri getir (gösterilmemiş olanlar ve sadece aktif kullanıcılardan)
     let query = supabase
       .from('proposals')
       .select(`
@@ -48,7 +48,7 @@ export const discoverAPI = {
         creator_id,
         event_datetime,
         venue_name,
-        creator:profiles!creator_id(name, profile_photo, birth_date, gender),
+        creator:profiles!creator_id(name, profile_photo, birth_date, gender, is_active),
         interest:interests(name)
       `)
       .eq('status', 'active')
@@ -76,34 +76,36 @@ export const discoverAPI = {
 
     let proposals = (data || []) as any as DiscoverProposal[];
 
-    // Yaş ve cinsiyet filtreleri (client-side, çünkü birth_date ve gender join ile geliyor)
-    if (filters?.minAge || filters?.maxAge || filters?.gender) {
-      proposals = proposals.filter(proposal => {
-        const creator = proposal.creator;
-        
-        // Yaş filtresi
-        if (filters.minAge || filters.maxAge) {
-          const birthDate = new Date(creator.birth_date);
-          const today = new Date();
-          let age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-          }
-          
-          if (filters.minAge && age < filters.minAge) return false;
-          if (filters.maxAge && age > filters.maxAge) return false;
+    // Aktif olmayan kullanıcıları filtrele ve diğer filtreler
+    proposals = proposals.filter(proposal => {
+      const creator = proposal.creator as any;
+      
+      // Sadece aktif kullanıcıları göster
+      if (creator.is_active === false) {
+        return false;
+      }
+      
+      // Yaş filtresi
+      if (filters?.minAge || filters?.maxAge) {
+        const birthDate = new Date(creator.birth_date);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
         }
         
-        // Cinsiyet filtresi
-        if (filters.gender && filters.gender !== 'all') {
-          const creatorGender = (creator as any).gender;
-          if (creatorGender !== filters.gender) return false;
-        }
-        
-        return true;
-      });
-    }
+        if (filters.minAge && age < filters.minAge) return false;
+        if (filters.maxAge && age > filters.maxAge) return false;
+      }
+      
+      // Cinsiyet filtresi
+      if (filters?.gender && filters.gender !== 'all') {
+        if (creator.gender !== filters.gender) return false;
+      }
+      
+      return true;
+    });
 
     return proposals;
   },

@@ -16,6 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import PhotoManagementModal from '@/components/PhotoManagementModal';
+import FreezeAccountModal from '@/components/FreezeAccountModal';
+import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
 import { PROVINCES } from '@/constants/cities';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
@@ -56,6 +59,11 @@ export default function ProfileScreen() {
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
   const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [showFreezeModal, setShowFreezeModal] = useState(false);
+  const [showFreezeSuccessModal, setShowFreezeSuccessModal] = useState(false);
+  const [freezeLoading, setFreezeLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -287,80 +295,204 @@ export default function ProfileScreen() {
   };
 
   const handleFreezeAccount = () => {
-    Alert.alert(
-      'Hesabı Dondur',
-      'Hesabınızı dondurmak istediğinize emin misiniz? Profiliniz başkaları tarafından görüntülenemeyecek.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Dondur',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('profiles')
-                .update({ is_active: false })
-                .eq('id', user?.id);
+    setShowFreezeModal(true);
+  };
 
-              if (error) throw error;
+  const handleConfirmFreeze = async () => {
+    setFreezeLoading(true);
+    
+    try {
+      console.log('🥶 Hesap dondurma işlemi başlatılıyor...');
+      
+      // Hesabı dondur
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_active: false })
+        .eq('id', user?.id);
 
-              Alert.alert('Başarılı', 'Hesabınız donduruldu');
-              setSettingsVisible(false);
-            } catch (error: any) {
-              Alert.alert('Hata', error.message);
-            }
-          },
-        },
-      ]
-    );
+      if (profileError) throw profileError;
+
+      // Aktif teklifleri pasif yap
+      const { error: proposalsError } = await supabase
+        .from('proposals')
+        .update({ status: 'frozen' })
+        .eq('creator_id', user?.id)
+        .eq('status', 'active');
+
+      if (proposalsError) {
+        console.warn('⚠️ Teklifler dondurulurken hata:', proposalsError);
+      }
+
+      // Aktif eşleşmeleri dondur
+      const { error: matchesError } = await supabase
+        .from('matches')
+        .update({ is_active: false })
+        .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`)
+        .eq('is_active', true);
+
+      if (matchesError) {
+        console.warn('⚠️ Eşleşmeler dondurulurken hata:', matchesError);
+      }
+
+      console.log('✅ Hesap başarıyla donduruldu');
+      
+      // Modalları kapat ve başarı modalını göster
+      setShowFreezeModal(false);
+      setSettingsVisible(false);
+      setFreezeLoading(false);
+      
+      // Kısa bir gecikme ile başarı modalını göster
+      setTimeout(() => {
+        setShowFreezeSuccessModal(true);
+      }, 300);
+      
+    } catch (error: any) {
+      console.error('❌ Hesap dondurma hatası:', error);
+      setFreezeLoading(false);
+      setShowFreezeModal(false);
+      Alert.alert('Hata', 'Hesap dondurulurken bir hata oluştu: ' + error.message);
+    }
+  };
+
+  const handleFreezeSuccessClose = async () => {
+    setShowFreezeSuccessModal(false);
+    
+    // Doğrudan çıkış yap (onay sormadan)
+    try {
+      await signOut();
+      console.log('✅ Kullanıcı çıkış yaptırıldı');
+      
+      // Login ekranına yönlendir
+      router.replace('/auth/welcome');
+    } catch (signOutError) {
+      console.error('❌ Çıkış hatası:', signOutError);
+      // Hata olsa bile yönlendir
+      router.replace('/auth/welcome');
+    }
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Hesabı Sil',
-      'Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz silinecektir.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Son Uyarı',
-              'Hesabınızı kalıcı olarak silmek üzeresiniz. Devam etmek istiyor musunuz?',
-              [
-                { text: 'İptal', style: 'cancel' },
-                {
-                  text: 'Evet, Sil',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      // Önce profil fotoğraflarını sil
-                      await supabase
-                        .from('profile_photos')
-                        .delete()
-                        .eq('profile_id', user?.id);
+    setShowDeleteModal(true);
+  };
 
-                      // Profili sil
-                      await supabase
-                        .from('profiles')
-                        .delete()
-                        .eq('id', user?.id);
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
+    
+    try {
+      console.log('🗑️ Hesap silme işlemi başlatılıyor...');
+      
+      // 1. Kullanıcı ilgi alanlarını sil
+      const { error: interestsError } = await supabase
+        .from('user_interests')
+        .delete()
+        .eq('user_id', user?.id);
 
-                      // Kullanıcıyı çıkış yap
-                      await signOut();
-                      router.replace('/auth/welcome');
-                    } catch (error: any) {
-                      Alert.alert('Hata', error.message);
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+      if (interestsError) {
+        console.warn('⚠️ İlgi alanları silinirken hata:', interestsError);
+      }
+
+      // 2. Profil fotoğraflarını sil
+      const { error: photosError } = await supabase
+        .from('profile_photos')
+        .delete()
+        .eq('profile_id', user?.id);
+
+      if (photosError) {
+        console.warn('⚠️ Fotoğraflar silinirken hata:', photosError);
+      }
+
+      // 3. Mesajları sil
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('sender_id', user?.id);
+
+      if (messagesError) {
+        console.warn('⚠️ Mesajlar silinirken hata:', messagesError);
+      }
+
+      // 4. Teklifleri sil
+      const { error: proposalsError } = await supabase
+        .from('proposals')
+        .delete()
+        .eq('creator_id', user?.id);
+
+      if (proposalsError) {
+        console.warn('⚠️ Teklifler silinirken hata:', proposalsError);
+      }
+
+      // 5. Teklif yanıtlarını sil
+      const { error: responsesError } = await supabase
+        .from('proposal_responses')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (responsesError) {
+        console.warn('⚠️ Teklif yanıtları silinirken hata:', responsesError);
+      }
+
+      // 6. Eşleşmeleri sil
+      const { error: matchesError } = await supabase
+        .from('matches')
+        .delete()
+        .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`);
+
+      if (matchesError) {
+        console.warn('⚠️ Eşleşmeler silinirken hata:', matchesError);
+      }
+
+      // 7. Bildirimleri sil
+      const { error: notificationsError } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (notificationsError) {
+        console.warn('⚠️ Bildirimler silinirken hata:', notificationsError);
+      }
+
+      // 8. Profili sil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user?.id);
+
+      if (profileError) throw profileError;
+
+      console.log('✅ Hesap başarıyla silindi');
+
+      // 9. Auth kullanıcısını sil (Supabase Auth)
+      try {
+        await signOut();
+      } catch (authError) {
+        console.warn('⚠️ Auth çıkış hatası:', authError);
+      }
+
+      // Modal'ı kapat ve yönlendir
+      setShowDeleteModal(false);
+      setDeleteLoading(false);
+      
+      Alert.alert(
+        'Hesap Silindi',
+        'Hesabınız ve tüm verileriniz kalıcı olarak silindi.',
+        [
+          {
+            text: 'Tamam',
+            onPress: () => {
+              router.replace('/auth/welcome');
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error('❌ Hesap silme hatası:', error);
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
+      Alert.alert(
+        'Hata', 
+        'Hesap silinirken bir hata oluştu: ' + error.message + '\n\nLütfen tekrar deneyin veya destek ekibiyle iletişime geçin.'
+      );
+    }
   };
 
   const handleChangeLocation = () => {
@@ -843,6 +975,28 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Freeze Account Modal */}
+      <FreezeAccountModal
+        visible={showFreezeModal}
+        onClose={() => setShowFreezeModal(false)}
+        onConfirm={handleConfirmFreeze}
+        loading={freezeLoading}
+      />
+
+      {/* Freeze Success Modal */}
+      <AccountFrozenSuccessModal
+        visible={showFreezeSuccessModal}
+        onClose={handleFreezeSuccessClose}
+      />
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        loading={deleteLoading}
+      />
 
     </SafeAreaView>
   );

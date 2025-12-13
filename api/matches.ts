@@ -50,11 +50,12 @@ export const matchesAPI = {
     // Tüm match ID'lerini topla
     const matchIds = matches.map((m: any) => m.id);
 
-    // Tek sorguda tüm kullanıcıları al
+    // Tek sorguda tüm kullanıcıları al (sadece aktif olanlar)
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name, profile_photo, birth_date')
-      .in('id', otherUserIds);
+      .select('id, name, profile_photo, birth_date, is_active')
+      .in('id', otherUserIds)
+      .eq('is_active', true); // Sadece aktif kullanıcıları getir
 
     // Tek sorguda tüm son mesajları al
     const { data: allMessages } = await supabase
@@ -91,16 +92,29 @@ export const matchesAPI = {
     // Profilleri map'e çevir
     const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]));
 
-    // Tüm verileri birleştir
-    const matchesWithDetails = matches.map((match: any) => {
-      const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
-      return {
-        ...match,
-        otherUser: profilesMap.get(otherUserId) || { name: '', profile_photo: '', birth_date: '' },
-        lastMessage: lastMessages.get(match.id),
-        unreadCount: unreadCounts.get(match.id) || 0,
-      };
-    });
+    // Tüm verileri birleştir (sadece aktif kullanıcıları dahil et)
+    const matchesWithDetails = matches
+      .map((match: any) => {
+        const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
+        const otherUser = profilesMap.get(otherUserId);
+        
+        // Eğer diğer kullanıcı aktif değilse bu match'i dahil etme
+        if (!otherUser) {
+          return null;
+        }
+        
+        return {
+          ...match,
+          otherUser: { 
+            name: otherUser.name, 
+            profile_photo: otherUser.profile_photo, 
+            birth_date: otherUser.birth_date 
+          },
+          lastMessage: lastMessages.get(match.id),
+          unreadCount: unreadCounts.get(match.id) || 0,
+        };
+      })
+      .filter(match => match !== null); // null olanları filtrele
 
     return matchesWithDetails as Match[];
   },

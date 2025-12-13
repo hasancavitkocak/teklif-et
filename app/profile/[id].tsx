@@ -73,9 +73,11 @@ export default function UserProfileScreen() {
           drinking,
           smoking,
           exercise,
-          religion
+          religion,
+          is_active
         `)
         .eq('id', id)
+        .eq('is_active', true) // Sadece aktif kullanıcıları göster
         .single();
 
       if (error) throw error;
