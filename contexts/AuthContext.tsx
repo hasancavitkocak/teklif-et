@@ -15,8 +15,9 @@ interface AuthContextType {
   refreshPremiumStatus: () => Promise<void>;
   refreshAccountStatus: () => Promise<void>;
   unfreezeAccount: () => Promise<boolean>;
-  updateLocationManually: () => Promise<{ success: boolean; city?: string }>;
+  updateLocationManually: () => Promise<{ success: boolean; city?: string; error?: string }>;
   updateCityFromSettings: (newCity: string) => Promise<boolean>;
+  requestLocationPermission: () => Promise<{ granted: boolean; error?: string }>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -124,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateLocationManually = async (): Promise<{ success: boolean; city?: string }> => {
+  const updateLocationManually = async (): Promise<{ success: boolean; city?: string; error?: string }> => {
     if (!user?.id) {
       console.log('❌ User ID bulunamadı, manuel güncelleme iptal edildi');
       return { success: false };
@@ -139,6 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.success && result.city) {
         console.log('✅ Manuel konum güncelleme tamamlandı, yeni şehir:', result.city);
         return { success: true, city: result.city };
+      } else if (result.error === 'permission_denied') {
+        console.log('❌ Konum izni reddedildi');
+        return { success: false, error: 'permission_denied' };
       } else {
         console.log('⚠️ Konum güncellendi ama şehir bilgisi alınamadı');
         return { success: true };
@@ -146,6 +150,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('❌ Manuel konum güncelleme hatası:', error);
       return { success: false };
+    }
+  };
+
+  const requestLocationPermission = async (): Promise<{ granted: boolean; error?: string }> => {
+    try {
+      console.log('📍 Konum izni isteniyor...');
+      
+      // Önce mevcut izin durumunu kontrol et
+      const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
+      
+      if (currentStatus === 'granted') {
+        console.log('✅ Konum izni zaten verilmiş');
+        return { granted: true };
+      }
+      
+      // İzin iste
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status === 'granted') {
+        console.log('✅ Konum izni verildi');
+        return { granted: true };
+      } else {
+        console.log('❌ Konum izni reddedildi:', status);
+        return { granted: false, error: status };
+      }
+    } catch (error) {
+      console.error('❌ Konum izni isteme hatası:', error);
+      return { granted: false, error: 'unknown' };
     }
   };
 
@@ -234,10 +266,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Premium durumu yüklendikten sonra konum güncellemesi yap (sadece premium olmayanlar için)
   useEffect(() => {
-    if (user?.id && isPremium === false) {
-      console.log('👤 Premium olmayan kullanıcı, otomatik konum güncelleniyor...');
-      updateUserLocation();
-    }
+    const checkLocationAndUpdate = async () => {
+      if (user?.id && isPremium === false) {
+        console.log('👤 Premium olmayan kullanıcı, konum izni kontrol ediliyor...');
+        
+        // Önce konum izni var mı kontrol et
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          console.log('✅ Konum izni var, otomatik güncelleme yapılıyor');
+          updateUserLocation();
+        } else {
+          // Konum izni yok, otomatik güncelleme atlanıyor
+        }
+      }
+    };
+    
+    checkLocationAndUpdate();
   }, [user?.id, isPremium]);
 
   // Real-time hesap durumu dinleme
@@ -293,10 +337,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle (sadece premium olmayanlar için)
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
+    const handleAppStateChange = async (nextAppState: string) => {
       if (nextAppState === 'active' && user?.id && !isPremium) {
-        console.log('📱 Uygulama aktif hale geldi, premium olmayan kullanıcı için konum güncelleniyor...');
-        updateUserLocation();
+        console.log('📱 Uygulama aktif hale geldi, premium olmayan kullanıcı için konum kontrol ediliyor...');
+        
+        // Önce konum izni var mı kontrol et
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          console.log('✅ Konum izni var, güncelleme yapılıyor');
+          updateUserLocation();
+        } else {
+          // Konum izni yok, güncelleme atlanıyor
+        }
       } else if (nextAppState === 'active' && user?.id && isPremium) {
         console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
       }
@@ -306,7 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription?.remove();
   }, [user?.id, isPremium]);
 
-  const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string }> => {
+  const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string; error?: string }> => {
     if (!user?.id) return { success: false };
     
     try {
@@ -316,7 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('❌ Konum izni reddedildi');
-        return { success: false };
+        return { success: false, error: 'permission_denied' };
       }
 
       // Mevcut konumu al
@@ -582,6 +634,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unfreezeAccount,
         updateLocationManually,
         updateCityFromSettings,
+        requestLocationPermission,
         signInWithPhone,
         verifyOtp,
         signOut,

@@ -34,7 +34,7 @@ import { PROVINCES } from '@/constants/cities';
 const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { user, isPremium, refreshPremiumStatus, currentCity } = useAuth();
+  const { user, isPremium, refreshPremiumStatus, currentCity, requestLocationPermission } = useAuth();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -227,8 +227,9 @@ export default function DiscoverScreen() {
       // Konum izni kontrol et
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
-        // İzin yoksa sessizce geç, kullanıcıyı rahatsız etme
-        console.log('❌ Konum izni yok, güncelleme atlanıyor');
+        // İzin yoksa kullanıcıya sor
+        console.log('❌ Konum izni yok, kullanıcıdan izin isteniyor');
+        showLocationPermissionAlert();
         return;
       }
 
@@ -296,6 +297,34 @@ export default function DiscoverScreen() {
       // Sessizce logla, kullanıcıyı rahatsız etme
       console.log('⚠️ Ana sayfa konum güncelleme hatası:', error);
     }
+  };
+
+  const showLocationPermissionAlert = () => {
+    Alert.alert(
+      'Konum İzni Gerekli',
+      'Keşfet sayfasını görüntüleyebilmek için konum izni gereklidir. Size yakın teklifleri gösterebilmemiz için konumunuza ihtiyacımız var.',
+      [
+        {
+          text: 'İptal',
+          style: 'cancel',
+        },
+        {
+          text: 'İzin Ver',
+          onPress: async () => {
+            const result = await requestLocationPermission();
+            if (result.granted) {
+              // İzin verildi, konum güncellemeyi tekrar dene
+              updateUserLocationOnFocus();
+            } else {
+              // İzin reddedildi, tekrar sor
+              setTimeout(() => {
+                showLocationPermissionAlert();
+              }, 1000);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const loadInterests = async () => {
