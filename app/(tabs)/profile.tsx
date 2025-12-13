@@ -11,12 +11,14 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown } from 'lucide-react-native';
+import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import PhotoManagementModal from '@/components/PhotoManagementModal';
 import { PROVINCES } from '@/constants/cities';
+import * as Location from 'expo-location';
+import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 
 interface Profile {
   name: string;
@@ -53,10 +55,114 @@ export default function ProfileScreen() {
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
   const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    // Profil sayfası açıldığında konum güncelle
+    updateCurrentLocation();
   }, []);
+
+  const updateCurrentLocation = async () => {
+    if (!user?.id || isUpdatingLocation) return;
+    
+    setIsUpdatingLocation(true);
+    try {
+      console.log('🔄 Profil sayfasında konum güncelleniyor...');
+      
+      // Konum izni kontrol et
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+        if (newStatus !== 'granted') {
+          console.log('❌ Konum izni reddedildi');
+          setIsUpdatingLocation(false);
+          return;
+        }
+      }
+
+      // Mevcut konumu al
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+      console.log('📍 Yeni konum alındı:', { latitude, longitude });
+
+      // Reverse geocoding ile şehir bilgisini al
+      const geocodeResults = await Location.reverseGeocodeAsync({ 
+        latitude, 
+        longitude 
+      });
+      
+      if (geocodeResults && geocodeResults.length > 0) {
+        const geocode = geocodeResults[0];
+        
+        // Debug: Geocode sonucunu logla
+        console.log('🗺️ Profil sayfası geocode:', {
+          district: geocode.district,
+          subregion: geocode.subregion,
+          city: geocode.city,
+          region: geocode.region
+        });
+        
+        // İlçe bilgisini akıllı şekilde belirle
+        let cityName = '';
+        let districtName = '';
+        let regionName = geocode.region || '';
+        
+        // Önce district alanını kontrol et ve mapping uygula
+        if (geocode.district) {
+          districtName = getDistrictFromNeighborhood(geocode.district);
+          console.log('🔄 Profil District mapping:', geocode.district, '->', districtName);
+        }
+        // Sonra subregion'ı kontrol et
+        else if (geocode.subregion) {
+          districtName = getDistrictFromNeighborhood(geocode.subregion);
+          console.log('🔄 Profil Subregion mapping:', geocode.subregion, '->', districtName);
+        }
+        // Son çare olarak city'yi kullan
+        else if (geocode.city) {
+          districtName = geocode.city;
+          console.log('🔄 Profil City kullanıldı:', districtName);
+        }
+        
+        // Final şehir adını oluştur
+        if (districtName && regionName) {
+          cityName = `${districtName}, ${regionName}`;
+          console.log('📍 Profil Final konum:', cityName);
+        } else if (districtName) {
+          cityName = districtName;
+        } else if (regionName) {
+          cityName = regionName;
+        }
+
+        if (cityName) {
+          // Profildeki şehir ve koordinat bilgilerini güncelle
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              city: cityName,
+              latitude,
+              longitude,
+            })
+            .eq('id', user.id);
+
+          if (error) {
+            console.error('❌ Profil güncelleme hatası:', error);
+          } else {
+            console.log('✅ Profil sayfasında konum güncellendi:', cityName);
+            // Profili yeniden yükle
+            loadProfile();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Konum güncelleme hatası:', error);
+    } finally {
+      setIsUpdatingLocation(false);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -334,6 +440,17 @@ export default function ProfileScreen() {
           <View style={styles.locationRowLarge}>
             <MapPin size={18} color="#8B5CF6" />
             <Text style={styles.locationTextLarge}>{profile.city}</Text>
+            <TouchableOpacity 
+              onPress={updateCurrentLocation}
+              disabled={isUpdatingLocation}
+              style={[styles.refreshLocationButton, isUpdatingLocation && styles.refreshLocationButtonDisabled]}
+            >
+              <RefreshCw 
+                size={14} 
+                color={isUpdatingLocation ? "#9CA3AF" : "#8B5CF6"} 
+                style={isUpdatingLocation ? styles.spinning : undefined}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -840,6 +957,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  refreshLocationButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  refreshLocationButtonDisabled: {
+    opacity: 0.5,
+  },
+  spinning: {
+    transform: [{ rotate: '45deg' }],
   },
   locationTextLarge: {
     fontSize: 15,

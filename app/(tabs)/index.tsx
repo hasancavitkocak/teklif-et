@@ -19,6 +19,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Store, ChevronDown, Crown } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -158,6 +160,7 @@ export default function DiscoverScreen() {
     useCallback(() => {
       console.log('Discover screen focused');
       if (user?.id) {
+        updateUserLocationOnFocus(); // Konum güncelle
         loadProposals();
         loadUserCity();
         refreshPremiumStatus(); // Premium durumunu yenile
@@ -195,6 +198,87 @@ export default function DiscoverScreen() {
       loadProposals();
     }
   }, [selectedCity, selectedInterest]);
+
+  const updateUserLocationOnFocus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('🔄 Ana sayfada konum güncelleniyor...');
+      
+      // Konum izni kontrol et
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        // İzin yoksa sessizce geç, kullanıcıyı rahatsız etme
+        console.log('❌ Konum izni yok, güncelleme atlanıyor');
+        return;
+      }
+
+      // Mevcut konumu al
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Reverse geocoding ile şehir bilgisini al
+      const geocodeResults = await Location.reverseGeocodeAsync({ 
+        latitude, 
+        longitude 
+      });
+      
+      if (geocodeResults && geocodeResults.length > 0) {
+        const geocode = geocodeResults[0];
+        
+        // İlçe bilgisini akıllı şekilde belirle
+        let cityName = '';
+        let districtName = '';
+        let regionName = geocode.region || '';
+        
+        // Önce district alanını kontrol et ve mapping uygula
+        if (geocode.district) {
+          districtName = getDistrictFromNeighborhood(geocode.district);
+        }
+        // Sonra subregion'ı kontrol et
+        else if (geocode.subregion) {
+          districtName = getDistrictFromNeighborhood(geocode.subregion);
+        }
+        // Son çare olarak city'yi kullan
+        else if (geocode.city) {
+          districtName = geocode.city;
+        }
+        
+        // Final şehir adını oluştur
+        if (districtName && regionName) {
+          cityName = `${districtName}, ${regionName}`;
+        } else if (districtName) {
+          cityName = districtName;
+        } else if (regionName) {
+          cityName = regionName;
+        }
+
+        if (cityName) {
+          // Profildeki şehir ve koordinat bilgilerini güncelle
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              city: cityName,
+              latitude,
+              longitude,
+            })
+            .eq('id', user.id);
+
+          if (!error) {
+            console.log('✅ Ana sayfada konum güncellendi:', cityName);
+            // Kullanıcı şehrini güncelle
+            setUserCity(cityName);
+          }
+        }
+      }
+    } catch (error) {
+      // Sessizce logla, kullanıcıyı rahatsız etme
+      console.log('⚠️ Ana sayfa konum güncelleme hatası:', error);
+    }
+  };
 
   const loadInterests = async () => {
     try {

@@ -1,5 +1,6 @@
 // Geocoding utility - Şehir adından koordinat al
 import * as Location from 'expo-location';
+import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 
 export interface Coordinates {
   latitude: number;
@@ -47,16 +48,35 @@ export async function reverseGeocode(
     
     if (results && results.length > 0) {
       const result = results[0];
-      const city = result.city || result.district || result.subregion;
-      const region = result.region;
       
-      if (city && region) {
-        return `${city}, ${region}`;
-      } else if (city) {
-        return city;
-      } else if (region) {
-        return region;
+      // İlçe bilgisini akıllı şekilde belirle
+      let cityName = '';
+      let districtName = '';
+      let regionName = result.region || '';
+      
+      // Önce district alanını kontrol et ve mapping uygula
+      if (result.district) {
+        districtName = getDistrictFromNeighborhood(result.district);
       }
+      // Sonra subregion'ı kontrol et
+      else if (result.subregion) {
+        districtName = getDistrictFromNeighborhood(result.subregion);
+      }
+      // Son çare olarak city'yi kullan
+      else if (result.city) {
+        districtName = result.city;
+      }
+      
+      // Final şehir adını oluştur
+      if (districtName && regionName) {
+        cityName = `${districtName}, ${regionName}`;
+      } else if (districtName) {
+        cityName = districtName;
+      } else if (regionName) {
+        cityName = regionName;
+      }
+      
+      return cityName || null;
     }
     
     return null;

@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { AppState } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 
 interface AuthContextType {
   session: Session | null;
@@ -65,14 +67,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id]);
 
+  // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user?.id) {
+        console.log('📱 Uygulama aktif hale geldi, konum güncelleniyor...');
+        updateUserLocation();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [user?.id]);
+
   const updateUserLocation = async () => {
     if (!user?.id) return;
     
     try {
+      console.log('🔄 Konum güncelleniyor...');
+      
       // Konum izni iste
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.log('Location permission denied');
+        console.log('❌ Konum izni reddedildi');
         return;
       }
 
@@ -82,25 +99,122 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const { latitude, longitude } = location.coords;
+      console.log('📍 Konum alındı:', { latitude, longitude });
 
-      // Reverse geocoding ile şehir bilgisini al
-      const [geocode] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      // Farklı accuracy seviyelerinde reverse geocoding dene
+      let finalCityName = '';
       
-      if (geocode?.city) {
-        // Profildeki şehir bilgisini güncelle
-        await supabase
+      // Önce düşük accuracy ile dene (daha geniş alan)
+      try {
+        const lowAccuracyResults = await Location.reverseGeocodeAsync({ 
+          latitude, 
+          longitude 
+        });
+        
+        if (lowAccuracyResults && lowAccuracyResults.length > 0) {
+          const geocode = lowAccuracyResults[0];
+          
+          // Debug: Tüm geocode alanlarını logla
+          console.log('🗺️ Geocode sonucu (Low Accuracy):', {
+            name: geocode.name,
+            street: geocode.street,
+            district: geocode.district,
+            subregion: geocode.subregion,
+            city: geocode.city,
+            region: geocode.region,
+            country: geocode.country,
+            postalCode: geocode.postalCode
+          });
+          
+          // İlçe bilgisini akıllı şekilde belirle
+          let districtName = '';
+          let regionName = geocode.region || '';
+          
+          // Önce district alanını kontrol et
+          if (geocode.district) {
+            // District alanı mahalle/cadde adı olabilir, gerçek ilçeye çevir
+            districtName = getDistrictFromNeighborhood(geocode.district);
+            console.log('🔄 District mapping:', geocode.district, '->', districtName);
+          }
+          // Sonra subregion'ı kontrol et
+          else if (geocode.subregion) {
+            districtName = getDistrictFromNeighborhood(geocode.subregion);
+            console.log('🔄 Subregion mapping:', geocode.subregion, '->', districtName);
+          }
+          // Son çare olarak city'yi kullan
+          else if (geocode.city) {
+            districtName = geocode.city;
+            console.log('🔄 City kullanıldı:', districtName);
+          }
+          
+          // Final şehir adını oluştur
+          if (districtName && regionName) {
+            finalCityName = `${districtName}, ${regionName}`;
+            console.log('📍 Final konum:', finalCityName);
+          } else if (districtName) {
+            finalCityName = districtName;
+            console.log('📍 Final konum (sadece ilçe):', finalCityName);
+          } else if (regionName) {
+            finalCityName = regionName;
+            console.log('📍 Final konum (sadece il):', finalCityName);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Low accuracy geocoding hatası:', error);
+      }
+      
+      // Eğer low accuracy sonuç vermezse, normal accuracy dene
+      if (!finalCityName) {
+        try {
+          const normalResults = await Location.reverseGeocodeAsync({ 
+            latitude, 
+            longitude 
+          });
+          
+          if (normalResults && normalResults.length > 0) {
+            const geocode = normalResults[0];
+            console.log('🗺️ Normal Geocode sonucu:', geocode);
+            
+            // Basit fallback
+            if (geocode.district && geocode.region) {
+              const mappedDistrict = getDistrictFromNeighborhood(geocode.district);
+              finalCityName = `${mappedDistrict}, ${geocode.region}`;
+            } else if (geocode.subregion && geocode.region) {
+              const mappedDistrict = getDistrictFromNeighborhood(geocode.subregion);
+              finalCityName = `${mappedDistrict}, ${geocode.region}`;
+            } else if (geocode.city && geocode.region) {
+              finalCityName = `${geocode.city}, ${geocode.region}`;
+            } else if (geocode.region) {
+              finalCityName = geocode.region;
+            }
+          }
+        } catch (error) {
+          console.error('❌ Normal geocoding hatası:', error);
+        }
+      }
+      
+      if (finalCityName) {
+
+        // Profildeki şehir ve koordinat bilgilerini güncelle
+        const { error } = await supabase
           .from('profiles')
           .update({
-            city: geocode.city,
+            city: finalCityName,
             latitude,
             longitude,
           })
           .eq('id', user.id);
 
-        console.log('✅ Location updated:', geocode.city);
+        if (error) {
+          console.error('❌ Profil güncelleme hatası:', error);
+        } else {
+          console.log('✅ Konum güncellendi:', finalCityName);
+        }
+      } else {
+        console.warn('⚠️ Şehir bilgisi bulunamadı');
       }
     } catch (error) {
-      console.error('Location update error:', error);
+      console.error('❌ Konum güncelleme hatası:', error);
     }
   };
 
