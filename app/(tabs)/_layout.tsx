@@ -6,7 +6,7 @@ import { useUnread } from '@/contexts/UnreadContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { unreadCount, proposalsCount } = useUnread();
+  const { unreadCount } = useUnread();
   
   return (
     <Tabs
@@ -47,31 +47,7 @@ export default function TabLayout() {
         name="proposals"
         options={{
           title: 'Tekliflerim',
-          tabBarIcon: ({ size, color }) => (
-            <View style={{ position: 'relative' }}>
-              <FileText size={size} color={color} />
-              {(proposalsCount || 0) > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -8,
-                    backgroundColor: '#EF4444',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                    {(proposalsCount || 0) > 9 ? '9+' : String(proposalsCount || 0)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
+          tabBarIcon: ({ size, color }) => <FileText size={size} color={color} />,
         }}
       />
       <Tabs.Screen

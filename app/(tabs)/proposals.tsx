@@ -338,17 +338,19 @@ export default function ProposalsScreen() {
         onPress={() => userId && router.push(`/profile/${userId}` as any)}
         activeOpacity={0.7}
       >
-        <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
+          {request.is_super_like && (
+            <View style={styles.superLikeBadgeOnImage}>
+              <Zap size={12} color="#FFF" fill="#FFF" />
+            </View>
+          )}
+        </View>
         <View style={styles.requestInfo}>
           <View style={styles.requestHeader}>
             <Text style={styles.requestName}>
               {profile.name}, {calculateAge(profile.birth_date)}
             </Text>
-            {request.is_super_like && (
-              <View style={styles.superLikeBadge}>
-                <Zap size={12} color="#FFF" fill="#FFF" />
-              </View>
-            )}
           </View>
           <Text style={styles.requestActivity}>{request.proposal.activity_name}</Text>
           <Text style={styles.requestCity}>{request.proposal.city}</Text>
@@ -691,6 +693,9 @@ const styles = StyleSheet.create({
     color: '#FFF',
     letterSpacing: 0.5,
   },
+  imageContainer: {
+    position: 'relative',
+  },
   requestImage: {
     width: 90,
     height: 90,
@@ -719,6 +724,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  superLikeBadgeOnImage: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#F59E0B',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
   },
   requestActivity: {
     fontSize: 15,

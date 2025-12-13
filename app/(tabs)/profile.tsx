@@ -40,7 +40,7 @@ interface Profile {
 }
 
 export default function ProfileScreen() {
-  const { user, signOut, isPremium } = useAuth();
+  const { user, signOut, isPremium, updateLocationManually, currentCity, updateCityFromSettings } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
@@ -67,16 +67,32 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     loadProfile();
-    // Profil sayfası açıldığında konum güncelle
-    updateCurrentLocation();
-  }, []);
+    // Premium olmayan kullanıcılar için otomatik konum güncelle
+    if (!isPremium) {
+      updateCurrentLocation();
+    }
+  }, [isPremium]);
 
-  const updateCurrentLocation = async () => {
+  // AuthContext'teki currentCity değiştiğinde editCity'yi de güncelle
+  useEffect(() => {
+    if (currentCity && currentCity !== editCity) {
+      console.log('🔄 AuthContext\'ten gelen yeni şehir ayarlara uygulanıyor:', currentCity);
+      setEditCity(currentCity);
+    }
+  }, [currentCity]);
+
+  const updateCurrentLocation = async (forceUpdate = false) => {
     if (!user?.id || isUpdatingLocation) return;
+    
+    // Premium kullanıcılar için sadece manuel güncellemeye izin ver
+    if (isPremium && !forceUpdate) {
+      console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
+      return;
+    }
     
     setIsUpdatingLocation(true);
     try {
-      console.log('🔄 Profil sayfasında konum güncelleniyor...');
+      console.log('🔄 Profil sayfasında konum güncelleniyor...', forceUpdate ? '(Manuel)' : '(Otomatik)');
       
       // Konum izni kontrol et
       const { status } = await Location.getForegroundPermissionsAsync();
@@ -242,40 +258,27 @@ export default function ProfileScreen() {
 
   const handleSaveSettings = async () => {
     try {
+      // Şehir değişikliği varsa AuthContext üzerinden güncelle
+      let cityUpdateSuccess = true;
+      if (editCity !== profile?.city) {
+        console.log('🔄 Şehir değişti, AuthContext üzerinden güncelleniyor:', editCity);
+        cityUpdateSuccess = await updateCityFromSettings(editCity);
+        if (!cityUpdateSuccess) {
+          Alert.alert('Hata', 'Şehir bilgisi güncellenirken bir hata oluştu');
+          return;
+        }
+      }
+
+      // Diğer profil bilgilerini güncelle (şehir hariç, çünkü AuthContext'te güncellendi)
       const updateData: any = {
         name: editName,
-        city: editCity,
         smoking: editSmoking,
         drinking: editDrinking,
       };
 
-      // Şehir değiştiyse koordinatları da güncelle
-      if (editCity !== profile?.city) {
-        console.log('🔄 Şehir değişti, koordinat alınıyor:', editCity);
-        
-        // Önce local cache'den dene
-        const { getCityCoordinates } = await import('@/constants/cityCoordinates');
-        let coordinates = getCityCoordinates(editCity);
-
-        // Bulunamazsa Geocoding API'den al
-        if (!coordinates) {
-          console.log('📍 Geocoding API kullanılıyor...');
-          const { geocodeCity } = await import('@/utils/geocoding');
-          const geocoded = await geocodeCity(editCity);
-          
-          if (geocoded) {
-            coordinates = { lat: geocoded.latitude, lon: geocoded.longitude };
-          }
-        }
-
-        // Koordinat bulunduysa ekle
-        if (coordinates) {
-          updateData.latitude = coordinates.lat;
-          updateData.longitude = coordinates.lon;
-          console.log('✅ Koordinatlar güncelleniyor:', coordinates);
-        } else {
-          console.warn('⚠️ Koordinat bulunamadı, mevcut koordinatlar korunuyor');
-        }
+      // Şehir değişmediyse normal güncelleme
+      if (editCity === profile?.city) {
+        updateData.city = editCity;
       }
 
       const { error } = await supabase
@@ -573,7 +576,25 @@ export default function ProfileScreen() {
             <MapPin size={18} color="#8B5CF6" />
             <Text style={styles.locationTextLarge}>{profile.city}</Text>
             <TouchableOpacity 
-              onPress={updateCurrentLocation}
+              onPress={async () => {
+                console.log('🔄 Manuel konum güncelleme butonu tıklandı');
+                setIsUpdatingLocation(true);
+                const result = await updateLocationManually();
+                console.log('📍 Manuel güncelleme sonucu:', result);
+                if (result.success) {
+                  console.log('✅ Profil yeniden yükleniyor...');
+                  await loadProfile(); // Profili yeniden yükle
+                  console.log('✅ Profil yeniden yüklendi');
+                  
+                  // Eğer yeni şehir bilgisi varsa, direkt olarak da güncelle
+                  if (result.city && profile) {
+                    console.log('🏙️ Şehir bilgisi direkt güncelleniyor:', result.city);
+                    setProfile({ ...profile, city: result.city });
+                    setEditCity(result.city); // Ayarlar modalındaki şehir bilgisini de güncelle
+                  }
+                }
+                setIsUpdatingLocation(false);
+              }}
               disabled={isUpdatingLocation}
               style={[styles.refreshLocationButton, isUpdatingLocation && styles.refreshLocationButtonDisabled]}
             >

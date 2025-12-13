@@ -11,9 +11,12 @@ interface AuthContextType {
   loading: boolean;
   isPremium: boolean;
   isAccountFrozen: boolean;
+  currentCity: string;
   refreshPremiumStatus: () => Promise<void>;
   refreshAccountStatus: () => Promise<void>;
   unfreezeAccount: () => Promise<boolean>;
+  updateLocationManually: () => Promise<{ success: boolean; city?: string }>;
+  updateCityFromSettings: (newCity: string) => Promise<boolean>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -27,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
   const [isAccountFrozen, setIsAccountFrozen] = useState(false);
-  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+  const [currentCity, setCurrentCity] = useState<string>('');
 
   const refreshPremiumStatus = async () => {
     if (!user?.id) return;
@@ -49,11 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_active')
+        .select('is_active, city')
         .eq('id', user.id)
         .single();
       
       setIsAccountFrozen(!(profile?.is_active ?? true));
+      if (profile?.city) {
+        setCurrentCity(profile.city);
+      }
     } catch (error) {
       console.error('Error loading account status:', error);
     }
@@ -104,6 +110,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateLocationManually = async (): Promise<{ success: boolean; city?: string }> => {
+    if (!user?.id) {
+      console.log('❌ User ID bulunamadı, manuel güncelleme iptal edildi');
+      return { success: false };
+    }
+    
+    try {
+      console.log('📍 Manuel konum güncelleme başlatılıyor... User ID:', user.id);
+      
+      // Konum güncelleme işlemini yap ve güncellenmiş şehir bilgisini al
+      const result = await updateUserLocationWithResult();
+      
+      if (result.success && result.city) {
+        console.log('✅ Manuel konum güncelleme tamamlandı, yeni şehir:', result.city);
+        return { success: true, city: result.city };
+      } else {
+        console.log('⚠️ Konum güncellendi ama şehir bilgisi alınamadı');
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('❌ Manuel konum güncelleme hatası:', error);
+      return { success: false };
+    }
+  };
+
+  const updateCityFromSettings = async (newCity: string): Promise<boolean> => {
+    if (!user?.id) {
+      console.log('❌ User ID bulunamadı, ayarlar güncellemesi iptal edildi');
+      return false;
+    }
+    
+    try {
+      console.log('🏙️ Ayarlardan şehir güncelleniyor:', newCity);
+      
+      // Şehir koordinatlarını al
+      const { getCityCoordinates } = await import('@/constants/cityCoordinates');
+      let coordinates = getCityCoordinates(newCity);
+
+      // Bulunamazsa Geocoding API'den al
+      if (!coordinates) {
+        console.log('📍 Geocoding API kullanılıyor...');
+        const { geocodeCity } = await import('@/utils/geocoding');
+        const geocoded = await geocodeCity(newCity);
+        
+        if (geocoded) {
+          coordinates = { lat: geocoded.latitude, lon: geocoded.longitude };
+        }
+      }
+
+      // Veritabanını güncelle
+      const updateData: any = { city: newCity };
+      if (coordinates) {
+        updateData.latitude = coordinates.lat;
+        updateData.longitude = coordinates.lon;
+        console.log('✅ Koordinatlar da güncelleniyor:', coordinates);
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('❌ Ayarlar şehir güncelleme hatası:', error);
+        return false;
+      }
+
+      // Global state'i güncelle
+      setCurrentCity(newCity);
+      console.log('✅ Ayarlardan şehir güncellendi:', newCity);
+      return true;
+    } catch (error) {
+      console.error('❌ Ayarlar şehir güncelleme hatası:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -121,17 +204,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // User değiştiğinde premium durumunu yükle ve konumu güncelle
+  // User değiştiğinde premium durumunu yükle ve konumu güncelle (premium değilse)
   useEffect(() => {
     if (user?.id) {
       refreshPremiumStatus();
       refreshAccountStatus();
-      updateUserLocation();
+      
+      // Premium kullanıcılar için otomatik konum güncellemesi yapma
+      // Sadece ilk login'de veya manuel olarak güncellenecek
     } else {
       setIsPremium(false);
       setIsAccountFrozen(false);
     }
   }, [user?.id]);
+
+  // Premium durumu yüklendikten sonra konum güncellemesi yap (sadece premium olmayanlar için)
+  useEffect(() => {
+    if (user?.id && isPremium === false) {
+      console.log('👤 Premium olmayan kullanıcı, otomatik konum güncelleniyor...');
+      updateUserLocation();
+    }
+  }, [user?.id, isPremium]);
 
   // Real-time hesap durumu dinleme
   useEffect(() => {
@@ -184,21 +277,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id, isAccountFrozen]);
 
-  // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle
+  // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle (sadece premium olmayanlar için)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'active' && user?.id) {
-        console.log('📱 Uygulama aktif hale geldi, konum güncelleniyor...');
+      if (nextAppState === 'active' && user?.id && !isPremium) {
+        console.log('📱 Uygulama aktif hale geldi, premium olmayan kullanıcı için konum güncelleniyor...');
         updateUserLocation();
+      } else if (nextAppState === 'active' && user?.id && isPremium) {
+        console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [user?.id]);
+  }, [user?.id, isPremium]);
 
-  const updateUserLocation = async () => {
-    if (!user?.id) return;
+  const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string }> => {
+    if (!user?.id) return { success: false };
     
     try {
       console.log('🔄 Konum güncelleniyor...');
@@ -207,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('❌ Konum izni reddedildi');
-        return;
+        return { success: false };
       }
 
       // Mevcut konumu al
@@ -311,7 +406,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (finalCityName) {
-
         // Profildeki şehir ve koordinat bilgilerini güncelle
         const { error } = await supabase
           .from('profiles')
@@ -324,19 +418,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error('❌ Profil güncelleme hatası:', error);
+          return { success: false };
         } else {
           console.log('✅ Konum güncellendi:', finalCityName);
+          setCurrentCity(finalCityName); // Global state'i güncelle
+          return { success: true, city: finalCityName };
         }
       } else {
         console.warn('⚠️ Şehir bilgisi bulunamadı');
+        return { success: false };
       }
     } catch (error) {
       console.error('❌ Konum güncelleme hatası:', error);
+      return { success: false };
     }
   };
 
+  const updateUserLocation = async () => {
+    const result = await updateUserLocationWithResult();
+    // Otomatik güncellemeler için sadece başarı/başarısızlık önemli
+    return result.success;
+  };
+
   const signInWithPhone = async (phone: string) => {
-    setPendingPhone(phone);
+    // Phone number is handled in verifyOtp
   };
 
   const verifyOtp = async (phone: string, otp: string) => {
@@ -457,9 +562,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isPremium,
         isAccountFrozen,
+        currentCity,
         refreshPremiumStatus,
         refreshAccountStatus,
         unfreezeAccount,
+        updateLocationManually,
+        updateCityFromSettings,
         signInWithPhone,
         verifyOtp,
         signOut,

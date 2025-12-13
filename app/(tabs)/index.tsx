@@ -27,13 +27,14 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
 import PremiumPopup from '@/components/PremiumPopup';
 import SimplePremiumAlert from '@/components/SimplePremiumAlert';
+import SuperLikeSuccessModal from '@/components/SuperLikeSuccessModal';
 
 import { PROVINCES } from '@/constants/cities';
 
 const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { user, isPremium, refreshPremiumStatus } = useAuth();
+  const { user, isPremium, refreshPremiumStatus, currentCity } = useAuth();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -42,7 +43,6 @@ export default function DiscoverScreen() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>('');
-  const [userCity, setUserCity] = useState<string>('');
   const [editingCity, setEditingCity] = useState(false);
   const [premiumPopupVisible, setPremiumPopupVisible] = useState(false);
   const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'boost' | 'filters'>('likes');
@@ -61,6 +61,8 @@ export default function DiscoverScreen() {
   const [selectedGender, setSelectedGender] = useState<string>('all'); // 'all', 'male', 'female'
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showSuperLikeSuccess, setShowSuperLikeSuccess] = useState(false);
+  const [superLikeUserName, setSuperLikeUserName] = useState<string>('');
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -162,16 +164,19 @@ export default function DiscoverScreen() {
       if (user?.id) {
         updateUserLocationOnFocus(); // Konum güncelle
         loadProposals();
-        loadUserCity();
         refreshPremiumStatus(); // Premium durumunu yenile
+        
+        // İlk yüklemede selectedCity'yi currentCity'den al
+        if (!selectedCity && currentCity) {
+          setSelectedCity(currentCity);
+        }
       }
-    }, [user?.id, selectedCity, selectedInterest])
+    }, [user?.id, selectedCity, selectedInterest, isPremium])
   );
 
   useEffect(() => {
     loadProposals();
     loadInterests();
-    loadUserCity();
 
     // Real-time yeni teklif dinleme - yeni teklifleri listeye ekle
     const subscription = supabase
@@ -199,8 +204,22 @@ export default function DiscoverScreen() {
     }
   }, [selectedCity, selectedInterest]);
 
+  // AuthContext'teki currentCity değiştiğinde selectedCity'yi güncelle
+  useEffect(() => {
+    if (currentCity && !selectedCity) {
+      console.log('🔄 AuthContext\'ten gelen şehir filtre olarak ayarlanıyor:', currentCity);
+      setSelectedCity(currentCity);
+    }
+  }, [currentCity]);
+
   const updateUserLocationOnFocus = async () => {
     if (!user?.id) return;
+    
+    // Premium kullanıcılar için otomatik konum güncellemesi yapma
+    if (isPremium) {
+      console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
+      return;
+    }
     
     try {
       console.log('🔄 Ana sayfada konum güncelleniyor...');
@@ -269,8 +288,7 @@ export default function DiscoverScreen() {
 
           if (!error) {
             console.log('✅ Ana sayfada konum güncellendi:', cityName);
-            // Kullanıcı şehrini güncelle
-            setUserCity(cityName);
+            // AuthContext'teki currentCity otomatik güncellenecek
           }
         }
       }
@@ -289,24 +307,7 @@ export default function DiscoverScreen() {
     }
   };
 
-  const loadUserCity = async () => {
-    if (!user?.id) return;
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('city')
-        .eq('id', user.id)
-        .single();
-      if (profile?.city) {
-        setUserCity(profile.city);
-        if (!selectedCity) {
-          setSelectedCity(profile.city);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user city:', error);
-    }
-  };
+
 
   const loadProposals = async (resetIndex = true) => {
     if (!user?.id) {
@@ -370,6 +371,18 @@ export default function DiscoverScreen() {
       await discoverAPI.markAsShown(user.id, proposal.id);
 
       const result = await discoverAPI.likeProposal(proposal.id, user.id, isSuperLike);
+      
+      // Süper beğeni başarı pop-up'ı göster
+      if (isSuperLike && !result.matched) {
+        setSuperLikeUserName(proposal.creator.name);
+        setShowSuperLikeSuccess(true);
+        
+        // Pop-up kapandıktan sonra sonraki teklifi göster
+        setTimeout(() => {
+          setCurrentIndex(currentIndex + 1);
+        }, 2500);
+        return;
+      }
       
       if (result.matched) {
         Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
@@ -741,7 +754,7 @@ export default function DiscoverScreen() {
                           <Text style={styles.cityDisplayText}>
                             {selectedProvince && selectedDistrict
                               ? `${selectedDistrict}, ${PROVINCES.find(p => p.id === selectedProvince)?.name}`
-                              : userCity || 'Konum alınıyor...'}
+                              : currentCity || 'Konum alınıyor...'}
                           </Text>
                         </View>
                         <TouchableOpacity
@@ -1158,6 +1171,13 @@ export default function DiscoverScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Super Like Success Modal */}
+      <SuperLikeSuccessModal
+        visible={showSuperLikeSuccess}
+        onClose={() => setShowSuperLikeSuccess(false)}
+        userName={superLikeUserName}
+      />
     </View>
   );
 }
@@ -1171,10 +1191,9 @@ function CreateProposalModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, currentCity } = useAuth();
   const [activityName, setActivityName] = useState('');
   const [venueName, setVenueName] = useState('');
-  const [userCity, setUserCity] = useState('');
   const [eventDate, setEventDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Yarın
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
@@ -1184,7 +1203,6 @@ function CreateProposalModal({
   useEffect(() => {
     if (visible) {
       loadInterests();
-      loadUserCity();
     }
   }, [visible]);
 
@@ -1193,17 +1211,7 @@ function CreateProposalModal({
     if (data) setInterests(data);
   };
 
-  const loadUserCity = async () => {
-    if (!user?.id) return;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('city')
-      .eq('id', user.id)
-      .single();
-    if (profile?.city) {
-      setUserCity(profile.city);
-    }
-  };
+
 
   const showDateTimePicker = () => {
     if (Platform.OS === 'android') {
@@ -1248,7 +1256,7 @@ function CreateProposalModal({
         participant_count: 1,
         is_group: false,
         interest_id: selectedInterest,
-        city: userCity || 'İstanbul',
+        city: currentCity || 'İstanbul',
         latitude: userData?.latitude,
         longitude: userData?.longitude,
         event_datetime: eventDate.toISOString(),
@@ -1310,7 +1318,7 @@ function CreateProposalModal({
               <View style={styles.locationDetectedBadge}>
                 <MapPin size={18} color="#8B5CF6" />
                 <Text style={styles.locationDetectedText}>
-                  {userCity || 'Konum alınıyor...'}
+                  {currentCity || 'Konum alınıyor...'}
                 </Text>
               </View>
             </View>
