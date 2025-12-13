@@ -6,6 +6,7 @@ import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 
 export default function LocationScreen() {
   const router = useRouter();
@@ -52,7 +53,44 @@ export default function LocationScreen() {
 
       if (results && results.length > 0) {
         const result = results[0];
-        const detectedCity = result.city || result.region || result.subregion;
+        
+        console.log('🗺️ Onboarding Geocode sonucu:', {
+          district: result.district,
+          subregion: result.subregion,
+          city: result.city,
+          region: result.region
+        });
+        
+        // İlçe bilgisini akıllı şekilde belirle
+        let detectedCity = '';
+        let districtName = '';
+        let regionName = result.region || '';
+        
+        // Önce district alanını kontrol et ve mapping uygula
+        if (result.district) {
+          districtName = getDistrictFromNeighborhood(result.district);
+          console.log('🔄 Onboarding District mapping:', result.district, '->', districtName);
+        }
+        // Sonra subregion'ı kontrol et
+        else if (result.subregion) {
+          districtName = getDistrictFromNeighborhood(result.subregion);
+          console.log('🔄 Onboarding Subregion mapping:', result.subregion, '->', districtName);
+        }
+        // Son çare olarak city'yi kullan
+        else if (result.city) {
+          districtName = result.city;
+          console.log('🔄 Onboarding City kullanıldı:', districtName);
+        }
+        
+        // Final şehir adını oluştur
+        if (districtName && regionName) {
+          detectedCity = `${districtName}, ${regionName}`;
+          console.log('📍 Onboarding Final konum:', detectedCity);
+        } else if (districtName) {
+          detectedCity = districtName;
+        } else if (regionName) {
+          detectedCity = regionName;
+        }
         
         if (detectedCity) {
           setCity(detectedCity);
