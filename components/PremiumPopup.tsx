@@ -17,7 +17,7 @@ const { width, height } = Dimensions.get('window');
 interface PremiumPopupProps {
   visible: boolean;
   onClose: () => void;
-  feature?: 'likes' | 'superLikes' | 'boost' | 'filters';
+  feature?: 'likes' | 'superLikes' | 'filters';
 }
 
 const featureMessages = {
@@ -28,13 +28,8 @@ const featureMessages = {
   },
   superLikes: {
     title: 'Super Like Limiti',
-    description: 'Bugün için super like hakkın bitti. Premium ile sınırsız super like!',
+    description: 'Bugün için super like hakkın bitti. Premium ile günlük 1 super like hakkı!',
     icon: Sparkles,
-  },
-  boost: {
-    title: 'Profil Boost',
-    description: 'Premium üyeler profillerini öne çıkarabilir ve daha fazla eşleşme alabilir!',
-    icon: Zap,
   },
   filters: {
     title: 'Gelişmiş Filtreler',
@@ -121,14 +116,7 @@ export default function PremiumPopup({ visible, onClose, feature = 'likes' }: Pr
                   <View style={styles.featureItemIcon}>
                     <Sparkles size={24} color="#FFF" />
                   </View>
-                  <Text style={styles.featureItemText}>Sınırsız{'\n'}Super Like</Text>
-                </View>
-                
-                <View style={styles.featureItem}>
-                  <View style={styles.featureItemIcon}>
-                    <Zap size={24} color="#FFF" />
-                  </View>
-                  <Text style={styles.featureItemText}>Profil{'\n'}Boost</Text>
+                  <Text style={styles.featureItemText}>Günlük 1{'\n'}Super Like</Text>
                 </View>
                 
                 <View style={styles.featureItem}>
@@ -136,6 +124,13 @@ export default function PremiumPopup({ visible, onClose, feature = 'likes' }: Pr
                     <Eye size={24} color="#FFF" />
                   </View>
                   <Text style={styles.featureItemText}>Gelişmiş{'\n'}Filtreler</Text>
+                </View>
+                
+                <View style={styles.featureItem}>
+                  <View style={styles.featureItemIcon}>
+                    <Crown size={24} color="#FFF" />
+                  </View>
+                  <Text style={styles.featureItemText}>Öncelikli{'\n'}Görünüm</Text>
                 </View>
               </View>
 
@@ -156,7 +151,7 @@ export default function PremiumPopup({ visible, onClose, feature = 'likes' }: Pr
 
               {/* Price Info */}
               <View style={styles.priceInfo}>
-                <Text style={styles.priceText}>₺149/ay'dan başlayan fiyatlarla</Text>
+                <Text style={styles.priceText}>₺149/hafta'dan başlayan fiyatlarla</Text>
                 <Text style={styles.priceSubtext}>İstediğin zaman iptal edebilirsin</Text>
               </View>
             </ScrollView>

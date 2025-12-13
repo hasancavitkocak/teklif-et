@@ -176,7 +176,8 @@ export const discoverAPI = {
       throw new Error('Günlük limit doldu. Premium olarak sınırsız teklif gönderebilirsiniz.');
     }
 
-    if (isSuperLike && !profile.is_premium && profile.daily_super_likes_used >= 1) {
+    // Super like kontrolü - hem premium hem free için günlük 1 limit
+    if (isSuperLike && profile.daily_super_likes_used >= 1) {
       throw new Error('Günlük super like hakkınız doldu');
     }
 

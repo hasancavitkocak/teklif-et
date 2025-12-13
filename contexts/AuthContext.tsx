@@ -35,13 +35,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshPremiumStatus = async () => {
     if (!user?.id) return;
     try {
+      // Önce expired premiumları kontrol et
+      await supabase.rpc('check_expired_premiums');
+      
+      // Sonra güncel premium durumunu al
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_premium')
+        .select('is_premium, premium_expires_at')
         .eq('id', user.id)
         .single();
       
-      setIsPremium(profile?.is_premium || false);
+      // Eğer premium_expires_at varsa ve geçmişse, premium'u false yap
+      let isPremiumActive = profile?.is_premium || false;
+      if (profile?.premium_expires_at) {
+        const expiryDate = new Date(profile.premium_expires_at);
+        const now = new Date();
+        if (expiryDate < now) {
+          isPremiumActive = false;
+        }
+      }
+      
+      setIsPremium(isPremiumActive);
     } catch (error) {
       console.error('Error loading premium status:', error);
     }

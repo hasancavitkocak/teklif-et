@@ -19,6 +19,7 @@ import PhotoManagementModal from '@/components/PhotoManagementModal';
 import FreezeAccountModal from '@/components/FreezeAccountModal';
 import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
+import SignOutModal from '@/components/SignOutModal';
 import { PROVINCES } from '@/constants/cities';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
@@ -64,6 +65,8 @@ export default function ProfileScreen() {
   const [freezeLoading, setFreezeLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -237,23 +240,22 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSignOut = async () => {
-    Alert.alert('Çıkış Yap', 'Çıkmak istediğinize emin misiniz?', [
-      { text: 'İptal', style: 'cancel' },
-      {
-        text: 'Çıkış Yap',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await signOut();
-            router.replace('/auth/welcome');
-          } catch (error: any) {
-            console.error('Sign out error:', error);
-            Alert.alert('Hata', error.message || 'Çıkış yapılırken bir hata oluştu');
-          }
-        },
-      },
-    ]);
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
+    setSignOutLoading(true);
+    try {
+      await signOut();
+      setShowSignOutModal(false);
+      router.replace('/auth/welcome');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      Alert.alert('Hata', error.message || 'Çıkış yapılırken bir hata oluştu');
+    } finally {
+      setSignOutLoading(false);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -1017,6 +1019,14 @@ export default function ProfileScreen() {
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
         loading={deleteLoading}
+      />
+
+      {/* Sign Out Modal */}
+      <SignOutModal
+        visible={showSignOutModal}
+        onClose={() => setShowSignOutModal(false)}
+        onConfirm={confirmSignOut}
+        loading={signOutLoading}
       />
 
     </SafeAreaView>

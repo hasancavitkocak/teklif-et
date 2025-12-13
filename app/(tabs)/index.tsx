@@ -45,7 +45,7 @@ export default function DiscoverScreen() {
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [editingCity, setEditingCity] = useState(false);
   const [premiumPopupVisible, setPremiumPopupVisible] = useState(false);
-  const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'boost' | 'filters'>('likes');
+  const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'filters'>('likes');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
@@ -443,15 +443,7 @@ export default function DiscoverScreen() {
           >
             <Bell size={22} color="#8B5CF6" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => {
-              setPremiumFeature('boost');
-              setPremiumPopupVisible(true);
-            }}
-          >
-            <Sparkles size={22} color="#8B5CF6" />
-          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setFilterModalVisible(true)}
@@ -483,12 +475,7 @@ export default function DiscoverScreen() {
               colors={['transparent', 'rgba(0,0,0,0.8)']}
               style={styles.cardGradient}
             >
-              {currentProposal.is_boosted && (
-                <View style={styles.boostBadge}>
-                  <Zap size={16} color="#FFF" fill="#FFF" />
-                  <Text style={styles.boostText}>Boost</Text>
-                </View>
-              )}
+
               
               {/* Ana Container - Yan Yana */}
               <View style={styles.cardBottomContainer}>
@@ -1501,23 +1488,7 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 100,
   },
-  boostBadge: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: '#F59E0B',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  boostText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFF',
-  },
+
   cardBottomContainer: {
     flexDirection: 'row',
     gap: 12,
