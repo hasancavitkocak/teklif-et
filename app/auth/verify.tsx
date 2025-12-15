@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
@@ -8,10 +8,47 @@ import { supabase } from '@/lib/supabase';
 export default function VerifyScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams<{ phone: string }>();
-  const { verifyOtp } = useAuth();
+  const { verifyOtp, resendOtp } = useAuth();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(60); // 60 saniye geri sayım
+  const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  // Geri sayım timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setCanResend(true);
+    }
+  }, [countdown]);
+
+  const handleResendCode = async () => {
+    if (!canResend) return;
+    
+    try {
+      const success = await resendOtp(phone);
+      if (success) {
+        setCountdown(60);
+        setCanResend(false);
+        setOtp(['', '', '', '', '', '']); // Kodu temizle
+        inputRefs.current[0]?.focus(); // İlk input'a odaklan
+        Alert.alert('Başarılı', 'Doğrulama kodu tekrar gönderildi');
+      }
+    } catch (error) {
+      Alert.alert('Hata', 'Kod gönderilemedi, lütfen tekrar deneyin');
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleOtpChange = (value: string, index: number) => {
     if (value.length > 1) return;
@@ -102,9 +139,22 @@ export default function VerifyScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.resendButton}>
-          <Text style={styles.resendText}>Kodu Tekrar Gönder</Text>
-        </TouchableOpacity>
+        <View style={styles.resendContainer}>
+          {!canResend ? (
+            <View style={styles.countdownContainer}>
+              <Text style={styles.countdownText}>
+                Kodu tekrar gönderebilmek için {formatTime(countdown)} bekleyin
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.resendButton}
+              onPress={handleResendCode}
+            >
+              <Text style={styles.resendText}>Kodu Tekrar Gönder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -175,6 +225,10 @@ const styles = StyleSheet.create({
     borderColor: '#8B5CF6',
     borderWidth: 2,
   },
+  resendContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
   resendButton: {
     alignItems: 'center',
     paddingVertical: 16,
@@ -183,5 +237,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  countdownContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  countdownText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });

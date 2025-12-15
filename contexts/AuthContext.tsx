@@ -20,6 +20,7 @@ interface AuthContextType {
   requestLocationPermission: () => Promise<{ granted: boolean; error?: string }>;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
+  resendOtp: (phone: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -510,6 +511,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Phone number is handled in verifyOtp
   };
 
+  const resendOtp = async (phone: string) => {
+    // Gerçek uygulamada burada SMS API'si çağrılacak
+    // Şimdilik demo için başarılı dönüyoruz
+    console.log('📱 Resending OTP to:', phone);
+    
+    // Simüle edilmiş gecikme
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return true;
+  };
+
   const verifyOtp = async (phone: string, otp: string) => {
     if (otp !== '123456') {
       throw new Error('Geçersiz doğrulama kodu');
@@ -637,6 +649,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requestLocationPermission,
         signInWithPhone,
         verifyOtp,
+        resendOtp,
         signOut,
       }}
     >
