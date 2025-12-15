@@ -26,6 +26,7 @@ export default function MatchesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<MatchType | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [matchToDelete, setMatchToDelete] = useState<MatchType | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
   // Sayfa her açıldığında veri yükle
@@ -127,22 +128,23 @@ export default function MatchesScreen() {
   };
 
   const handleDeleteMatch = async () => {
-    if (!selectedMatchForMenu || !user?.id) return;
+    if (!matchToDelete || !user?.id) return;
     
-    const matchIdToDelete = selectedMatchForMenu.id;
+    const matchIdToDelete = matchToDelete.id;
+    
+    // Modal'ı kapat ve state'i temizle
+    setShowDeleteConfirm(false);
+    setMatchToDelete(null);
     
     // Önce UI'dan kaldır (instant)
     setMatches(prev => prev.filter(m => m.id !== matchIdToDelete));
-    setShowDeleteConfirm(false);
-    setSelectedMatchForMenu(null);
     
     // API katmanından soft delete
     try {
       await matchesAPI.deleteMatch(matchIdToDelete, user.id);
-      console.log('Match soft deleted successfully');
     } catch (error: any) {
       console.error('Delete error:', error);
-      Alert.alert('Hata', 'Sohbet sonlandırılamadı');
+      Alert.alert('Hata', 'Sohbet sonlandırılamadı: ' + error.message);
       // Hata olursa geri yükle
       loadMatches();
     }
@@ -252,6 +254,7 @@ export default function MatchesScreen() {
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
+                setMatchToDelete(selectedMatchForMenu);
                 setSelectedMatchForMenu(null);
                 setTimeout(() => setShowDeleteConfirm(true), 100);
               }}

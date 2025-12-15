@@ -328,12 +328,12 @@ export default function ProfileScreen() {
         console.warn('⚠️ Teklifler dondurulurken hata:', proposalsError);
       }
 
-      // Aktif eşleşmeleri dondur
+      // Kullanıcının aktif match'lerini soft delete et (hesap dondurunca)
       const { error: matchesError } = await supabase
         .from('matches')
-        .update({ is_active: false })
+        .update({ deleted_by: user?.id })
         .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`)
-        .eq('is_active', true);
+        .is('deleted_by', null);
 
       if (matchesError) {
         console.warn('⚠️ Eşleşmeler dondurulurken hata:', matchesError);

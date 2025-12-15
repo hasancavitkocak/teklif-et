@@ -105,12 +105,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('⚠️ Teklifler aktif edilirken hata:', proposalsError);
       }
 
-      // Dondurulmuş eşleşmeleri aktif yap
+      // Kullanıcının soft delete edilmiş match'lerini temizle (hesap dondurmadan çıkınca)
       const { error: matchesError } = await supabase
         .from('matches')
-        .update({ is_active: true })
+        .update({ deleted_by: null })
         .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-        .eq('is_active', false);
+        .eq('deleted_by', user.id);
 
       if (matchesError) {
         console.warn('⚠️ Eşleşmeler aktif edilirken hata:', matchesError);
@@ -584,12 +584,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .eq('creator_id', authResult.data.user.id)
               .eq('status', 'frozen');
 
-            // Dondurulmuş eşleşmeleri aktif yap
+            // Kullanıcının soft delete edilmiş match'lerini temizle (login sırasında)
             await supabase
               .from('matches')
-              .update({ is_active: true })
+              .update({ deleted_by: null })
               .or(`user1_id.eq.${authResult.data.user.id},user2_id.eq.${authResult.data.user.id}`)
-              .eq('is_active', false);
+              .eq('deleted_by', authResult.data.user.id);
 
             console.log('✅ Hesap login sırasında otomatik aktif edildi');
           }
