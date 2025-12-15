@@ -53,6 +53,10 @@ export default function ProfileScreen() {
   const [editCity, setEditCity] = useState('');
   const [editSmoking, setEditSmoking] = useState('');
   const [editDrinking, setEditDrinking] = useState('');
+  const [editNotificationMessages, setEditNotificationMessages] = useState(true);
+  const [editNotificationMatches, setEditNotificationMatches] = useState(true);
+  const [editNotificationProposals, setEditNotificationProposals] = useState(true);
+  const [editNotificationMarketing, setEditNotificationMarketing] = useState(false);
   const [editingCity, setEditingCity] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState<string>('');
@@ -207,6 +211,10 @@ export default function ProfileScreen() {
         setEditCity(profileData.city);
         setEditSmoking(profileData.smoking);
         setEditDrinking(profileData.drinking);
+        setEditNotificationMessages(profileData.notification_messages ?? true);
+        setEditNotificationMatches(profileData.notification_matches ?? true);
+        setEditNotificationProposals(profileData.notification_proposals ?? true);
+        setEditNotificationMarketing(profileData.notification_marketing ?? false);
       }
 
       const { data: interestsData } = await supabase
@@ -276,6 +284,10 @@ export default function ProfileScreen() {
         name: editName,
         smoking: editSmoking,
         drinking: editDrinking,
+        notification_messages: editNotificationMessages,
+        notification_matches: editNotificationMatches,
+        notification_proposals: editNotificationProposals,
+        notification_marketing: editNotificationMarketing,
       };
 
       // Şehir değişmediyse normal güncelleme
@@ -937,6 +949,67 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
+              {/* Bildirim Ayarları */}
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>Bildirim Ayarları</Text>
+                
+                <View style={styles.notificationItem}>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>Yeni Mesajlar</Text>
+                    <Text style={styles.notificationSubtitle}>Yeni mesaj geldiğinde bildirim al</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.toggleSwitch, editNotificationMessages && styles.toggleSwitchActive]}
+                    onPress={() => setEditNotificationMessages(!editNotificationMessages)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.toggleThumb, editNotificationMessages && styles.toggleThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.notificationItem}>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>Yeni Eşleşmeler</Text>
+                    <Text style={styles.notificationSubtitle}>Yeni eşleşme olduğunda bildirim al</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.toggleSwitch, editNotificationMatches && styles.toggleSwitchActive]}
+                    onPress={() => setEditNotificationMatches(!editNotificationMatches)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.toggleThumb, editNotificationMatches && styles.toggleThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.notificationItem}>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>Teklif Bildirimleri</Text>
+                    <Text style={styles.notificationSubtitle}>Teklif kabul/red edildiğinde bildirim al</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.toggleSwitch, editNotificationProposals && styles.toggleSwitchActive]}
+                    onPress={() => setEditNotificationProposals(!editNotificationProposals)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.toggleThumb, editNotificationProposals && styles.toggleThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.notificationItem}>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>Pazarlama Bildirimleri</Text>
+                    <Text style={styles.notificationSubtitle}>Özel teklifler ve kampanyalar</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.toggleSwitch, editNotificationMarketing && styles.toggleSwitchActive]}
+                    onPress={() => setEditNotificationMarketing(!editNotificationMarketing)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.toggleThumb, editNotificationMarketing && styles.toggleThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* Hesap İşlemleri */}
               <View style={styles.settingsSection}>
                 <Text style={styles.settingsSectionTitle}>Hesap İşlemleri</Text>
@@ -1516,6 +1589,54 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#EF4444',
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  notificationInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  notificationSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E5E7EB',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  toggleThumbActive: {
+    transform: [{ translateX: 20 }],
   },
   modalFooter: {
     paddingHorizontal: 24,
