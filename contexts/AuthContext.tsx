@@ -374,27 +374,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             postalCode: geocode.postalCode
           });
           
-          // Sadece subregion ve region kullan
-          let subregionName = '';
+          // Subregion ve district'dan en uygun olanı seç
+          let districtName = '';
           let regionName = geocode.region || '';
           
-          // Sadece subregion'ı kontrol et (district kullanma)
-          if (geocode.subregion) {
-            // Subregion'ı direkt kullan, mapping yapma
-            subregionName = geocode.subregion.trim();
-            console.log('📍 Subregion kullanıldı:', subregionName);
+          // Önce subregion'ı kontrol et
+          if (geocode.subregion && geocode.subregion.trim()) {
+            districtName = geocode.subregion.trim();
+            console.log('📍 Subregion kullanıldı:', districtName);
+          } 
+          // Subregion yoksa district'i kullan
+          else if (geocode.district && geocode.district.trim()) {
+            districtName = geocode.district.trim();
+            console.log('📍 District kullanıldı:', districtName);
           }
           
           // Final şehir adını oluştur
-          if (subregionName && regionName) {
-            finalCityName = `${subregionName}, ${regionName}`;
-            console.log('📍 Final konum (subregion + region):', finalCityName);
+          if (districtName && regionName) {
+            finalCityName = `${districtName}, ${regionName}`;
+            console.log('📍 Final konum (subregion/district + region):', finalCityName);
           } else if (regionName) {
             finalCityName = regionName;
             console.log('📍 Final konum (sadece region):', finalCityName);
-          } else if (subregionName) {
-            finalCityName = subregionName;
-            console.log('📍 Final konum (sadece subregion):', finalCityName);
+          } else if (districtName) {
+            finalCityName = districtName;
+            console.log('📍 Final konum (sadece subregion/district):', finalCityName);
           }
         }
       } catch (error) {
@@ -438,17 +442,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const geocode = normalResults[0];
             console.log('🗺️ Normal Geocode sonucu:', geocode);
             
-            // Önce subregion, sonra district (daha doğru sıralama)
+            // Önce subregion, sonra district
             if (geocode.subregion && geocode.region) {
-              const mappedDistrict = getDistrictFromNeighborhood(geocode.subregion.trim());
-              finalCityName = `${mappedDistrict}, ${geocode.region}`;
+              finalCityName = `${geocode.subregion.trim()}, ${geocode.region}`;
+              console.log('📍 Normal accuracy - Subregion kullanıldı:', finalCityName);
             } else if (geocode.district && geocode.region) {
-              const mappedDistrict = getDistrictFromNeighborhood(geocode.district);
-              finalCityName = `${mappedDistrict}, ${geocode.region}`;
+              finalCityName = `${geocode.district.trim()}, ${geocode.region}`;
+              console.log('📍 Normal accuracy - District kullanıldı:', finalCityName);
             } else if (geocode.city && geocode.region) {
               finalCityName = `${geocode.city}, ${geocode.region}`;
+              console.log('📍 Normal accuracy - City kullanıldı:', finalCityName);
             } else if (geocode.region) {
               finalCityName = geocode.region;
+              console.log('📍 Normal accuracy - Sadece region kullanıldı:', finalCityName);
             }
           }
         } catch (error) {

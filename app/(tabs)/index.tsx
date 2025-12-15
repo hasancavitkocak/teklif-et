@@ -272,17 +272,20 @@ export default function DiscoverScreen() {
         let districtName = '';
         let regionName = geocode.region || '';
         
-        // Önce district alanını kontrol et ve mapping uygula
-        if (geocode.district) {
-          districtName = getDistrictFromNeighborhood(geocode.district);
+        // Önce subregion'ı kontrol et
+        if (geocode.subregion && geocode.subregion.trim()) {
+          districtName = geocode.subregion.trim();
+          console.log('📍 Index - Subregion kullanıldı:', districtName);
         }
-        // Sonra subregion'ı kontrol et
-        else if (geocode.subregion) {
-          districtName = getDistrictFromNeighborhood(geocode.subregion);
+        // Subregion yoksa district'i kontrol et
+        else if (geocode.district && geocode.district.trim()) {
+          districtName = geocode.district.trim();
+          console.log('📍 Index - District kullanıldı:', districtName);
         }
         // Son çare olarak city'yi kullan
         else if (geocode.city) {
           districtName = geocode.city;
+          console.log('📍 Index - City kullanıldı:', districtName);
         }
         
         // Final şehir adını oluştur

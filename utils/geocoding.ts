@@ -54,17 +54,20 @@ export async function reverseGeocode(
       let districtName = '';
       let regionName = result.region || '';
       
-      // Önce district alanını kontrol et ve mapping uygula
-      if (result.district) {
-        districtName = getDistrictFromNeighborhood(result.district);
+      // Önce subregion'ı kontrol et
+      if (result.subregion && result.subregion.trim()) {
+        districtName = result.subregion.trim();
+        console.log('📍 Utils - Subregion kullanıldı:', districtName);
       }
-      // Sonra subregion'ı kontrol et
-      else if (result.subregion) {
-        districtName = getDistrictFromNeighborhood(result.subregion);
+      // Subregion yoksa district'i kontrol et
+      else if (result.district && result.district.trim()) {
+        districtName = result.district.trim();
+        console.log('📍 Utils - District kullanıldı:', districtName);
       }
       // Son çare olarak city'yi kullan
       else if (result.city) {
         districtName = result.city;
+        console.log('📍 Utils - City kullanıldı:', districtName);
       }
       
       // Final şehir adını oluştur

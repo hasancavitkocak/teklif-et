@@ -163,20 +163,20 @@ export default function ProfileScreen() {
         let districtName = '';
         let regionName = geocode.region || '';
         
-        // Önce subregion'ı kontrol et (daha doğru ilçe bilgisi)
-        if (geocode.subregion) {
-          districtName = getDistrictFromNeighborhood(geocode.subregion.trim());
-          console.log('🔄 Profil Subregion mapping:', geocode.subregion, '->', districtName);
+        // Önce subregion'ı kontrol et
+        if (geocode.subregion && geocode.subregion.trim()) {
+          districtName = geocode.subregion.trim();
+          console.log('📍 Profile - Subregion kullanıldı:', districtName);
         }
-        // Sonra district alanını kontrol et ve mapping uygula
-        else if (geocode.district) {
-          districtName = getDistrictFromNeighborhood(geocode.district);
-          console.log('🔄 Profil District mapping:', geocode.district, '->', districtName);
+        // Subregion yoksa district'i kontrol et
+        else if (geocode.district && geocode.district.trim()) {
+          districtName = geocode.district.trim();
+          console.log('📍 Profile - District kullanıldı:', districtName);
         }
         // Son çare olarak city'yi kullan
         else if (geocode.city) {
           districtName = geocode.city;
-          console.log('🔄 Profil City kullanıldı:', districtName);
+          console.log('📍 Profile - City kullanıldı:', districtName);
         }
         
         // Final şehir adını oluştur
