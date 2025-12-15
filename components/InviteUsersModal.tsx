@@ -55,6 +55,7 @@ export default function InviteUsersModal({
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
   
   // Filtreleme state'leri
   const [showFilters, setShowFilters] = useState(false);
@@ -133,8 +134,24 @@ export default function InviteUsersModal({
   useEffect(() => {
     if (visible && user) {
       loadInvitableUsers();
+      loadRemainingInvitations();
     }
   }, [visible, proposalId]);
+
+  const loadRemainingInvitations = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_remaining_invitations', {
+        p_user_id: user.id
+      });
+      
+      if (error) throw error;
+      setRemainingInvitations(data || 0);
+    } catch (error) {
+      console.error('Error loading remaining invitations:', error);
+    }
+  };
 
   const loadInvitableUsers = async () => {
     if (!user) return;
@@ -299,6 +316,26 @@ export default function InviteUsersModal({
     if (newSelected.has(userId)) {
       newSelected.delete(userId);
     } else {
+      // Premium olmayan kullanıcılar için limit kontrolü
+      if (!isPremium && newSelected.size >= remainingInvitations) {
+        Alert.alert(
+          'Davet Limiti',
+          `Günlük davet limitiniz doldu. Kalan davet hakkınız: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
+          [
+            { text: 'Tamam', style: 'default' },
+            { 
+              text: 'Premium Ol', 
+              style: 'default',
+              onPress: () => {
+                onClose();
+                // Premium sayfasına yönlendir
+                // router.push('/(tabs)/premium');
+              }
+            }
+          ]
+        );
+        return;
+      }
       newSelected.add(userId);
     }
     setSelectedUsers(newSelected);
@@ -307,6 +344,27 @@ export default function InviteUsersModal({
   const handleSendInvitations = async () => {
     if (!user || selectedUsers.size === 0) return;
 
+    // Premium olmayan kullanıcılar için limit kontrolü
+    if (!isPremium && selectedUsers.size > remainingInvitations) {
+      Alert.alert(
+        'Davet Limiti',
+        `Günlük davet limitinizi aştınız. Kalan davet hakkınız: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
+        [
+          { text: 'Tamam', style: 'default' },
+          { 
+            text: 'Premium Ol', 
+            style: 'default',
+            onPress: () => {
+              onClose();
+              // Premium sayfasına yönlendir
+              // router.push('/(tabs)/premium');
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     setSending(true);
     try {
       await invitationsAPI.inviteUsers(
@@ -314,6 +372,9 @@ export default function InviteUsersModal({
         user.id,
         Array.from(selectedUsers)
       );
+      
+      // Kalan davet sayısını güncelle
+      loadRemainingInvitations();
       
       // Listeyi yenile
       onInviteSent?.();
@@ -333,6 +394,8 @@ export default function InviteUsersModal({
       
       if (error.message?.includes('duplicate')) {
         Alert.alert('Uyarı', 'Bazı kullanıcılar zaten davet edilmiş');
+      } else if (error.message?.includes('limit')) {
+        Alert.alert('Davet Limiti', 'Günlük davet limitinizi aştınız. Premium üyelik ile sınırsız davet gönderebilirsiniz.');
       } else {
         Alert.alert('Hata', 'Davetler gönderilirken bir hata oluştu');
       }
@@ -757,6 +820,11 @@ export default function InviteUsersModal({
               <Text style={styles.headerSubtitle} numberOfLines={1}>
                 {proposalName}
               </Text>
+              {!isPremium && (
+                <Text style={styles.invitationLimit}>
+                  Kalan davet: {remainingInvitations === 999 ? '∞' : remainingInvitations}
+                </Text>
+              )}
             </View>
 
             <View style={styles.headerActions}>
@@ -882,6 +950,12 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     color: '#6B7280',
+  },
+  invitationLimit: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontWeight: '600',
+    marginTop: 2,
   },
   sendButton: {
     width: 48,

@@ -42,6 +42,7 @@ interface Profile {
   is_premium: boolean;
   daily_proposals_sent: number;
   daily_super_likes_used: number;
+  daily_invitations_sent: number;
   allow_invitations: boolean;
   phone: string;
 }
@@ -80,6 +81,7 @@ export default function ProfileScreen() {
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
   const [remainingSuperLikes, setRemainingSuperLikes] = useState<number>(0);
+  const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
 
   useEffect(() => {
     loadProfile();
@@ -260,6 +262,12 @@ export default function ProfileScreen() {
           p_user_id: user.id 
         });
         setRemainingSuperLikes(remainingLikes || 0);
+
+        // Kalan davet hakkını al
+        const { data: remainingInvites } = await supabase.rpc('get_remaining_invitations', { 
+          p_user_id: user.id 
+        });
+        setRemainingInvitations(remainingInvites || 0);
       }
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -657,6 +665,12 @@ export default function ProfileScreen() {
               {remainingSuperLikes}
             </Text>
             <Text style={styles.statLabel}>Super Like</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>
+              {remainingInvitations === 999 ? '∞' : remainingInvitations}
+            </Text>
+            <Text style={styles.statLabel}>Davet</Text>
           </View>
         </View>
 

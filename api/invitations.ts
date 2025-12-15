@@ -31,6 +31,30 @@ export interface ProposalInvitation {
 export const invitationsAPI = {
   // Kullanıcıları teklife davet et
   inviteUsers: async (proposalId: string, inviterId: string, userIds: string[]) => {
+    // Önce limit kontrolü yap
+    const { data: canSend, error: checkError } = await supabase.rpc('can_send_invitations', {
+      p_user_id: inviterId,
+      p_invitation_count: userIds.length
+    });
+
+    if (checkError) throw checkError;
+
+    if (!canSend) {
+      throw new Error('Günlük davet limitinizi aştınız');
+    }
+
+    // Davet sayacını güncelle
+    const { data: useResult, error: useError } = await supabase.rpc('use_invitations', {
+      p_user_id: inviterId,
+      p_invitation_count: userIds.length
+    });
+
+    if (useError) throw useError;
+
+    if (!useResult) {
+      throw new Error('Davet limiti kontrolü başarısız oldu');
+    }
+
     const invitations = userIds.map(userId => ({
       proposal_id: proposalId,
       inviter_id: inviterId,
@@ -48,6 +72,30 @@ export const invitationsAPI = {
 
   // Tek kullanıcıyı davet et
   inviteUser: async (proposalId: string, inviterId: string, userId: string) => {
+    // Önce limit kontrolü yap
+    const { data: canSend, error: checkError } = await supabase.rpc('can_send_invitations', {
+      p_user_id: inviterId,
+      p_invitation_count: 1
+    });
+
+    if (checkError) throw checkError;
+
+    if (!canSend) {
+      throw new Error('Günlük davet limitinizi aştınız');
+    }
+
+    // Davet sayacını güncelle
+    const { data: useResult, error: useError } = await supabase.rpc('use_invitations', {
+      p_user_id: inviterId,
+      p_invitation_count: 1
+    });
+
+    if (useError) throw useError;
+
+    if (!useResult) {
+      throw new Error('Davet limiti kontrolü başarısız oldu');
+    }
+
     const { data, error } = await supabase
       .from('proposal_invitations')
       .insert({
