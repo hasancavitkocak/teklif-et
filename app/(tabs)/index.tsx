@@ -40,6 +40,7 @@ export default function DiscoverScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [skippedProposalIds, setSkippedProposalIds] = useState<Set<string>>(new Set());
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>('');
@@ -351,8 +352,12 @@ export default function DiscoverScreen() {
         minAge: isPremium ? minAge : undefined,
         maxAge: isPremium ? maxAge : undefined,
         gender: isPremium ? selectedGender : undefined,
+        maxDistance: maxDistance, // 50 km varsayılan
       });
-      setProposals(data);
+      // Geçilen teklifleri frontend'te filtrele (sadece o liste için)
+      const filteredData = resetIndex ? data : data.filter(proposal => !skippedProposalIds.has(proposal.id));
+      
+      setProposals(filteredData);
       // Sadece manuel yüklemede veya filtre değişiminde index'i sıfırla
       if (resetIndex) {
         setCurrentIndex(0);
@@ -396,9 +401,6 @@ export default function DiscoverScreen() {
     const proposal = proposals[currentIndex];
 
     try {
-      // Gösterildi olarak işaretle
-      await discoverAPI.markAsShown(user.id, proposal.id);
-
       const result = await discoverAPI.likeProposal(proposal.id, user.id, isSuperLike);
       
       // Süper beğeni başarı pop-up'ı göster
@@ -441,11 +443,10 @@ export default function DiscoverScreen() {
 
     const proposal = proposals[currentIndex];
 
-    try {
-      // Gösterildi olarak işaretle
-      await discoverAPI.markAsShown(user.id, proposal.id);
-    } catch (error) {
-      console.error('Mark as shown error:', error);
+    // Geçilen teklifi hatırla (o oturum için)
+    const currentProposal = proposals[currentIndex];
+    if (currentProposal) {
+      setSkippedProposalIds(prev => new Set([...Array.from(prev), currentProposal.id]));
     }
 
     setCurrentIndex(currentIndex + 1);
@@ -588,7 +589,8 @@ export default function DiscoverScreen() {
             onPress={() => {
               setRefreshing(true);
               setCurrentIndex(0);
-              loadProposals();
+              setSkippedProposalIds(new Set()); // Geçilen teklifleri temizle
+              loadProposals(true); // resetIndex = true
             }}
           >
             <Text style={styles.refreshButtonText}>Yenile</Text>

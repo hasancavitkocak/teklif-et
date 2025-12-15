@@ -385,6 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Önce düşük accuracy ile dene (daha geniş alan)
       try {
+        console.log('🔍 Reverse geocoding başlatılıyor...');
         const lowAccuracyResults = await Location.reverseGeocodeAsync({ 
           latitude, 
           longitude 
@@ -409,16 +410,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let districtName = '';
           let regionName = geocode.region || '';
           
-          // Önce district alanını kontrol et
-          if (geocode.district) {
+          // Önce subregion'ı kontrol et (daha doğru ilçe bilgisi)
+          if (geocode.subregion) {
+            districtName = getDistrictFromNeighborhood(geocode.subregion.trim());
+            console.log('🔄 Subregion mapping:', geocode.subregion, '->', districtName);
+          }
+          // Sonra district alanını kontrol et
+          else if (geocode.district) {
             // District alanı mahalle/cadde adı olabilir, gerçek ilçeye çevir
             districtName = getDistrictFromNeighborhood(geocode.district);
             console.log('🔄 District mapping:', geocode.district, '->', districtName);
-          }
-          // Sonra subregion'ı kontrol et
-          else if (geocode.subregion) {
-            districtName = getDistrictFromNeighborhood(geocode.subregion);
-            console.log('🔄 Subregion mapping:', geocode.subregion, '->', districtName);
           }
           // Son çare olarak city'yi kullan
           else if (geocode.city) {
@@ -440,6 +441,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error('❌ Low accuracy geocoding hatası:', error);
+        
+        // Geocoding hatası durumunda koordinatları kaydet ama şehir adını manuel belirle
+        console.log('🔄 Geocoding başarısız, koordinat tabanlı şehir belirleniyor...');
+        
+        // Türkiye'nin büyük şehirlerinin koordinat aralıkları
+        if (latitude >= 40.8 && latitude <= 41.2 && longitude >= 28.8 && longitude <= 29.3) {
+          finalCityName = 'İstanbul';
+        } else if (latitude >= 39.8 && latitude <= 40.1 && longitude >= 32.7 && longitude <= 33.0) {
+          finalCityName = 'Ankara';
+        } else if (latitude >= 38.3 && latitude <= 38.5 && longitude >= 27.0 && longitude <= 27.3) {
+          finalCityName = 'İzmir';
+        } else if (latitude >= 37.0 && latitude <= 37.1 && longitude >= 27.1 && longitude <= 27.3) {
+          finalCityName = 'Muğla';
+        } else if (latitude >= 36.8 && latitude <= 37.0 && longitude >= 30.6 && longitude <= 30.8) {
+          finalCityName = 'Antalya';
+        } else {
+          // Genel Türkiye koordinatları içindeyse
+          if (latitude >= 35.8 && latitude <= 42.1 && longitude >= 25.7 && longitude <= 44.8) {
+            finalCityName = 'Türkiye'; // Genel konum
+          } else {
+            finalCityName = 'Bilinmeyen Konum';
+          }
+        }
+        
+        console.log('📍 Koordinat tabanlı konum belirlendi:', finalCityName);
       }
       
       // Eğer low accuracy sonuç vermezse, normal accuracy dene
@@ -454,12 +480,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const geocode = normalResults[0];
             console.log('🗺️ Normal Geocode sonucu:', geocode);
             
-            // Basit fallback
-            if (geocode.district && geocode.region) {
-              const mappedDistrict = getDistrictFromNeighborhood(geocode.district);
+            // Önce subregion, sonra district (daha doğru sıralama)
+            if (geocode.subregion && geocode.region) {
+              const mappedDistrict = getDistrictFromNeighborhood(geocode.subregion.trim());
               finalCityName = `${mappedDistrict}, ${geocode.region}`;
-            } else if (geocode.subregion && geocode.region) {
-              const mappedDistrict = getDistrictFromNeighborhood(geocode.subregion);
+            } else if (geocode.district && geocode.region) {
+              const mappedDistrict = getDistrictFromNeighborhood(geocode.district);
               finalCityName = `${mappedDistrict}, ${geocode.region}`;
             } else if (geocode.city && geocode.region) {
               finalCityName = `${geocode.city}, ${geocode.region}`;
@@ -469,6 +495,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error) {
           console.error('❌ Normal geocoding hatası:', error);
+          
+          // İkinci geocoding de başarısızsa, koordinat tabanlı belirleme yap
+          if (!finalCityName) {
+            console.log('🔄 İkinci geocoding de başarısız, koordinat tabanlı belirleme...');
+            
+            if (latitude >= 40.8 && latitude <= 41.2 && longitude >= 28.8 && longitude <= 29.3) {
+              finalCityName = 'İstanbul';
+            } else if (latitude >= 39.8 && latitude <= 40.1 && longitude >= 32.7 && longitude <= 33.0) {
+              finalCityName = 'Ankara';
+            } else if (latitude >= 38.3 && latitude <= 38.5 && longitude >= 27.0 && longitude <= 27.3) {
+              finalCityName = 'İzmir';
+            } else {
+              finalCityName = 'Türkiye';
+            }
+            
+            console.log('📍 Fallback konum belirlendi:', finalCityName);
+          }
         }
       }
       
@@ -492,8 +535,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: true, city: finalCityName };
         }
       } else {
-        console.warn('⚠️ Şehir bilgisi bulunamadı');
-        return { success: false };
+        console.warn('⚠️ Şehir bilgisi bulunamadı, sadece koordinatlar kaydediliyor');
+        
+        // En azından koordinatları kaydet
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            latitude,
+            longitude,
+            city: 'Konum Tespit Edilemedi'
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('❌ Koordinat kaydetme hatası:', error);
+          return { success: false };
+        } else {
+          console.log('✅ Koordinatlar kaydedildi');
+          setCurrentCity('Konum Tespit Edilemedi');
+          return { success: true, city: 'Konum Tespit Edilemedi' };
+        }
       }
     } catch (error) {
       console.error('❌ Konum güncelleme hatası:', error);

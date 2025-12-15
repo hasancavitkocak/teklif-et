@@ -26,17 +26,24 @@ export const discoverAPI = {
     minAge?: number;
     maxAge?: number;
     gender?: string;
+    maxDistance?: number; // km cinsinden
   }) => {
-    // Daha önce gösterilmiş teklif ID'lerini al
-    const { data: shownData } = await supabase
-      .from('discover_feed')
+    // Kullanıcının koordinatlarını al (mesafe filtrelemesi için)
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('latitude, longitude, city')
+      .eq('id', userId)
+      .single();
+
+    // Daha önce başvuru yapılmış teklif ID'lerini al (sadece bunları hariç tut)
+    const { data: appliedData } = await supabase
+      .from('proposal_requests')
       .select('proposal_id')
-      .eq('user_id', userId)
-      .eq('shown', true);
+      .eq('requester_id', userId);
 
-    const shownProposalIds = (shownData || []).map((item: any) => item.proposal_id);
+    const appliedProposalIds = (appliedData || []).map((item: any) => item.proposal_id);
 
-    // Tüm aktif teklifleri getir (gösterilmemiş olanlar ve sadece aktif kullanıcılardan)
+    // Tüm aktif teklifleri getir (koordinatlar dahil - mesafe hesaplaması için)
     let query = supabase
       .from('proposals')
       .select(`
@@ -48,20 +55,29 @@ export const discoverAPI = {
         creator_id,
         event_datetime,
         venue_name,
-        creator:profiles!creator_id(name, profile_photo, birth_date, gender, is_active),
+        creator:profiles!creator_id(name, profile_photo, birth_date, gender, is_active, latitude, longitude),
         interest:interests(name)
       `)
       .eq('status', 'active')
       .neq('creator_id', userId); // Kendi tekliflerini gösterme
 
-    // Daha önce gösterilmiş teklifleri hariç tut
-    if (shownProposalIds.length > 0) {
-      query = query.not('id', 'in', `(${shownProposalIds.join(',')})`);
+    // Daha önce başvuru yapılmış teklifleri hariç tut
+    if (appliedProposalIds.length > 0) {
+      query = query.not('id', 'in', `(${appliedProposalIds.join(',')})`);
     }
 
-    // Filtreler
+    // Geçilen teklifleri frontend'te filtreleyeceğiz
+
+    // Filtreler - şehir filtresi
     if (filters?.city) {
-      query = query.ilike('city', `%${filters.city}%`);
+      // Şehir adından il kısmını çıkar (örn: "Maltepe, İstanbul" -> "İstanbul")
+      const cityParts = filters.city.split(',').map(part => part.trim());
+      const province = cityParts.length > 1 ? cityParts[cityParts.length - 1] : filters.city;
+      
+      console.log('🏙️ Şehir filtresi:', filters.city, '->', province);
+      
+      // İl bazında filtrele (İstanbul, Ankara, İzmir vs.)
+      query = query.ilike('city', `%${province}%`);
     }
     if (filters?.interestId) {
       query = query.eq('interest_id', filters.interestId);
@@ -75,14 +91,48 @@ export const discoverAPI = {
     if (error) throw error;
 
     let proposals = (data || []) as any as DiscoverProposal[];
+    
+    console.log('📋 Ham teklif sayısı:', proposals.length);
+    console.log('📋 İlk 3 teklif şehirleri:', proposals.slice(0, 3).map(p => p.city));
 
-    // Aktif olmayan kullanıcıları filtrele ve diğer filtreler
+    // Mesafe hesaplama fonksiyonu (Haversine formula)
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371; // Dünya'nın yarıçapı (km)
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c; // Mesafe km cinsinden
+    };
+
+    // Aktif olmayan kullanıcıları filtrele ve mesafe filtrelemesi
     proposals = proposals.filter(proposal => {
       const creator = proposal.creator as any;
       
       // Sadece aktif kullanıcıları göster
       if (creator.is_active === false) {
         return false;
+      }
+
+      // Mesafe filtresi (koordinatlar varsa)
+      if (userProfile?.latitude && userProfile?.longitude && creator.latitude && creator.longitude) {
+        const distance = calculateDistance(
+          userProfile.latitude, 
+          userProfile.longitude, 
+          creator.latitude, 
+          creator.longitude
+        );
+        
+        const maxDistance = filters?.maxDistance || 50; // Varsayılan 50 km
+        
+        console.log(`📍 Mesafe: ${creator.name} - ${distance.toFixed(1)} km (max: ${maxDistance} km)`);
+        
+        if (distance > maxDistance) {
+          return false;
+        }
       }
       
       // Yaş filtresi
@@ -110,36 +160,7 @@ export const discoverAPI = {
     return proposals;
   },
 
-  // Teklif gösterildi olarak işaretle
-  markAsShown: async (userId: string, proposalId: string) => {
-    // Önce güncellemeyi dene
-    const { data: updated, error: updateError } = await supabase
-      .from('discover_feed')
-      .update({ shown: true })
-      .eq('user_id', userId)
-      .eq('proposal_id', proposalId)
-      .select();
 
-    // Eğer güncelleme başarılıysa veya kayıt varsa, işlem tamam
-    if (!updateError && updated && updated.length > 0) {
-      return;
-    }
-
-    // Eğer kayıt yoksa, eklemeyi dene
-    const { error: insertError } = await supabase
-      .from('discover_feed')
-      .insert({
-        user_id: userId,
-        proposal_id: proposalId,
-        shown: true,
-        position: 0,
-      });
-
-    // Duplicate key hatası görmezden gel (başka bir işlem eklemiş olabilir)
-    if (insertError && insertError.code !== '23505') {
-      throw insertError;
-    }
-  },
 
   // Teklife başvur (like)
   likeProposal: async (
