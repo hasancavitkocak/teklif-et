@@ -14,6 +14,7 @@ interface AuthContextType {
   currentCity: string;
   refreshPremiumStatus: () => Promise<void>;
   refreshAccountStatus: () => Promise<void>;
+  refreshUserStats: () => Promise<void>;
   unfreezeAccount: () => Promise<boolean>;
   updateLocationManually: () => Promise<{ success: boolean; city?: string; error?: string }>;
   updateCityFromSettings: (newCity: string) => Promise<boolean>;
@@ -79,6 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error loading account status:', error);
     }
+  };
+
+  const refreshUserStats = async () => {
+    // Bu fonksiyon profile sayfasının stats'larını yenilemek için kullanılacak
+    // Event emitter gibi çalışacak
+    console.log('🔄 User stats refresh triggered');
   };
 
   const unfreezeAccount = async (): Promise<boolean> => {
@@ -265,25 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id]);
 
-  // Premium durumu yüklendikten sonra konum güncellemesi yap (sadece premium olmayanlar için)
-  useEffect(() => {
-    const checkLocationAndUpdate = async () => {
-      if (user?.id && isPremium === false) {
-        console.log('👤 Premium olmayan kullanıcı, konum izni kontrol ediliyor...');
-        
-        // Önce konum izni var mı kontrol et
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          console.log('✅ Konum izni var, otomatik güncelleme yapılıyor');
-          updateUserLocation();
-        } else {
-          // Konum izni yok, otomatik güncelleme atlanıyor
-        }
-      }
-    };
-    
-    checkLocationAndUpdate();
-  }, [user?.id, isPremium]);
+  // Otomatik konum güncelleme kaldırıldı - sadece onboarding'de konum alınacak
 
   // Real-time hesap durumu dinleme
   useEffect(() => {
@@ -336,28 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id, isAccountFrozen]);
 
-  // App state değişikliklerini dinle - uygulamaya geri dönüldüğünde konum güncelle (sadece premium olmayanlar için)
-  useEffect(() => {
-    const handleAppStateChange = async (nextAppState: string) => {
-      if (nextAppState === 'active' && user?.id && !isPremium) {
-        console.log('📱 Uygulama aktif hale geldi, premium olmayan kullanıcı için konum kontrol ediliyor...');
-        
-        // Önce konum izni var mı kontrol et
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          console.log('✅ Konum izni var, güncelleme yapılıyor');
-          updateUserLocation();
-        } else {
-          // Konum izni yok, güncelleme atlanıyor
-        }
-      } else if (nextAppState === 'active' && user?.id && isPremium) {
-        console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
-  }, [user?.id, isPremium]);
+  // Otomatik konum güncelleme kaldırıldı - sadece onboarding'de konum alınacak
 
   const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string; error?: string }> => {
     if (!user?.id) return { success: false };
@@ -694,6 +662,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         currentCity,
         refreshPremiumStatus,
         refreshAccountStatus,
+        refreshUserStats,
         unfreezeAccount,
         updateLocationManually,
         updateCityFromSettings,

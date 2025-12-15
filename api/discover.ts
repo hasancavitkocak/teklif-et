@@ -168,33 +168,15 @@ export const discoverAPI = {
     userId: string,
     isSuperLike: boolean = false
   ) => {
-    // Kullanıcı limitlerini kontrol et
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('daily_proposals_sent, daily_super_likes_used, is_premium, last_reset_date')
-      .eq('id', userId)
-      .single();
+    // Teklif kredisi kontrolü
+    const { data: canCreate, error: checkError } = await supabase.rpc('can_create_proposal', {
+      p_user_id: userId
+    });
 
-    if (!profile) throw new Error('Profil bulunamadı');
+    if (checkError) throw checkError;
 
-    // Günlük reset kontrolü
-    const today = new Date().toISOString().split('T')[0];
-    if (profile.last_reset_date !== today) {
-      await supabase
-        .from('profiles')
-        .update({
-          daily_proposals_sent: 0,
-          daily_super_likes_used: 0,
-          last_reset_date: today,
-        })
-        .eq('id', userId);
-      profile.daily_proposals_sent = 0;
-      profile.daily_super_likes_used = 0;
-    }
-
-    // Limit kontrolü
-    if (!profile.is_premium && profile.daily_proposals_sent >= 5) {
-      throw new Error('Günlük limit doldu. Premium olarak sınırsız teklif gönderebilirsiniz.');
+    if (!canCreate) {
+      throw new Error('Günlük teklif hakkınız bitti. Teklif gönderebilmek için premium ol.');
     }
 
     // Super like kontrolü - database fonksiyonu ile kontrol et
@@ -227,6 +209,17 @@ export const discoverAPI = {
       });
 
     if (error) throw error;
+
+    // Teklif kredisini düş
+    const { data: useResult, error: useError } = await supabase.rpc('use_proposal_credit', {
+      p_user_id: userId
+    });
+
+    if (useError) throw useError;
+
+    if (!useResult) {
+      throw new Error('Teklif kredisi kontrolü başarısız oldu');
+    }
 
     // Super like kullanıldıysa sayacı güncelle
     if (isSuperLike) {
@@ -335,38 +328,22 @@ export const discoverAPI = {
             }
           }
 
-          // Limitler güncelle
+          // Super like kullanıldıysa sayacı güncelle (teklif kredisi zaten düşürüldü)
           if (isSuperLike) {
             // Super like kullan
             await supabase.rpc('use_super_like', { p_user_id: userId });
           }
-          
-          // Proposal sayısını güncelle
-          await supabase
-            .from('profiles')
-            .update({
-              daily_proposals_sent: profile.daily_proposals_sent + 1,
-            })
-            .eq('id', userId);
 
           return { matched: true };
         }
       }
     }
 
-    // Limitler güncelle
+    // Super like kullanıldıysa sayacı güncelle (teklif kredisi zaten düşürüldü)
     if (isSuperLike) {
       // Super like kullan
       await supabase.rpc('use_super_like', { p_user_id: userId });
     }
-    
-    // Proposal sayısını güncelle
-    await supabase
-      .from('profiles')
-      .update({
-        daily_proposals_sent: profile.daily_proposals_sent + 1,
-      })
-      .eq('id', userId);
 
     return { matched: false };
   },

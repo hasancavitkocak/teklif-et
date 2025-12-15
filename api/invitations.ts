@@ -40,10 +40,10 @@ export const invitationsAPI = {
     if (checkError) throw checkError;
 
     if (!canSend) {
-      throw new Error('Günlük davet limitinizi aştınız');
+      throw new Error('Davet krediniz yetersiz');
     }
 
-    // Davet sayacını güncelle
+    // Davet kredisini düş
     const { data: useResult, error: useError } = await supabase.rpc('use_invitations', {
       p_user_id: inviterId,
       p_invitation_count: userIds.length
@@ -52,7 +52,7 @@ export const invitationsAPI = {
     if (useError) throw useError;
 
     if (!useResult) {
-      throw new Error('Davet limiti kontrolü başarısız oldu');
+      throw new Error('Davet kredisi kontrolü başarısız oldu');
     }
 
     const invitations = userIds.map(userId => ({
@@ -81,10 +81,10 @@ export const invitationsAPI = {
     if (checkError) throw checkError;
 
     if (!canSend) {
-      throw new Error('Günlük davet limitinizi aştınız');
+      throw new Error('Davet krediniz yetersiz');
     }
 
-    // Davet sayacını güncelle
+    // Davet kredisini düş
     const { data: useResult, error: useError } = await supabase.rpc('use_invitations', {
       p_user_id: inviterId,
       p_invitation_count: 1
@@ -93,7 +93,7 @@ export const invitationsAPI = {
     if (useError) throw useError;
 
     if (!useResult) {
-      throw new Error('Davet limiti kontrolü başarısız oldu');
+      throw new Error('Davet kredisi kontrolü başarısız oldu');
     }
 
     const { data, error } = await supabase

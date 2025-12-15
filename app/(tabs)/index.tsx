@@ -34,7 +34,7 @@ import { PROVINCES } from '@/constants/cities';
 const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { user, isPremium, refreshPremiumStatus, currentCity, requestLocationPermission } = useAuth();
+  const { user, isPremium, refreshPremiumStatus, currentCity, requestLocationPermission, refreshUserStats } = useAuth();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -64,6 +64,7 @@ export default function DiscoverScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSuperLikeSuccess, setShowSuperLikeSuccess] = useState(false);
   const [superLikeUserName, setSuperLikeUserName] = useState<string>('');
+  const [remainingProposals, setRemainingProposals] = useState<number>(0);
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -165,6 +166,7 @@ export default function DiscoverScreen() {
       if (user?.id) {
         updateUserLocationOnFocus(); // Konum güncelle
         loadProposals();
+        loadRemainingProposals(); // Kalan teklif kredisini yükle
         refreshPremiumStatus(); // Premium durumunu yenile
         
         // İlk yüklemede selectedCity'yi currentCity'den al
@@ -174,6 +176,21 @@ export default function DiscoverScreen() {
       }
     }, [user?.id, selectedCity, selectedInterest, isPremium])
   );
+
+  const loadRemainingProposals = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_remaining_proposals', {
+        p_user_id: user.id
+      });
+      
+      if (error) throw error;
+      setRemainingProposals(data || 0);
+    } catch (error) {
+      console.error('Error loading remaining proposals:', error);
+    }
+  };
 
   useEffect(() => {
     loadProposals();
@@ -419,13 +436,35 @@ export default function DiscoverScreen() {
         Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
       }
 
+      // Kalan teklif kredisini güncelle
+      loadRemainingProposals();
+      
+      // Profile sayfasının stats'larını güncelle
+      refreshUserStats();
+
       setCurrentIndex(currentIndex + 1);
     } catch (error: any) {
-      if (error.message.includes('limit') || error.message.includes('başvurdunuz')) {
-        // Limit hatası - Premium popup göster
-        if (error.message.includes('limit')) {
-          setPremiumFeature(isSuperLike ? 'superLikes' : 'likes');
-          setPremiumPopupVisible(true);
+      if (error.message.includes('limit') || error.message.includes('başvurdunuz') || error.message.includes('hakkınız bitti')) {
+        // Limit hatası - Premium popup göster veya premium sayfasına yönlendir
+        if (error.message.includes('limit') || error.message.includes('hakkınız bitti')) {
+          if (error.message.includes('hakkınız bitti')) {
+            // Teklif kredisi bitti - Premium sayfasına yönlendir
+            Alert.alert(
+              'Günlük Teklif Hakkınız Bitti',
+              'Teklif gönderebilmek için premium ol.',
+              [
+                { text: 'Tamam', style: 'default' },
+                { 
+                  text: 'Premium Ol', 
+                  style: 'default',
+                  onPress: () => router.push('/(tabs)/premium')
+                }
+              ]
+            );
+          } else {
+            setPremiumFeature(isSuperLike ? 'superLikes' : 'likes');
+            setPremiumPopupVisible(true);
+          }
         } else {
           Alert.alert('Bilgi', error.message);
         }
@@ -1209,7 +1248,7 @@ function CreateProposalModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { user, currentCity } = useAuth();
+  const { user, currentCity, refreshUserStats } = useAuth();
   const [activityName, setActivityName] = useState('');
   const [venueName, setVenueName] = useState('');
   const [eventDate, setEventDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Yarın
@@ -1286,9 +1325,17 @@ function CreateProposalModal({
       setVenueName('');
       setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
       setSelectedInterest(null);
+      
+      // Profile sayfasının stats'larını güncelle
+      refreshUserStats();
+      
       onCreated();
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      if (error.message?.includes('kredi')) {
+        Alert.alert('Teklif Kredisi Yetersiz', 'Teklif krediniz yetersiz. Premium üyelik ile sınırsız teklif oluşturabilirsiniz.');
+      } else {
+        Alert.alert('Hata', error.message);
+      }
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import PhotoManagementModal from '@/components/PhotoManagementModal';
 import FreezeAccountModal from '@/components/FreezeAccountModal';
 import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
@@ -82,6 +82,7 @@ export default function ProfileScreen() {
   const [signOutLoading, setSignOutLoading] = useState(false);
   const [remainingSuperLikes, setRemainingSuperLikes] = useState<number>(0);
   const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
+  const [remainingProposals, setRemainingProposals] = useState<number>(0);
 
   useEffect(() => {
     loadProfile();
@@ -90,6 +91,15 @@ export default function ProfileScreen() {
       updateCurrentLocation();
     }
   }, [isPremium]);
+
+  // Sayfa her açıldığında stats'ları yenile
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        loadProfile();
+      }
+    }, [user?.id])
+  );
 
   // AuthContext'teki currentCity değiştiğinde editCity'yi de güncelle
   useEffect(() => {
@@ -268,6 +278,12 @@ export default function ProfileScreen() {
           p_user_id: user.id 
         });
         setRemainingInvitations(remainingInvites || 0);
+
+        // Kalan teklif hakkını al
+        const { data: remainingProps } = await supabase.rpc('get_remaining_proposals', { 
+          p_user_id: user.id 
+        });
+        setRemainingProposals(remainingProps || 0);
       }
     } catch (error: any) {
       Alert.alert('Hata', error.message);
@@ -656,9 +672,9 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
-              {profile.is_premium ? '∞' : Math.max(0, 5 - (profile.daily_proposals_sent || 0))}
+              {remainingProposals === 999 ? '∞' : remainingProposals}
             </Text>
-            <Text style={styles.statLabel}>Kalan</Text>
+            <Text style={styles.statLabel}>Teklif Kredisi</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
@@ -670,7 +686,7 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>
               {remainingInvitations === 999 ? '∞' : remainingInvitations}
             </Text>
-            <Text style={styles.statLabel}>Davet</Text>
+            <Text style={styles.statLabel}>Davet Kredisi</Text>
           </View>
         </View>
 

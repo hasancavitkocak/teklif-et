@@ -200,6 +200,28 @@ export const proposalsAPI = {
     event_datetime?: string;
     venue_name?: string;
   }) => {
+    // Önce teklif kredisi kontrolü yap
+    const { data: canCreate, error: checkError } = await supabase.rpc('can_create_proposal', {
+      p_user_id: data.creator_id
+    });
+
+    if (checkError) throw checkError;
+
+    if (!canCreate) {
+      throw new Error('Teklif krediniz yetersiz');
+    }
+
+    // Teklif kredisini düş
+    const { data: useResult, error: useError } = await supabase.rpc('use_proposal_credit', {
+      p_user_id: data.creator_id
+    });
+
+    if (useError) throw useError;
+
+    if (!useResult) {
+      throw new Error('Teklif kredisi kontrolü başarısız oldu');
+    }
+
     const { data: proposal, error } = await supabase
       .from('proposals')
       .insert(data)

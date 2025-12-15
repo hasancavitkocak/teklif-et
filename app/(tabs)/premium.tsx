@@ -31,10 +31,10 @@ export default function PremiumScreen() {
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
 
   const features = [
-    { icon: Eye, title: 'Sınırsız Teklif', description: 'Günde 5 yerine sınırsız teklif gönder' },
-    { icon: Sparkles, title: 'Günlük Super Like', description: 'Her gün 1 super like hakkı (ücretsiz kullanıcılar da 1 hak alır)' },
+    { icon: Eye, title: 'Sınırsız Teklif', description: 'Günde 10 yerine sınırsız teklif gönder' },
+    { icon: Sparkles, title: 'Günlük Super Like', description: 'Her gün 1 super like hakkı' },
+    { icon: Crown, title: 'Sınırsız Davet', description: 'Tekliflerine sınırsız davet hakkı' },
     { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Detaylı arama kriterleri' },
-    { icon: Crown, title: 'Öncelikli Görünüm', description: 'Profilin daha fazla görülür' },
   ];
 
   const plans = [

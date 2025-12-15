@@ -18,6 +18,7 @@ import { invitationsAPI } from '@/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PROVINCES } from '@/constants/cities';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 import SimplePremiumAlert from './SimplePremiumAlert';
 
 interface User {
@@ -50,7 +51,8 @@ export default function InviteUsersModal({
   proposalInterestId,
   onInviteSent,
 }: InviteUsersModalProps) {
-  const { user, isPremium } = useAuth();
+  const { user, isPremium, refreshUserStats } = useAuth();
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -319,8 +321,8 @@ export default function InviteUsersModal({
       // Premium olmayan kullanıcılar için limit kontrolü
       if (!isPremium && newSelected.size >= remainingInvitations) {
         Alert.alert(
-          'Davet Limiti',
-          `Günlük davet limitiniz doldu. Kalan davet hakkınız: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
+          'Davet Kredisi Yetersiz',
+          `Davet krediniz yetersiz. Kalan davet krediniz: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
           [
             { text: 'Tamam', style: 'default' },
             { 
@@ -328,8 +330,7 @@ export default function InviteUsersModal({
               style: 'default',
               onPress: () => {
                 onClose();
-                // Premium sayfasına yönlendir
-                // router.push('/(tabs)/premium');
+                router.push('/(tabs)/premium');
               }
             }
           ]
@@ -347,8 +348,8 @@ export default function InviteUsersModal({
     // Premium olmayan kullanıcılar için limit kontrolü
     if (!isPremium && selectedUsers.size > remainingInvitations) {
       Alert.alert(
-        'Davet Limiti',
-        `Günlük davet limitinizi aştınız. Kalan davet hakkınız: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
+        'Davet Kredisi Yetersiz',
+        `Davet krediniz yetersiz. Kalan davet krediniz: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
         [
           { text: 'Tamam', style: 'default' },
           { 
@@ -356,8 +357,7 @@ export default function InviteUsersModal({
             style: 'default',
             onPress: () => {
               onClose();
-              // Premium sayfasına yönlendir
-              // router.push('/(tabs)/premium');
+              router.push('/(tabs)/premium');
             }
           }
         ]
@@ -375,6 +375,9 @@ export default function InviteUsersModal({
       
       // Kalan davet sayısını güncelle
       loadRemainingInvitations();
+      
+      // Profile sayfasının stats'larını güncelle
+      refreshUserStats();
       
       // Listeyi yenile
       onInviteSent?.();
@@ -394,8 +397,8 @@ export default function InviteUsersModal({
       
       if (error.message?.includes('duplicate')) {
         Alert.alert('Uyarı', 'Bazı kullanıcılar zaten davet edilmiş');
-      } else if (error.message?.includes('limit')) {
-        Alert.alert('Davet Limiti', 'Günlük davet limitinizi aştınız. Premium üyelik ile sınırsız davet gönderebilirsiniz.');
+      } else if (error.message?.includes('limit') || error.message?.includes('kredi')) {
+        Alert.alert('Davet Kredisi Yetersiz', 'Davet krediniz yetersiz. Premium üyelik ile sınırsız davet gönderebilirsiniz.');
       } else {
         Alert.alert('Hata', 'Davetler gönderilirken bir hata oluştu');
       }
@@ -822,7 +825,7 @@ export default function InviteUsersModal({
               </Text>
               {!isPremium && (
                 <Text style={styles.invitationLimit}>
-                  Kalan davet: {remainingInvitations === 999 ? '∞' : remainingInvitations}
+                  Davet kredisi: {remainingInvitations === 999 ? '∞' : remainingInvitations}
                 </Text>
               )}
             </View>
