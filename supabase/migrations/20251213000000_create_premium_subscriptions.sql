@@ -39,14 +39,17 @@ CREATE INDEX IF NOT EXISTS idx_premium_subscriptions_end_date ON premium_subscri
 ALTER TABLE premium_subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own subscriptions
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON premium_subscriptions;
 CREATE POLICY "Users can view own subscriptions" ON premium_subscriptions
   FOR SELECT USING (auth.uid() = user_id);
 
 -- Users can insert their own subscriptions
+DROP POLICY IF EXISTS "Users can create own subscriptions" ON premium_subscriptions;
 CREATE POLICY "Users can create own subscriptions" ON premium_subscriptions
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own subscriptions
+DROP POLICY IF EXISTS "Users can update own subscriptions" ON premium_subscriptions;
 CREATE POLICY "Users can update own subscriptions" ON premium_subscriptions
   FOR UPDATE USING (auth.uid() = user_id);
 

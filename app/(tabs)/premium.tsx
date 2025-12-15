@@ -32,7 +32,7 @@ export default function PremiumScreen() {
 
   const features = [
     { icon: Eye, title: 'Sınırsız Teklif', description: 'Günde 5 yerine sınırsız teklif gönder' },
-    { icon: Sparkles, title: 'Günlük 1 Super Like', description: 'Her gün 1 super like hakkı' },
+    { icon: Sparkles, title: 'Günlük Super Like', description: 'Her gün 1 super like hakkı (ücretsiz kullanıcılar da 1 hak alır)' },
     { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Detaylı arama kriterleri' },
     { icon: Crown, title: 'Öncelikli Görünüm', description: 'Profilin daha fazla görülür' },
   ];

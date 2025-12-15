@@ -265,10 +265,12 @@ export const invitationsAPI = {
     });
 
     // Aynı şehirdeki TÜM kullanıcıları getir (ilgi alanı kontrolü YOK)
+    // Sadece davet edilmeyi kabul eden kullanıcıları getir
     let query = supabase
       .from('profiles')
-      .select('id, name, profile_photo, birth_date, city, gender, latitude, longitude')
-      .neq('id', currentUserId);
+      .select('id, name, profile_photo, birth_date, city, gender, latitude, longitude, allow_invitations')
+      .neq('id', currentUserId)
+      .eq('allow_invitations', true); // Sadece davet edilmeyi kabul edenler
 
     // Cinsiyet filtresi
     if (filters?.gender && filters.gender !== 'all') {

@@ -4,16 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
-import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 
 export default function LocationScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, requestLocationPermission, updateLocationManually } = useAuth();
   const [city, setCity] = useState('');
-  const [loading, setLoading] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -22,137 +20,85 @@ export default function LocationScreen() {
   };
 
   useEffect(() => {
-    detectLocation();
+    detectLocationWithRetry();
   }, []);
 
-  const detectLocation = async () => {
+  const detectLocationWithRetry = async (attempt = 1) => {
+    console.log(`📍 Onboarding konum tespiti denemesi ${attempt}/3`);
+    
     try {
       setDetectingLocation(true);
+      setRetryCount(attempt);
 
-      const Location = require('expo-location');
+      // Konum izni iste
+      const permissionResult = await requestLocationPermission();
       
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        Alert.alert(
-          'İzin Gerekli', 
-          'Konumunuzu tespit etmek için konum iznine ihtiyacımız var.',
-          [{ text: 'Tamam', onPress: () => router.back() }]
-        );
+      if (!permissionResult.granted) {
+        console.log('❌ Onboarding konum izni reddedildi');
+        setTimeout(async () => {
+          detectLocationWithRetry(1);
+        }, 2000);
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const results = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-
-      if (results && results.length > 0) {
-        const result = results[0];
-        
-        console.log('🗺️ Onboarding Geocode sonucu:', {
-          district: result.district,
-          subregion: result.subregion,
-          city: result.city,
-          region: result.region
-        });
-        
-        // İlçe bilgisini akıllı şekilde belirle
-        let detectedCity = '';
-        let districtName = '';
-        let regionName = result.region || '';
-        
-        // Önce district alanını kontrol et ve mapping uygula
-        if (result.district) {
-          districtName = getDistrictFromNeighborhood(result.district);
-          console.log('🔄 Onboarding District mapping:', result.district, '->', districtName);
-        }
-        // Sonra subregion'ı kontrol et
-        else if (result.subregion) {
-          districtName = getDistrictFromNeighborhood(result.subregion);
-          console.log('🔄 Onboarding Subregion mapping:', result.subregion, '->', districtName);
-        }
-        // Son çare olarak city'yi kullan
-        else if (result.city) {
-          districtName = result.city;
-          console.log('🔄 Onboarding City kullanıldı:', districtName);
-        }
-        
-        // Final şehir adını oluştur
-        if (districtName && regionName) {
-          detectedCity = `${districtName}, ${regionName}`;
-          console.log('📍 Onboarding Final konum:', detectedCity);
-        } else if (districtName) {
-          detectedCity = districtName;
-        } else if (regionName) {
-          detectedCity = regionName;
-        }
-        
-        if (detectedCity) {
-          setCity(detectedCity);
-          triggerHaptic();
-        } else {
-          Alert.alert(
-            'Hata', 
-            'Şehir bilgisi bulunamadı.',
-            [{ text: 'Tamam', onPress: () => router.back() }]
-          );
-        }
+      // AuthContext'teki updateLocationManually fonksiyonunu kullan
+      console.log('🔄 Onboarding AuthContext üzerinden konum güncelleniyor...');
+      const locationResult = await updateLocationManually();
+      
+      if (locationResult.success && locationResult.city) {
+        console.log('✅ Onboarding konum başarıyla alındı:', locationResult.city);
+        setCity(locationResult.city);
+        triggerHaptic();
+        setDetectingLocation(false);
+      } else if (locationResult.error === 'permission_denied') {
+        setTimeout(() => {
+          detectLocationWithRetry(1);
+        }, 2000);
+        return;
       } else {
-        Alert.alert(
-          'Hata', 
-          'Konum bilgisi alınamadı.',
-          [{ text: 'Tamam', onPress: () => router.back() }]
-        );
+        throw new Error('Konum tespit edilemedi');
       }
+      
     } catch (error: any) {
-      console.error('Location error:', error);
-      Alert.alert(
-        'Hata', 
-        'Konumunuz tespit edilemedi.',
-        [{ text: 'Tamam', onPress: () => router.back() }]
-      );
-    } finally {
+      console.error(`❌ Onboarding konum tespiti hatası (deneme ${attempt}):`, error);
+      
+      if (attempt < 3) {
+        setTimeout(() => {
+          detectLocationWithRetry(attempt + 1);
+        }, 1000);
+        return;
+      }
+      
+      // 3 deneme de başarısız
       setDetectingLocation(false);
+      Alert.alert(
+        'Konum Tespiti Başarısız', 
+        'Konumunuz tespit edilemedi. Manuel olarak devam etmek ister misiniz?',
+        [
+          { text: 'Geri Dön', onPress: () => router.back() },
+          { 
+            text: 'Manuel Devam', 
+            onPress: async () => {
+              setCity('Manuel konum');
+              setDetectingLocation(false);
+            }
+          }
+        ]
+      );
     }
   };
 
-  const handleContinue = async () => {
+
+
+  const handleContinue = () => {
     if (!city.trim()) {
-      Alert.alert('Eksik Bilgi', 'Konum tespit edilemedi');
+      Alert.alert('Hata', 'Konum tespit edilemedi');
       return;
     }
-
+    
+    console.log('✅ Onboarding konum ile devam ediliyor:', city);
     triggerHaptic();
-    setLoading(true);
-    try {
-      // Koordinatları da kaydet
-      const Location = require('expo-location');
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          city: city.trim(),
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user?.id);
-
-      if (error) throw error;
-      router.push('/onboarding/photos');
-    } catch (error: any) {
-      Alert.alert('Hata', error.message);
-    } finally {
-      setLoading(false);
-    }
+    router.push('/onboarding/photos');
   };
 
   return (
@@ -184,7 +130,10 @@ export default function LocationScreen() {
           {detectingLocation ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#8B5CF6" />
-              <Text style={styles.loadingText}>Konumunuz tespit ediliyor...</Text>
+              <Text style={styles.loadingText}>
+                Konumunuz tespit ediliyor... ({retryCount}/3)
+              </Text>
+              <Text style={styles.loadingSubtext}>Tespit edilince devam edebilirsiniz</Text>
             </View>
           ) : (
             <View style={styles.locationContainer}>
@@ -201,14 +150,15 @@ export default function LocationScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          style={[styles.button, (!city.trim() || loading || detectingLocation) && styles.disabledButton]}
-          onPress={handleContinue}
-          disabled={!city.trim() || loading || detectingLocation}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>Devam Et</Text>
-        </TouchableOpacity>
+        {!detectingLocation && (
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleContinue}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>Devam Et</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -279,6 +229,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontWeight: '500',
   },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   locationContainer: {
     paddingVertical: 20,
   },
@@ -327,9 +283,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
-  },
-  disabledButton: {
-    opacity: 0.4,
   },
   buttonText: {
     fontSize: 17,

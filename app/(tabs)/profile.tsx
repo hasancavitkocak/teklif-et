@@ -42,6 +42,7 @@ interface Profile {
   is_premium: boolean;
   daily_proposals_sent: number;
   daily_super_likes_used: number;
+  allow_invitations: boolean;
   phone: string;
 }
 
@@ -63,6 +64,7 @@ export default function ProfileScreen() {
   const [editNotificationMatches, setEditNotificationMatches] = useState(true);
   const [editNotificationProposals, setEditNotificationProposals] = useState(true);
   const [editNotificationMarketing, setEditNotificationMarketing] = useState(false);
+  const [editAllowInvitations, setEditAllowInvitations] = useState(true);
   const [editingCity, setEditingCity] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState<string>('');
@@ -77,6 +79,7 @@ export default function ProfileScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
+  const [remainingSuperLikes, setRemainingSuperLikes] = useState<number>(0);
 
   useEffect(() => {
     loadProfile();
@@ -221,6 +224,7 @@ export default function ProfileScreen() {
         setEditNotificationMatches(profileData.notification_matches ?? true);
         setEditNotificationProposals(profileData.notification_proposals ?? true);
         setEditNotificationMarketing(profileData.notification_marketing ?? false);
+        setEditAllowInvitations(profileData.allow_invitations ?? true);
       }
 
       const { data: interestsData } = await supabase
@@ -249,6 +253,14 @@ export default function ProfileScreen() {
         .eq('status', 'active');
 
       setMyProposals(count || 0);
+
+      // Kalan super like hakkını al
+      if (user?.id) {
+        const { data: remainingLikes } = await supabase.rpc('get_remaining_super_likes', { 
+          p_user_id: user.id 
+        });
+        setRemainingSuperLikes(remainingLikes || 0);
+      }
     } catch (error: any) {
       Alert.alert('Hata', error.message);
     }
@@ -294,6 +306,7 @@ export default function ProfileScreen() {
         notification_matches: editNotificationMatches,
         notification_proposals: editNotificationProposals,
         notification_marketing: editNotificationMarketing,
+        allow_invitations: editAllowInvitations,
       };
 
       // Şehir değişmediyse normal güncelleme
@@ -641,7 +654,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
-              {profile.is_premium ? '∞' : Math.max(0, 1 - (profile.daily_super_likes_used || 0))}
+              {remainingSuperLikes}
             </Text>
             <Text style={styles.statLabel}>Super Like</Text>
           </View>
@@ -1068,6 +1081,25 @@ export default function ProfileScreen() {
                 </View>
 
 
+              </View>
+
+              {/* Gizlilik Ayarları */}
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>Gizlilik Ayarları</Text>
+                
+                <View style={styles.notificationItem}>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>Tekliflere Davet Edilebilirlik</Text>
+                    <Text style={styles.notificationSubtitle}>Diğer kullanıcılar sizi tekliflerine davet edebilsin</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.toggleSwitch, editAllowInvitations && styles.toggleSwitchActive]}
+                    onPress={() => setEditAllowInvitations(!editAllowInvitations)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.toggleThumb, editAllowInvitations && styles.toggleThumbActive]} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Hesap İşlemleri */}

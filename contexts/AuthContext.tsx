@@ -406,37 +406,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             postalCode: geocode.postalCode
           });
           
-          // İlçe bilgisini akıllı şekilde belirle
-          let districtName = '';
+          // Sadece subregion ve region kullan
+          let subregionName = '';
           let regionName = geocode.region || '';
           
-          // Önce subregion'ı kontrol et (daha doğru ilçe bilgisi)
+          // Sadece subregion'ı kontrol et (district kullanma)
           if (geocode.subregion) {
-            districtName = getDistrictFromNeighborhood(geocode.subregion.trim());
-            console.log('🔄 Subregion mapping:', geocode.subregion, '->', districtName);
-          }
-          // Sonra district alanını kontrol et
-          else if (geocode.district) {
-            // District alanı mahalle/cadde adı olabilir, gerçek ilçeye çevir
-            districtName = getDistrictFromNeighborhood(geocode.district);
-            console.log('🔄 District mapping:', geocode.district, '->', districtName);
-          }
-          // Son çare olarak city'yi kullan
-          else if (geocode.city) {
-            districtName = geocode.city;
-            console.log('🔄 City kullanıldı:', districtName);
+            // Subregion'ı direkt kullan, mapping yapma
+            subregionName = geocode.subregion.trim();
+            console.log('📍 Subregion kullanıldı:', subregionName);
           }
           
           // Final şehir adını oluştur
-          if (districtName && regionName) {
-            finalCityName = `${districtName}, ${regionName}`;
-            console.log('📍 Final konum:', finalCityName);
-          } else if (districtName) {
-            finalCityName = districtName;
-            console.log('📍 Final konum (sadece ilçe):', finalCityName);
+          if (subregionName && regionName) {
+            finalCityName = `${subregionName}, ${regionName}`;
+            console.log('📍 Final konum (subregion + region):', finalCityName);
           } else if (regionName) {
             finalCityName = regionName;
-            console.log('📍 Final konum (sadece il):', finalCityName);
+            console.log('📍 Final konum (sadece region):', finalCityName);
+          } else if (subregionName) {
+            finalCityName = subregionName;
+            console.log('📍 Final konum (sadece subregion):', finalCityName);
           }
         }
       } catch (error) {

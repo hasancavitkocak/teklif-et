@@ -197,9 +197,12 @@ export const discoverAPI = {
       throw new Error('Günlük limit doldu. Premium olarak sınırsız teklif gönderebilirsiniz.');
     }
 
-    // Super like kontrolü - hem premium hem free için günlük 1 limit
-    if (isSuperLike && profile.daily_super_likes_used >= 1) {
-      throw new Error('Günlük super like hakkınız doldu');
+    // Super like kontrolü - database fonksiyonu ile kontrol et
+    if (isSuperLike) {
+      const { data: canUse } = await supabase.rpc('can_use_super_like', { p_user_id: userId });
+      if (!canUse) {
+        throw new Error('Günlük super like hakkınız doldu');
+      }
     }
 
     // Daha önce başvuru yapılmış mı kontrol et
@@ -224,6 +227,11 @@ export const discoverAPI = {
       });
 
     if (error) throw error;
+
+    // Super like kullanıldıysa sayacı güncelle
+    if (isSuperLike) {
+      await supabase.rpc('use_super_like', { p_user_id: userId });
+    }
 
     // Yeni teklif bildirimi gönder
     try {
@@ -328,13 +336,16 @@ export const discoverAPI = {
           }
 
           // Limitler güncelle
+          if (isSuperLike) {
+            // Super like kullan
+            await supabase.rpc('use_super_like', { p_user_id: userId });
+          }
+          
+          // Proposal sayısını güncelle
           await supabase
             .from('profiles')
             .update({
               daily_proposals_sent: profile.daily_proposals_sent + 1,
-              daily_super_likes_used: isSuperLike
-                ? profile.daily_super_likes_used + 1
-                : profile.daily_super_likes_used,
             })
             .eq('id', userId);
 
@@ -344,13 +355,16 @@ export const discoverAPI = {
     }
 
     // Limitler güncelle
+    if (isSuperLike) {
+      // Super like kullan
+      await supabase.rpc('use_super_like', { p_user_id: userId });
+    }
+    
+    // Proposal sayısını güncelle
     await supabase
       .from('profiles')
       .update({
         daily_proposals_sent: profile.daily_proposals_sent + 1,
-        daily_super_likes_used: isSuperLike
-          ? profile.daily_super_likes_used + 1
-          : profile.daily_super_likes_used,
       })
       .eq('id', userId);
 
