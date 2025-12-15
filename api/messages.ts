@@ -130,6 +130,35 @@ export const messagesAPI = {
       });
 
     if (error) throw error;
+
+    // Push notification gönder
+    try {
+      // Match bilgisini al
+      const { data: match } = await supabase
+        .from('matches')
+        .select(`
+          user1_id,
+          user2_id,
+          user1:profiles!user1_id(name),
+          user2:profiles!user2_id(name)
+        `)
+        .eq('id', matchId)
+        .single();
+
+      if (match) {
+        // Alıcıyı belirle
+        const recipientId = match.user1_id === senderId ? match.user2_id : match.user1_id;
+        const senderName = match.user1_id === senderId 
+          ? (match as any).user1?.name || 'Bilinmeyen'
+          : (match as any).user2?.name || 'Bilinmeyen';
+
+        // Push notification gönder (dinamik import)
+        const { notificationsAPI } = await import('./notifications');
+        await notificationsAPI.sendMessageNotification(recipientId, senderName, content, matchId);
+      }
+    } catch (error) {
+      console.error('Mesaj bildirimi gönderme hatası:', error);
+    }
   },
 
   // Match'i soft delete

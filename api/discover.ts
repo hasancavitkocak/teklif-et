@@ -225,6 +225,36 @@ export const discoverAPI = {
 
     if (error) throw error;
 
+    // Yeni teklif bildirimi gönder
+    try {
+      // Teklif ve kullanıcı bilgilerini al
+      const [proposalResult, requesterResult] = await Promise.all([
+        supabase
+          .from('proposals')
+          .select('creator_id, activity_name')
+          .eq('id', proposalId)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', userId)
+          .single()
+      ]);
+
+      if (proposalResult.data && requesterResult.data) {
+        // Push notification gönder (dinamik import)
+        const { notificationsAPI } = await import('./notifications');
+        await notificationsAPI.sendNewProposalRequestNotification(
+          proposalResult.data.creator_id,
+          requesterResult.data.name,
+          proposalResult.data.activity_name,
+          isSuperLike
+        );
+      }
+    } catch (error) {
+      console.error('Yeni teklif bildirimi gönderme hatası:', error);
+    }
+
     // Karşılıklı başvuru kontrolü (otomatik eşleşme)
     const { data: proposal } = await supabase
       .from('proposals')
@@ -268,6 +298,33 @@ export const discoverAPI = {
                 user1_id: user1,
                 user2_id: user2,
               });
+
+            // Eşleşme bildirimi gönder
+            try {
+              // Her iki kullanıcının da adını al
+              const { data: users } = await supabase
+                .from('profiles')
+                .select('id, name')
+                .in('id', [user1, user2]);
+
+              if (users && users.length === 2) {
+                const user1Data = users.find(u => u.id === user1);
+                const user2Data = users.find(u => u.id === user2);
+
+                // Push notification gönder (dinamik import)
+                const { notificationsAPI } = await import('./notifications');
+                
+                // Her iki kullanıcıya da bildirim gönder
+                if (user1Data && user2Data) {
+                  await Promise.all([
+                    notificationsAPI.sendMatchNotification(user1, user2Data.name),
+                    notificationsAPI.sendMatchNotification(user2, user1Data.name),
+                  ]);
+                }
+              }
+            } catch (error) {
+              console.error('Eşleşme bildirimi gönderme hatası:', error);
+            }
           }
 
           // Limitler güncelle

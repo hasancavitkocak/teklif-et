@@ -9,6 +9,8 @@ import {
   Alert,
   Modal,
   TextInput,
+  Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react-native';
@@ -23,6 +25,9 @@ import SignOutModal from '@/components/SignOutModal';
 import { PROVINCES } from '@/constants/cities';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
+
+import { usePushNotifications } from '@/contexts/PushNotificationContext';
+import * as Device from 'expo-device';
 
 interface Profile {
   name: string;
@@ -42,6 +47,7 @@ interface Profile {
 
 export default function ProfileScreen() {
   const { user, signOut, isPremium, updateLocationManually, currentCity, updateCityFromSettings } = useAuth();
+  const { permissionStatus, checkPermissionStatus, registerForPushNotifications } = usePushNotifications();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
@@ -953,6 +959,58 @@ export default function ProfileScreen() {
               <View style={styles.settingsSection}>
                 <Text style={styles.settingsSectionTitle}>Bildirim Ayarları</Text>
                 
+                {/* Bildirim İzni Durumu */}
+                <View style={styles.permissionStatus}>
+                  <View style={styles.permissionInfo}>
+                    <Text style={styles.permissionTitle}>
+                      Bildirim İzni: {
+                        permissionStatus === 'granted' ? '✅ Verildi' : 
+                        permissionStatus === 'denied' ? '❌ Reddedildi' :
+                        permissionStatus === null ? '⏳ Kontrol ediliyor...' : '❓ Bilinmiyor'
+                      }
+                    </Text>
+                    <Text style={styles.permissionSubtitle}>
+                      {permissionStatus === 'granted' 
+                        ? (__DEV__ ? 'Push bildirimler hazır (DEV modda log olarak görünür)' : 'Push bildirimler aktif')
+                        : permissionStatus === 'denied' 
+                        ? 'Cihaz ayarlarından izin verebilirsiniz'
+                        : 'Bildirim almak için izin verin'}
+                    </Text>
+                  </View>
+                  {permissionStatus !== 'granted' && (
+                    <TouchableOpacity
+                      style={styles.enablePermissionButton}
+                      onPress={async () => {
+                        const token = await registerForPushNotifications();
+                        if (token) {
+                          Alert.alert('Başarılı', 'Bildirim izni verildi!');
+                          await checkPermissionStatus();
+                        } else {
+                          Alert.alert(
+                            'İzin Gerekli',
+                            'Bildirim izni için cihaz ayarlarına gidin.',
+                            [
+                              { text: 'İptal', style: 'cancel' },
+                              { 
+                                text: 'Ayarlara Git', 
+                                onPress: () => {
+                                  if (Platform.OS === 'ios') {
+                                    Linking.openURL('app-settings:');
+                                  } else {
+                                    Linking.openSettings();
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                        }
+                      }}
+                    >
+                      <Text style={styles.enablePermissionButtonText}>İzin Ver</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
                 <View style={styles.notificationItem}>
                   <View style={styles.notificationInfo}>
                     <Text style={styles.notificationTitle}>Yeni Mesajlar</Text>
@@ -1008,6 +1066,8 @@ export default function ProfileScreen() {
                     <View style={[styles.toggleThumb, editNotificationMarketing && styles.toggleThumbActive]} />
                   </TouchableOpacity>
                 </View>
+
+
               </View>
 
               {/* Hesap İşlemleri */}
@@ -1738,5 +1798,41 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFF',
+  },
+
+  permissionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+  permissionInfo: {
+    flex: 1,
+  },
+  permissionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  permissionSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  enablePermissionButton: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  enablePermissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

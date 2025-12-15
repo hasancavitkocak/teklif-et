@@ -35,7 +35,10 @@ module.exports = {
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
       ],
       blockedPermissions: [],
       gradleProperties: {
@@ -48,7 +51,19 @@ module.exports = {
       output: "single",
       favicon: "./assets/images/favicon.png"
     },
-    plugins: ["expo-router", "expo-font"],
+    plugins: [
+      "expo-router", 
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/app-icon-new.png",
+          color: "#8B5CF6",
+          sounds: ["./assets/sounds/notification.wav"],
+          mode: "production"
+        }
+      ]
+    ],
     experiments: {
       typedRoutes: true
     },

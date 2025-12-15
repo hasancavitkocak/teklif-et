@@ -7,6 +7,17 @@ export interface NotificationPreferences {
   notification_marketing: boolean;
 }
 
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data?: any;
+  read: boolean;
+  created_at: string;
+}
+
 export const notificationsAPI = {
   // Kullanıcının bildirim tercihlerini getir
   getPreferences: async (userId: string): Promise<NotificationPreferences> => {
@@ -42,7 +53,7 @@ export const notificationsAPI = {
     return preferences[type];
   },
 
-  // Push notification gönderme (gelecekte Expo Notifications ile entegre edilecek)
+  // Push notification gönderme
   sendPushNotification: async (
     userId: string, 
     title: string, 
@@ -55,49 +66,96 @@ export const notificationsAPI = {
       if (notificationType) {
         const isEnabled = await notificationsAPI.isNotificationEnabled(userId, notificationType);
         if (!isEnabled) {
-          console.log(`Bildirim gönderilmedi: ${notificationType} kapalı (User: ${userId})`);
+          console.log(`📱 Bildirim gönderilmedi: ${notificationType} kapalı (User: ${userId})`);
           return;
         }
       }
 
-      // TODO: Expo Notifications ile push notification gönder
-      console.log('Push notification gönderilecek:', {
-        userId,
+      // Kullanıcının push token'ını al
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('push_token')
+        .eq('id', userId)
+        .single();
+
+      if (!profile?.push_token) {
+        console.log(`📱 Push token bulunamadı (User: ${userId}) - Kullanıcı henüz bildirim izni vermemiş`);
+        return;
+      }
+
+      // Push token formatını kontrol et (Expo token mu?)
+      if (!profile.push_token.startsWith('ExponentPushToken[')) {
+        console.log(`📱 Geçersiz push token formatı (User: ${userId})`);
+        return;
+      }
+
+      // Development modda da gerçek push notification gönder (development build'de)
+      // Sadece Expo Go'da devre dışı bırak
+      const isExpoGo = __DEV__ && !require('expo-device').isDevice;
+      
+      if (isExpoGo) {
+        console.log(`📱 Push notification (Expo Go'da devre dışı): ${title} - ${body}`);
+        return;
+      }
+      
+      console.log(`📤 Push notification gönderiliyor: ${title} - ${body} (Token: ${profile.push_token.substring(0, 30)}...)`);
+      
+      // Development build'de gerçek push notification gönder
+
+      // Production'da gerçek push notification gönder
+      const message = {
+        to: profile.push_token,
+        sound: 'default',
         title,
         body,
-        data,
-        type: notificationType
+        data: data || {},
+      };
+
+      console.log('📤 Push notification gönderiliyor:', { userId, title, token: profile.push_token.substring(0, 30) + '...' });
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
       });
 
-      // Şimdilik sadece console'a log at
-      // Gerçek implementasyon:
-      // const { data: profile } = await supabase
-      //   .from('profiles')
-      //   .select('push_token')
-      //   .eq('id', userId)
-      //   .single();
-      // 
-      // if (profile?.push_token) {
-      //   await Notifications.sendPushNotificationAsync({
-      //     to: profile.push_token,
-      //     title,
-      //     body,
-      //     data
-      //   });
-      // }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.data && result.data[0]) {
+        if (result.data[0].status === 'error') {
+          console.error('❌ Push notification hatası:', result.data[0].message);
+        } else {
+          console.log('✅ Push notification gönderildi:', { userId, title, status: result.data[0].status });
+        }
+      } else {
+        console.log('✅ Push notification gönderildi:', { userId, title });
+      }
 
     } catch (error) {
-      console.error('Push notification gönderme hatası:', error);
+      // Network hatalarını daha sessiz handle et
+      if (error instanceof Error && error.message.includes('Network request failed')) {
+        console.log(`📱 Push notification gönderilemedi (network hatası) - User: ${userId}`);
+      } else {
+        console.error('❌ Push notification gönderme hatası:', error);
+      }
     }
   },
 
   // Yeni mesaj bildirimi
-  sendMessageNotification: async (recipientId: string, senderName: string, messageContent: string) => {
+  sendMessageNotification: async (recipientId: string, senderName: string, messageContent: string, matchId?: string) => {
     await notificationsAPI.sendPushNotification(
       recipientId,
       `${senderName} mesaj gönderdi`,
       messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent,
-      { type: 'message', senderId: recipientId },
+      { type: 'message', matchId },
       'notification_messages'
     );
   },
@@ -138,5 +196,53 @@ export const notificationsAPI = {
       { type: 'marketing', ...data },
       'notification_marketing'
     );
+  },
+
+  // Yeni teklif başvurusu bildirimi
+  sendNewProposalRequestNotification: async (creatorId: string, requesterName: string, activityName: string, isSuperLike: boolean = false) => {
+    const title = isSuperLike ? 'Yeni Super Like! ⭐' : 'Yeni Teklif Başvurusu! 🎯';
+    const body = isSuperLike 
+      ? `${requesterName} "${activityName}" teklifinize super like attı!`
+      : `${requesterName} "${activityName}" teklifinize başvurdu!`;
+
+    await notificationsAPI.sendPushNotification(
+      creatorId,
+      title,
+      body,
+      { type: 'proposal_request', requesterName, activityName, isSuperLike },
+      'notification_proposals'
+    );
+  },
+
+  // Bildirimleri getir (şimdilik boş array döndür - gelecekte database'den gelecek)
+  getNotifications: async (userId: string): Promise<Notification[]> => {
+    // TODO: Gerçek bildirimler database'den gelecek
+    // Şimdilik boş array döndürüyoruz
+    return [];
+  },
+
+  // Okunmamış bildirim sayısını getir
+  getUnreadCount: async (userId: string): Promise<number> => {
+    // TODO: Gerçek sayı database'den gelecek
+    // Şimdilik 0 döndürüyoruz
+    return 0;
+  },
+
+  // Bildirimi okundu olarak işaretle
+  markAsRead: async (notificationId: string): Promise<void> => {
+    // TODO: Database'de güncelleme yapılacak
+    console.log('Bildirim okundu olarak işaretlendi:', notificationId);
+  },
+
+  // Tüm bildirimleri okundu olarak işaretle
+  markAllAsRead: async (userId: string): Promise<void> => {
+    // TODO: Database'de güncelleme yapılacak
+    console.log('Tüm bildirimler okundu olarak işaretlendi:', userId);
+  },
+
+  // Bildirimi sil
+  deleteNotification: async (notificationId: string): Promise<void> => {
+    // TODO: Database'den silme yapılacak
+    console.log('Bildirim silindi:', notificationId);
   },
 };

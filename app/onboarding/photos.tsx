@@ -202,7 +202,7 @@ export default function PhotosScreen() {
 
       if (profileError) throw profileError;
 
-      router.replace('/(tabs)');
+      router.replace('/onboarding/notifications');
     } catch (error: any) {
       console.error('Complete error:', error);
       Alert.alert('Hata', error.message || 'Fotoğraflar yüklenemedi');

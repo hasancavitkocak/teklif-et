@@ -6,6 +6,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UnreadProvider } from '@/contexts/UnreadContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { PushNotificationProvider } from '@/contexts/PushNotificationContext';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -15,6 +16,7 @@ export default function RootLayout() {
       <AuthProvider>
         <UnreadProvider>
           <NotificationProvider>
+            <PushNotificationProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="auth/welcome" />
@@ -27,12 +29,14 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding/lifestyle" />
               <Stack.Screen name="onboarding/location" />
               <Stack.Screen name="onboarding/photos" />
+              <Stack.Screen name="onboarding/notifications" />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="account-frozen" />
               <Stack.Screen name="notifications" />
               <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="dark" translucent={false} />
+            </PushNotificationProvider>
           </NotificationProvider>
         </UnreadProvider>
       </AuthProvider>

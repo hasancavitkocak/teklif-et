@@ -230,6 +230,36 @@ export const proposalsAPI = {
 
     if (updateError) throw updateError;
 
+    // Push notification gönder
+    try {
+      // Teklif ve kullanıcı bilgilerini al
+      const [proposalResult, userResult] = await Promise.all([
+        supabase
+          .from('proposals')
+          .select('activity_name')
+          .eq('id', proposalId)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', userId)
+          .single()
+      ]);
+
+      if (proposalResult.data && userResult.data) {
+        // Push notification gönder (dinamik import)
+        const { notificationsAPI } = await import('./notifications');
+        await notificationsAPI.sendProposalNotification(
+          requesterId,
+          userResult.data.name,
+          true, // kabul edildi
+          proposalResult.data.activity_name
+        );
+      }
+    } catch (error) {
+      console.error('Teklif kabul bildirimi gönderme hatası:', error);
+    }
+
     // Match oluştur (duplicate kontrolü ile)
     const user1 = userId < requesterId ? userId : requesterId;
     const user2 = userId < requesterId ? requesterId : userId;
@@ -263,12 +293,47 @@ export const proposalsAPI = {
 
   // Başvuruyu reddet
   rejectRequest: async (requestId: string) => {
+    // Önce request bilgilerini al (push notification için)
+    const { data: requestData } = await supabase
+      .from('proposal_requests')
+      .select(`
+        requester_id,
+        proposal:proposals(id, activity_name, creator_id)
+      `)
+      .eq('id', requestId)
+      .single();
+
     const { error } = await supabase
       .from('proposal_requests')
       .update({ status: 'rejected' })
       .eq('id', requestId);
 
     if (error) throw error;
+
+    // Push notification gönder
+    try {
+      if (requestData?.proposal) {
+        // Teklif sahibinin adını al
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', (requestData.proposal as any).creator_id)
+          .single();
+
+        if (creatorData) {
+          // Push notification gönder (dinamik import)
+          const { notificationsAPI } = await import('./notifications');
+          await notificationsAPI.sendProposalNotification(
+            requestData.requester_id,
+            creatorData.name,
+            false, // reddedildi
+            (requestData.proposal as any).activity_name
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Teklif red bildirimi gönderme hatası:', error);
+    }
   },
 
   // Bekleyen başvuru sayısını al (optimize edilmiş)
