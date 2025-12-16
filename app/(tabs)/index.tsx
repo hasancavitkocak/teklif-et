@@ -94,6 +94,15 @@ export default function DiscoverScreen() {
   const [showWarningToast, setShowWarningToast] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
   
+  // Action loading states
+  const [isLiking, setIsLiking] = useState(false);
+  const [isSuperLiking, setIsSuperLiking] = useState(false);
+  const [isPassing, setIsPassing] = useState(false);
+  
+  // Batch update için counter
+  const [actionCount, setActionCount] = useState(0);
+  const batchUpdateThreshold = 3; // Her 3 aksiyonda bir güncelle
+  
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -252,7 +261,7 @@ export default function DiscoverScreen() {
     if (user?.id) {
       loadProposals();
     }
-  }, [selectedCity, selectedInterest]);
+  }, [selectedCity, selectedInterest, selectedDate]);
 
   // AuthContext'teki currentCity değiştiğinde selectedCity'yi güncelle
   useEffect(() => {
@@ -395,6 +404,7 @@ export default function DiscoverScreen() {
         maxAge: isPremium ? maxAge : undefined,
         gender: isPremium ? selectedGender : undefined,
         maxDistance: maxDistance, // 50 km varsayılan
+        eventDate: selectedDate ? selectedDate.toISOString() : undefined, // Tarih filtresi
       });
       // Geçilen teklifleri frontend'te filtrele (sadece o liste için)
       const filteredData = resetIndex ? data : data.filter(proposal => !skippedProposalIds.has(proposal.id));
@@ -440,20 +450,38 @@ export default function DiscoverScreen() {
 
   const handleLike = async (isSuperLike = false) => {
     if (currentIndex >= proposals.length || !user?.id) return;
+    
+    // Eğer herhangi bir işlem devam ediyorsa, yeni işlem başlatma
+    if (isLiking || isSuperLiking || isPassing) return;
 
     const proposal = proposals[currentIndex];
 
+    // Loading state'i ayarla
+    if (isSuperLike) {
+      setIsSuperLiking(true);
+    } else {
+      setIsLiking(true);
+    }
+
     try {
+      // Optimistic UI update - hemen sonraki karta geç
+      const nextIndex = currentIndex + 1;
+      
       const result = await discoverAPI.likeProposal(proposal.id, user.id, isSuperLike);
+      
+      // Backend işlemi tamamlandı, şimdi UI güncellemelerini yap
       
       // Süper beğeni başarı pop-up'ı göster
       if (isSuperLike && !result.matched) {
         setSuperLikeUserName(proposal.creator.name);
         setShowSuperLikeSuccess(true);
         
-        // Pop-up kapandıktan sonra sonraki teklifi göster
+        // Optimistic update - hemen karta geç
+        setCurrentIndex(nextIndex);
+        
+        // Pop-up göster ama kart geçişi zaten yapıldı
         setTimeout(() => {
-          setCurrentIndex(currentIndex + 1);
+          setIsSuperLiking(false);
         }, 2500);
         return;
       }
@@ -461,19 +489,27 @@ export default function DiscoverScreen() {
       if (result.matched) {
         setMatchedUserName(proposal.creator.name);
         setShowMatchSuccessModal(true);
+        // Match durumunda da hemen geç, modal kapanınca ek işlem yok
+        setCurrentIndex(nextIndex);
       } else {
-        // Eşleşme yoksa toast göster
+        // Eşleşme yoksa toast göster ve karta geç
         setIsToastSuperLike(isSuperLike);
         setShowProposalSentToast(true);
+        
+        // Optimistic update - hemen karta geç
+        setCurrentIndex(nextIndex);
       }
 
-      // Kalan teklif kredisini güncelle
-      loadRemainingProposals();
+      // Batch update sistemi - her 3 aksiyonda bir güncelle
+      const newActionCount = actionCount + 1;
+      setActionCount(newActionCount);
       
-      // Profile sayfasının stats'larını güncelle
-      refreshUserStats();
-
-      setCurrentIndex(currentIndex + 1);
+      if (newActionCount % batchUpdateThreshold === 0) {
+        // Sadece belirli aralıklarla güncelle (performans için)
+        loadRemainingProposals();
+        refreshUserStats();
+      }
+      
     } catch (error: any) {
       if (error.message.includes('limit') || error.message.includes('başvurdunuz') || error.message.includes('hakkınız bitti')) {
         // Limit hatası - Premium popup göster veya premium sayfasına yönlendir
@@ -495,21 +531,47 @@ export default function DiscoverScreen() {
         setErrorMessage(error.message);
         setShowErrorToast(true);
       }
+    } finally {
+      // Loading state'i temizle
+      if (isSuperLike) {
+        setIsSuperLiking(false);
+      } else {
+        setIsLiking(false);
+      }
     }
   };
 
   const handlePass = async () => {
     if (currentIndex >= proposals.length || !user?.id) return;
+    
+    // Eğer herhangi bir işlem devam ediyorsa, yeni işlem başlatma
+    if (isLiking || isSuperLiking || isPassing) return;
 
     const proposal = proposals[currentIndex];
 
-    // Geçilen teklifi hatırla (o oturum için)
-    const currentProposal = proposals[currentIndex];
-    if (currentProposal) {
-      setSkippedProposalIds(prev => new Set([...Array.from(prev), currentProposal.id]));
-    }
+    // Loading state'i ayarla
+    setIsPassing(true);
 
-    setCurrentIndex(currentIndex + 1);
+    try {
+      // Geçilen teklifi hatırla (o oturum için)
+      const currentProposal = proposals[currentIndex];
+      if (currentProposal) {
+        setSkippedProposalIds(prev => new Set([...Array.from(prev), currentProposal.id]));
+      }
+
+      // Optimistic update - hemen sonraki karta geç
+      setCurrentIndex(currentIndex + 1);
+      
+      // Backend işlemi gerekirse arka planda yap (analytics için)
+      // Şu an sadece frontend'te skip ediyoruz
+      
+    } catch (error: any) {
+      console.error('Pass error:', error);
+      setErrorMessage('Bir hata oluştu, tekrar deneyin');
+      setShowErrorToast(true);
+    } finally {
+      setIsPassing(false);
+    }
   };
 
   const currentProposal = proposals[currentIndex];
@@ -629,19 +691,42 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
 
           <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.passButton} onPress={handlePass}>
-              <X size={32} color="#EF4444" />
+            <TouchableOpacity 
+              style={styles.passButton} 
+              onPress={handlePass}
+              disabled={isLiking || isSuperLiking || isPassing}
+            >
+              <X 
+                size={32} 
+                color={(isLiking || isSuperLiking || isPassing) ? "#EF444450" : "#EF4444"} 
+              />
             </TouchableOpacity>
+            
             <TouchableOpacity
               style={styles.superLikeButton}
               onPress={() => handleLike(true)}
+              disabled={isLiking || isSuperLiking || isPassing}
             >
-              <Zap size={28} color="#FFF" fill="#FFF" />
+              <Zap 
+                size={28} 
+                color={(isLiking || isSuperLiking || isPassing) ? "#FFFFFF50" : "#FFF"} 
+                fill={(isLiking || isSuperLiking || isPassing) ? "#FFFFFF50" : "#FFF"} 
+              />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.likeButton} onPress={() => handleLike()}>
+            
+            <TouchableOpacity 
+              style={styles.likeButton} 
+              onPress={() => handleLike()}
+              disabled={isLiking || isSuperLiking || isPassing}
+            >
               <Image 
                 source={require('@/assets/images/puzzle-iconnew.png')} 
-                style={{ width: 48, height: 48, tintColor: '#8B5CF6' }}
+                style={{ 
+                  width: 48, 
+                  height: 48, 
+                  tintColor: (isLiking || isSuperLiking || isPassing) ? '#8B5CF650' : '#8B5CF6',
+                  opacity: (isLiking || isSuperLiking || isPassing) ? 0.5 : 1
+                }}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -1293,11 +1378,15 @@ export default function DiscoverScreen() {
       {/* Match Success Modal */}
       <MatchSuccessModal
         visible={showMatchSuccessModal}
-        onClose={() => setShowMatchSuccessModal(false)}
+        onClose={() => {
+          setShowMatchSuccessModal(false);
+          // Kart geçişi zaten yapıldı, ek işlem gerekmiyor
+        }}
         userName={matchedUserName}
         onMessage={() => {
           setShowMatchSuccessModal(false);
           // TODO: Navigate to messages
+          // Kart geçişi zaten yapıldı
         }}
       />
 
@@ -2700,5 +2789,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  
+  // Loading ve Disabled Button Stilleri (artık kullanılmıyor)
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  loadingSpinner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    borderTopColor: 'transparent',
   },
 });

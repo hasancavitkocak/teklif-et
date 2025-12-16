@@ -18,6 +18,105 @@ export interface DiscoverProposal {
   };
 }
 
+// Eşleşme kontrolü için yardımcı fonksiyon
+const checkForMatch = async (proposalId: string, userId: string) => {
+  // Karşılıklı başvuru kontrolü (otomatik eşleşme) - sadece aktif başvurular
+  const { data: proposal } = await supabase
+    .from('proposals')
+    .select('creator_id')
+    .eq('id', proposalId)
+    .single();
+
+  if (proposal) {
+    // Sadece pending veya accepted status'lu başvuruları kontrol et
+    const { data: reverseRequest } = await supabase
+      .from('proposal_requests')
+      .select('id, proposal_id, status')
+      .eq('requester_id', proposal.creator_id)
+      .in('status', ['pending', 'accepted']) // Reddedilmiş başvuruları hariç tut
+      .maybeSingle();
+
+    if (reverseRequest && reverseRequest.proposal_id) {
+      const { data: myProposal } = await supabase
+        .from('proposals')
+        .select('id')
+        .eq('creator_id', userId)
+        .eq('id', reverseRequest.proposal_id)
+        .maybeSingle();
+
+      if (myProposal) {
+        // Otomatik eşleşme oluştur (duplicate kontrolü ile)
+        const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
+        const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
+
+        // Önce var mı kontrol et
+        const { data: existingMatch } = await supabase
+          .from('matches')
+          .select('id')
+          .eq('user1_id', user1)
+          .eq('user2_id', user2)
+          .maybeSingle();
+
+        if (!existingMatch) {
+          // Eşleşme oluştur
+          await supabase
+            .from('matches')
+            .insert({
+              proposal_id: proposalId,
+              user1_id: user1,
+              user2_id: user2,
+            });
+
+          // Her iki başvurunun da status'unu accepted yap
+          await Promise.all([
+            // Mevcut başvuru
+            supabase
+              .from('proposal_requests')
+              .update({ status: 'accepted' })
+              .eq('proposal_id', proposalId)
+              .eq('requester_id', userId),
+            
+            // Karşılıklı başvuru
+            supabase
+              .from('proposal_requests')
+              .update({ status: 'accepted' })
+              .eq('id', reverseRequest.id)
+          ]);
+
+          // Eşleşme bildirimi gönder (arka planda)
+          (async () => {
+            try {
+              const { data: users } = await supabase
+                .from('profiles')
+                .select('id, name')
+                .in('id', [user1, user2]);
+
+              if (users && users.length === 2) {
+                const user1Data = users.find(u => u.id === user1);
+                const user2Data = users.find(u => u.id === user2);
+
+                if (user1Data && user2Data) {
+                  const { notificationsAPI } = await import('./notifications');
+                  await Promise.all([
+                    notificationsAPI.sendMatchNotification(user1, user2Data.name),
+                    notificationsAPI.sendMatchNotification(user2, user1Data.name),
+                  ]);
+                }
+              }
+            } catch (error: any) {
+              console.error('Eşleşme bildirimi gönderme hatası:', error);
+            }
+          })();
+
+          return { matched: true };
+        }
+      }
+    }
+  }
+
+  return { matched: false };
+};
+
 export const discoverAPI = {
   // Keşfet sayfası için teklifleri getir (yeni kullanıcılar için de çalışır)
   getProposals: async (userId: string, filters?: { 
@@ -27,6 +126,7 @@ export const discoverAPI = {
     maxAge?: number;
     gender?: string;
     maxDistance?: number; // km cinsinden
+    eventDate?: string; // ISO string formatında tarih
   }) => {
     // Kullanıcının koordinatlarını al (mesafe filtrelemesi için)
     const { data: userProfile } = await supabase
@@ -35,11 +135,11 @@ export const discoverAPI = {
       .eq('id', userId)
       .single();
 
-    // Daha önce başvuru yapılmış teklif ID'lerini al (sadece bunları hariç tut)
+    // Daha önce başvuru yapılmış teklif ID'lerini al (tüm başvurular - rejected dahil)
     const { data: appliedData } = await supabase
       .from('proposal_requests')
       .select('proposal_id')
-      .eq('requester_id', userId);
+      .eq('requester_id', userId); // Tüm başvuruları hariç tut (pending, accepted, rejected)
 
     const appliedProposalIds = (appliedData || []).map((item: any) => item.proposal_id);
 
@@ -82,6 +182,24 @@ export const discoverAPI = {
     }
     if (filters?.interestId) {
       query = query.eq('interest_id', filters.interestId);
+    }
+
+    // Tarih filtresi
+    if (filters?.eventDate) {
+      // Seçilen tarihin başlangıcı ve bitişi (00:00:00 - 23:59:59)
+      const selectedDate = new Date(filters.eventDate);
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      console.log('📅 Tarih filtresi:', startOfDay.toISOString(), '-', endOfDay.toISOString());
+      
+      // Sadece seçilen tarih aralığındaki teklifleri getir
+      query = query
+        .gte('event_datetime', startOfDay.toISOString())
+        .lte('event_datetime', endOfDay.toISOString());
     }
 
     // Boost edilenler önce, sonra rastgele
@@ -190,16 +308,89 @@ export const discoverAPI = {
       }
     }
 
-    // Daha önce başvuru yapılmış mı kontrol et
+    // Daha önce başvuru yapılmış mı kontrol et (tüm durumlar)
     const { data: existingRequest } = await supabase
       .from('proposal_requests')
-      .select('id')
+      .select('id, status')
       .eq('proposal_id', proposalId)
       .eq('requester_id', userId)
       .maybeSingle();
 
     if (existingRequest) {
-      throw new Error('Bu teklife daha önce başvurdunuz');
+      if (existingRequest.status === 'pending') {
+        throw new Error('Bu teklife daha önce başvurdunuz');
+      } else if (existingRequest.status === 'accepted') {
+        throw new Error('Bu teklifle zaten eşleştiniz');
+      } else if (existingRequest.status === 'rejected') {
+        // Reddedilmiş başvuruyu güncelle (yeni şans ver)
+        const { error: updateError } = await supabase
+          .from('proposal_requests')
+          .update({
+            status: 'pending',
+            is_super_like: isSuperLike,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRequest.id);
+
+        if (updateError) throw updateError;
+
+        console.log('🔄 Reddedilmiş başvuru güncellendi:', existingRequest.id);
+        
+        // Günlük eşleşme isteği kotasını kullan
+        const { data: useRequestResult, error: useRequestError } = await supabase.rpc('use_daily_request_quota', {
+          p_user_id: userId
+        });
+
+        if (useRequestError) throw useRequestError;
+        if (!useRequestResult) {
+          throw new Error('Günlük eşleşme isteği kotası kontrolü başarısız oldu');
+        }
+
+        // Super like kullanıldıysa sayacı güncelle
+        if (isSuperLike) {
+          await supabase.rpc('use_super_like', { p_user_id: userId });
+        }
+
+        // Notification gönder ve eşleşme kontrol et (aşağıdaki kodla devam et)
+        // Bu durumda yeni başvuru oluşturmaya gerek yok, güncelleme yaptık
+        const skipNewRequest = true;
+        
+        // Notification ve eşleşme kontrolü için aşağıdaki koda geç
+        if (skipNewRequest) {
+          // Notification gönder (arka planda)
+          Promise.all([
+            supabase
+              .from('proposals')
+              .select('creator_id, activity_name')
+              .eq('id', proposalId)
+              .single(),
+            supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', userId)
+              .single()
+          ]).then(async ([proposalResult, requesterResult]) => {
+            if (proposalResult.data && requesterResult.data) {
+              try {
+                const { notificationsAPI } = await import('./notifications');
+                await notificationsAPI.sendNewProposalRequestNotification(
+                  proposalResult.data.creator_id,
+                  requesterResult.data.name,
+                  proposalResult.data.activity_name,
+                  isSuperLike
+                );
+              } catch (error: any) {
+                console.error('Yeni teklif bildirimi gönderme hatası:', error);
+              }
+            }
+          }).catch((error: any) => {
+            console.error('Bildirim verisi alma hatası:', error);
+          });
+
+          // Eşleşme kontrolü yap ve sonucu döndür
+          return await checkForMatch(proposalId, userId);
+        }
+      }
     }
 
     // Günlük eşleşme isteği kotasını kullan
@@ -224,131 +415,42 @@ export const discoverAPI = {
 
     if (error) throw error;
 
-    // Super like kullanıldıysa sayacı güncelle
+    // Super like kullanıldıysa sayacı güncelle (sadece bir kez)
     if (isSuperLike) {
       await supabase.rpc('use_super_like', { p_user_id: userId });
     }
 
-    // Yeni teklif bildirimi gönder
-    try {
-      // Teklif ve kullanıcı bilgilerini al
-      const [proposalResult, requesterResult] = await Promise.all([
-        supabase
-          .from('proposals')
-          .select('creator_id, activity_name')
-          .eq('id', proposalId)
-          .single(),
-        supabase
-          .from('profiles')
-          .select('name')
-          .eq('id', userId)
-          .single()
-      ]);
-
+    // Yeni teklif bildirimi gönder (arka planda, ana işlemi bloklamadan)
+    Promise.all([
+      supabase
+        .from('proposals')
+        .select('creator_id, activity_name')
+        .eq('id', proposalId)
+        .single(),
+      supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', userId)
+        .single()
+    ]).then(async ([proposalResult, requesterResult]) => {
       if (proposalResult.data && requesterResult.data) {
-        // Push notification gönder (dinamik import)
-        const { notificationsAPI } = await import('./notifications');
-        await notificationsAPI.sendNewProposalRequestNotification(
-          proposalResult.data.creator_id,
-          requesterResult.data.name,
-          proposalResult.data.activity_name,
-          isSuperLike
-        );
-      }
-    } catch (error) {
-      console.error('Yeni teklif bildirimi gönderme hatası:', error);
-    }
-
-    // Karşılıklı başvuru kontrolü (otomatik eşleşme)
-    const { data: proposal } = await supabase
-      .from('proposals')
-      .select('creator_id')
-      .eq('id', proposalId)
-      .single();
-
-    if (proposal) {
-      const { data: reverseRequest } = await supabase
-        .from('proposal_requests')
-        .select('id, proposal_id')
-        .eq('requester_id', proposal.creator_id)
-        .maybeSingle();
-
-      if (reverseRequest && reverseRequest.proposal_id) {
-        const { data: myProposal } = await supabase
-          .from('proposals')
-          .select('id')
-          .eq('creator_id', userId)
-          .eq('id', reverseRequest.proposal_id)
-          .maybeSingle();
-
-        if (myProposal) {
-          // Otomatik eşleşme oluştur (duplicate kontrolü ile)
-          const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
-          const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
-
-          // Önce var mı kontrol et
-          const { data: existingMatch } = await supabase
-            .from('matches')
-            .select('id')
-            .eq('user1_id', user1)
-            .eq('user2_id', user2)
-            .maybeSingle();
-
-          if (!existingMatch) {
-            await supabase
-              .from('matches')
-              .insert({
-                proposal_id: proposalId,
-                user1_id: user1,
-                user2_id: user2,
-              });
-
-            // Eşleşme bildirimi gönder
-            try {
-              // Her iki kullanıcının da adını al
-              const { data: users } = await supabase
-                .from('profiles')
-                .select('id, name')
-                .in('id', [user1, user2]);
-
-              if (users && users.length === 2) {
-                const user1Data = users.find(u => u.id === user1);
-                const user2Data = users.find(u => u.id === user2);
-
-                // Push notification gönder (dinamik import)
-                const { notificationsAPI } = await import('./notifications');
-                
-                // Her iki kullanıcıya da bildirim gönder
-                if (user1Data && user2Data) {
-                  await Promise.all([
-                    notificationsAPI.sendMatchNotification(user1, user2Data.name),
-                    notificationsAPI.sendMatchNotification(user2, user1Data.name),
-                  ]);
-                }
-              }
-            } catch (error) {
-              console.error('Eşleşme bildirimi gönderme hatası:', error);
-            }
-          }
-
-          // Super like kullanıldıysa sayacı güncelle (teklif kredisi zaten düşürüldü)
-          if (isSuperLike) {
-            // Super like kullan
-            await supabase.rpc('use_super_like', { p_user_id: userId });
-          }
-
-          return { matched: true };
+        try {
+          const { notificationsAPI } = await import('./notifications');
+          await notificationsAPI.sendNewProposalRequestNotification(
+            proposalResult.data.creator_id,
+            requesterResult.data.name,
+            proposalResult.data.activity_name,
+            isSuperLike
+          );
+        } catch (error: any) {
+          console.error('Yeni teklif bildirimi gönderme hatası:', error);
         }
       }
-    }
+    }).catch((error: any) => {
+      console.error('Bildirim verisi alma hatası:', error);
+    });
 
-    // Super like kullanıldıysa sayacı güncelle (teklif kredisi zaten düşürüldü)
-    if (isSuperLike) {
-      // Super like kullan
-      await supabase.rpc('use_super_like', { p_user_id: userId });
-    }
-
-    return { matched: false };
+    return await checkForMatch(proposalId, userId);
   },
 
   // Bugün için kalan eşleşme isteği sayısını al
