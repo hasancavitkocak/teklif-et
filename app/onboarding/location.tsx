@@ -104,7 +104,7 @@ export default function LocationScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
-        <View style={[styles.progress, { width: '84%' }]} />
+        <View style={[styles.progress, { width: '100%' }]} />
       </View>
 
       <View style={styles.header}>
@@ -122,7 +122,7 @@ export default function LocationScreen() {
       <View style={styles.content}>
         <View>
           <View style={styles.titleContainer}>
-            <Text style={styles.stepIndicator}>Adım 6/7</Text>
+            <Text style={styles.stepIndicator}>Adım 6/6</Text>
             <Text style={styles.title}>Neredesiniz?</Text>
             <Text style={styles.subtitle}>Konumunuz otomatik tespit ediliyor</Text>
           </View>

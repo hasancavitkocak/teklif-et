@@ -9,23 +9,23 @@ import {
   Animated,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LogOut } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-interface SignOutModalProps {
+interface ProposalDeleteConfirmModalProps {
   visible: boolean;
   onClose: () => void;
   onConfirm: () => void;
   loading?: boolean;
 }
 
-export default function SignOutModal({ 
+export default function ProposalDeleteConfirmModal({ 
   visible, 
   onClose,
   onConfirm,
   loading = false
-}: SignOutModalProps) {
+}: ProposalDeleteConfirmModalProps) {
   const scaleAnim = new Animated.Value(0);
   const fadeAnim = new Animated.Value(0);
 
@@ -44,7 +44,6 @@ export default function SignOutModal({
           useNativeDriver: true,
         }),
       ]).start();
-
     } else {
       scaleAnim.setValue(0);
       fadeAnim.setValue(0);
@@ -68,20 +67,19 @@ export default function SignOutModal({
             },
           ]}
         >
-          {/* Main Modal */}
           <View style={styles.modal}>
-            {/* Logout Icon */}
+            {/* Delete Icon */}
             <View style={styles.iconContainer}>
-              <View style={styles.logoutIconContainer}>
-                <LogOut size={32} color="#EF4444" />
+              <View style={styles.deleteIconContainer}>
+                <Trash2 size={28} color="#EF4444" />
               </View>
             </View>
 
             {/* Content */}
             <View style={styles.content}>
-              <Text style={styles.title}>Çıkış Yap</Text>
+              <Text style={styles.title}>Teklifi Sil</Text>
               <Text style={styles.subtitle}>
-                Çıkış yapmak istediğinize emin misiniz?
+                Bu teklifi silmek istediğinize emin misiniz?
               </Text>
 
               {/* Buttons */}
@@ -95,12 +93,12 @@ export default function SignOutModal({
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.signOutButton, loading && styles.signOutButtonDisabled]}
+                  style={[styles.deleteButton, loading && styles.deleteButtonDisabled]}
                   onPress={onConfirm}
                   disabled={loading}
                 >
-                  <Text style={styles.signOutButtonText}>
-                    {loading ? 'Çıkış Yapılıyor...' : 'Çıkış Yap'}
+                  <Text style={styles.deleteButtonText}>
+                    {loading ? 'Siliniyor...' : 'Sil'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -138,13 +136,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  logoutIconContainer: {
+  deleteIconContainer: {
     width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: '#FEF2F2',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   content: {
     alignItems: 'center',
@@ -161,6 +161,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 20,
+    lineHeight: 20,
   },
   buttons: {
     flexDirection: 'row',
@@ -181,7 +182,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
-  signOutButton: {
+  deleteButton: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -190,10 +191,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signOutButtonDisabled: {
+  deleteButtonDisabled: {
     opacity: 0.7,
   },
-  signOutButtonText: {
+  deleteButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFF',

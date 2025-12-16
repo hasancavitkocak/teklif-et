@@ -20,6 +20,8 @@ import { invitationsAPI } from '@/api/invitations';
 import InviteUsersModal from '@/components/InviteUsersModal';
 import InvitationsList from '@/components/InvitationsList';
 import ProposalSwipeCards from '@/components/ProposalSwipeCards';
+import ProposalDeletedToast from '@/components/ProposalDeletedToast';
+import ProposalDeleteConfirmModal from '@/components/ProposalDeleteConfirmModal';
 
 export default function ProposalsScreen() {
   const { user } = useAuth();
@@ -40,6 +42,10 @@ export default function ProposalsScreen() {
     city: string;
     interestId: string;
   } | null>(null);
+  const [showDeletedToast, setShowDeletedToast] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Sayfa her açıldığında veri yükle
   useFocusEffect(
@@ -196,27 +202,26 @@ export default function ProposalsScreen() {
     }
   };
 
-  const handleDeleteProposal = async (proposalId: string) => {
-    Alert.alert(
-      'Teklifi Sil',
-      'Bu teklifi silmek istediğinize emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await proposalsAPI.deleteProposal(proposalId);
-              Alert.alert('Başarılı', 'Teklif silindi');
-              loadProposals();
-            } catch (error: any) {
-              Alert.alert('Hata', error.message);
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteProposal = (proposalId: string) => {
+    setProposalToDelete(proposalId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteProposal = async () => {
+    if (!proposalToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      await proposalsAPI.deleteProposal(proposalToDelete);
+      setShowDeleteConfirm(false);
+      setShowDeletedToast(true);
+      loadProposals();
+    } catch (error: any) {
+      Alert.alert('Hata', error.message);
+    } finally {
+      setDeleteLoading(false);
+      setProposalToDelete(null);
+    }
   };
 
   const handleInviteUsers = async (proposal: Proposal) => {
@@ -239,6 +244,8 @@ export default function ProposalsScreen() {
   const handleCloseInviteModal = () => {
     setInviteModalVisible(false);
     setSelectedProposal(null);
+    // Davet gönderildikten sonra proposals listesini yenile
+    loadTabData();
   };
 
   const calculateAge = (birthDate: string) => {
@@ -338,14 +345,15 @@ export default function ProposalsScreen() {
         onPress={() => userId && router.push(`/profile/${userId}` as any)}
         activeOpacity={0.7}
       >
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
-          {request.is_super_like && (
-            <View style={styles.superLikeBadgeOnImage}>
-              <Zap size={12} color="#FFF" fill="#FFF" />
-            </View>
-          )}
-        </View>
+        {/* Süper Beğeni Badge - Üstte */}
+        {request.is_super_like && (
+          <View style={styles.superLikeBadgeTop}>
+            <Zap size={14} color="#FFF" fill="#FFF" />
+            <Text style={styles.superLikeBadgeText}>Süper Beğeni</Text>
+          </View>
+        )}
+        
+        <Image source={{ uri: profile.profile_photo }} style={styles.requestImage} />
         <View style={styles.requestInfo}>
           <View style={styles.requestHeader}>
             <Text style={styles.requestName}>
@@ -609,6 +617,23 @@ export default function ProposalsScreen() {
           onInviteSent={loadTabData}
         />
       )}
+
+      {/* Proposal Delete Confirm Modal */}
+      <ProposalDeleteConfirmModal
+        visible={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setProposalToDelete(null);
+        }}
+        onConfirm={confirmDeleteProposal}
+        loading={deleteLoading}
+      />
+
+      {/* Proposal Deleted Toast */}
+      <ProposalDeletedToast
+        visible={showDeletedToast}
+        onHide={() => setShowDeletedToast(false)}
+      />
     </View>
   );
 }
@@ -693,9 +718,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     letterSpacing: 0.5,
   },
-  imageContainer: {
-    position: 'relative',
-  },
   requestImage: {
     width: 90,
     height: 90,
@@ -725,23 +747,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  superLikeBadgeOnImage: {
+  superLikeBadgeTop: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: 12,
+    left: 12,
     backgroundColor: '#F59E0B',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFF',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
+  },
+  superLikeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.3,
   },
   requestActivity: {
     fontSize: 15,

@@ -24,10 +24,13 @@ import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict'
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '@/api';
 import PremiumPopup from '@/components/PremiumPopup';
 import SimplePremiumAlert from '@/components/SimplePremiumAlert';
 import SuperLikeSuccessModal from '@/components/SuperLikeSuccessModal';
+import ProposalSentToast from '@/components/ProposalSentToast';
+import ProposalCreatedToast from '@/components/ProposalCreatedToast';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -35,6 +38,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
   const { user, isPremium, refreshPremiumStatus, currentCity, requestLocationPermission, refreshUserStats } = useAuth();
+  const { registerForPushNotifications } = usePushNotifications();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -65,6 +69,9 @@ export default function DiscoverScreen() {
   const [showSuperLikeSuccess, setShowSuperLikeSuccess] = useState(false);
   const [superLikeUserName, setSuperLikeUserName] = useState<string>('');
   const [remainingProposals, setRemainingProposals] = useState<number>(0);
+  const [showProposalSentToast, setShowProposalSentToast] = useState(false);
+  const [isToastSuperLike, setIsToastSuperLike] = useState(false);
+  const [showProposalCreatedToast, setShowProposalCreatedToast] = useState(false);
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -168,6 +175,9 @@ export default function DiscoverScreen() {
         loadProposals();
         loadRemainingProposals(); // Kalan teklif kredisini yükle
         refreshPremiumStatus(); // Premium durumunu yenile
+        
+        // İlk kez uygulamaya girişte bildirim izni al
+        registerForPushNotifications();
         
         // İlk yüklemede selectedCity'yi currentCity'den al
         if (!selectedCity && currentCity) {
@@ -437,6 +447,10 @@ export default function DiscoverScreen() {
       
       if (result.matched) {
         Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
+      } else {
+        // Eşleşme yoksa toast göster
+        setIsToastSuperLike(isSuperLike);
+        setShowProposalSentToast(true);
       }
 
       // Kalan teklif kredisini güncelle
@@ -645,7 +659,11 @@ export default function DiscoverScreen() {
         onClose={() => setCreateModalVisible(false)}
         onCreated={() => {
           setCreateModalVisible(false);
-          router.push('/(tabs)/proposals');
+          setShowProposalCreatedToast(true);
+          // 3 saniye sonra proposals sayfasına yönlendir
+          setTimeout(() => {
+            router.push('/(tabs)/proposals');
+          }, 3000);
         }}
       />
 
@@ -1238,6 +1256,19 @@ export default function DiscoverScreen() {
         onClose={() => setShowSuperLikeSuccess(false)}
         userName={superLikeUserName}
       />
+
+      {/* Proposal Sent Toast */}
+      <ProposalSentToast
+        visible={showProposalSentToast}
+        onHide={() => setShowProposalSentToast(false)}
+        isSuperLike={isToastSuperLike}
+      />
+
+      {/* Proposal Created Toast */}
+      <ProposalCreatedToast
+        visible={showProposalCreatedToast}
+        onHide={() => setShowProposalCreatedToast(false)}
+      />
     </View>
   );
 }
@@ -1323,7 +1354,7 @@ function CreateProposalModal({
         venue_name: venueName.trim() || undefined,
       });
 
-      Alert.alert('Başarılı', 'Teklifiniz oluşturuldu');
+      // Form'u temizle
       setActivityName('');
       setVenueName('');
       setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));

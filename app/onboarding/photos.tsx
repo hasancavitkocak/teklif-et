@@ -202,7 +202,7 @@ export default function PhotosScreen() {
 
       if (profileError) throw profileError;
 
-      router.replace('/onboarding/notifications');
+      router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Complete error:', error);
       Alert.alert('Hata', error.message || 'Fotoğraflar yüklenemedi');
@@ -240,7 +240,7 @@ export default function PhotosScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
-          <Text style={styles.stepIndicator}>Adım 7/7</Text>
+          <Text style={styles.stepIndicator}>Son Adım</Text>
           <Text style={styles.title}>Fotoğraflarınızı ekleyin</Text>
           <Text style={styles.subtitle}>
             En az 2 fotoğraf gerekli ({photos.length}/6)
