@@ -453,6 +453,8 @@ export default function ProposalsScreen() {
       {activeTab === 'my_proposals' && (
         <ScrollView
           style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
           }
@@ -510,7 +512,8 @@ export default function ProposalsScreen() {
                     {new Date(proposal.created_at).toLocaleDateString('tr-TR', {
                       day: 'numeric',
                       month: 'long',
-                      year: 'numeric',
+                      year: 'numeric'
+                    })} {new Date(proposal.created_at).toLocaleTimeString('tr-TR', {
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
@@ -730,7 +733,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: '#FFF',
+  },
+  scrollContent: {
     paddingTop: 12,
+    paddingBottom: 100, // Tab bar için extra space
   },
   requestCard: {
     flexDirection: 'row',
