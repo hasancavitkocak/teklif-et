@@ -33,6 +33,7 @@ import ProposalCreatedToast from '@/components/ProposalCreatedToast';
 import LocationPermissionModal from '@/components/LocationPermissionModal';
 import MatchSuccessModal from '@/components/MatchSuccessModal';
 import ProposalLimitModal from '@/components/ProposalLimitModal';
+import RequestLimitModal from '@/components/RequestLimitModal';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import WarningToast from '@/components/WarningToast';
@@ -83,6 +84,7 @@ export default function DiscoverScreen() {
   const [showMatchSuccessModal, setShowMatchSuccessModal] = useState(false);
   const [matchedUserName, setMatchedUserName] = useState('');
   const [showProposalLimitModal, setShowProposalLimitModal] = useState(false);
+  const [showRequestLimitModal, setShowRequestLimitModal] = useState(false);
   
   // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
@@ -476,9 +478,8 @@ export default function DiscoverScreen() {
       if (error.message.includes('limit') || error.message.includes('başvurdunuz') || error.message.includes('hakkınız bitti')) {
         // Limit hatası - Premium popup göster veya premium sayfasına yönlendir
         if (error.message.includes('Günlük eşleşme isteği hakkınız bitti')) {
-          // Eşleşme isteği limiti bitti - Premium modal göster
-          setPremiumFeature('requests');
-          setPremiumPopupVisible(true);
+          // Eşleşme isteği limiti bitti - Basit modal göster
+          setShowRequestLimitModal(true);
         } else if (error.message.includes('super like hakkınız')) {
           // Super like limiti bitti
           setPremiumFeature('superLikes');
@@ -530,7 +531,7 @@ export default function DiscoverScreen() {
             style={styles.logoIcon}
             resizeMode="contain"
           />
-          <Text style={styles.logoText}>Teklif Et</Text>
+          <Text style={[styles.logoText, { fontFamily: 'System' }]}>Teklif Et</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -1310,6 +1311,12 @@ export default function DiscoverScreen() {
         }}
       />
 
+      {/* Request Limit Modal */}
+      <RequestLimitModal
+        visible={showRequestLimitModal}
+        onClose={() => setShowRequestLimitModal(false)}
+      />
+
       {/* Error Toast */}
       <ErrorToast
         visible={showErrorToast}
@@ -1348,7 +1355,16 @@ function CreateProposalModal({
   const { user, currentCity, refreshUserStats } = useAuth();
   const [activityName, setActivityName] = useState('');
   const [venueName, setVenueName] = useState('');
-  const [eventDate, setEventDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Yarın
+  const [eventDate, setEventDate] = useState(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    // Saat 18:00'den önce bugün, sonra yarın
+    if (hour < 18) {
+      return now; // Bugün
+    } else {
+      return new Date(Date.now() + 24 * 60 * 60 * 1000); // Yarın
+    }
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [interests, setInterests] = useState<any[]>([]);

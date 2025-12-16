@@ -84,6 +84,7 @@ export default function ProfileScreen() {
   const [remainingSuperLikes, setRemainingSuperLikes] = useState<number>(0);
   const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
   const [remainingProposals, setRemainingProposals] = useState<number>(0);
+  const [remainingRequests, setRemainingRequests] = useState<number>(0);
   
   // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
@@ -287,10 +288,18 @@ export default function ProfileScreen() {
         setRemainingInvitations(remainingInvites || 0);
 
         // Kalan teklif hakkını al
-        const { data: remainingProps } = await supabase.rpc('get_remaining_proposals', { 
+        const { data: remainingProps } = await supabase.rpc('get_remaining_proposals_today', { 
           p_user_id: user.id 
         });
+        console.log('🔢 Remaining proposals today:', remainingProps);
         setRemainingProposals(remainingProps || 0);
+
+        // Kalan eşleşme isteği hakkını al
+        const { data: remainingReqs } = await supabase.rpc('get_remaining_requests_today', { 
+          p_user_id: user.id 
+        });
+        console.log('🔢 Remaining requests today:', remainingReqs);
+        setRemainingRequests(remainingReqs || 0);
       }
     } catch (error: any) {
       setErrorMessage(error.message);
@@ -680,13 +689,19 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>
               {remainingProposals === 999 ? '∞' : remainingProposals}
             </Text>
-            <Text style={styles.statLabel}>Teklif Kredisi</Text>
+            <Text style={styles.statLabel}>Günlük Teklif</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
               {remainingSuperLikes}
             </Text>
             <Text style={styles.statLabel}>Super Like</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>
+              {remainingRequests === 999 ? '∞' : remainingRequests}
+            </Text>
+            <Text style={styles.statLabel}>Günlük Eşleşme</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>

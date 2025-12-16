@@ -237,9 +237,12 @@ export const proposalsAPI = {
       }
 
       // Günlük kotayı kullan
+      console.log('📊 Using daily proposal quota for user:', data.creator_id);
       const { data: useResult, error: useError } = await supabase.rpc('use_daily_proposal_quota', {
         p_user_id: data.creator_id
       });
+
+      console.log('📊 Quota usage result:', useResult, 'Error:', useError);
 
       if (useError) throw useError;
 

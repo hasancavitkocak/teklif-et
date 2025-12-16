@@ -169,16 +169,7 @@ export const discoverAPI = {
     userId: string,
     isSuperLike: boolean = false
   ) => {
-    // Teklif kredisi kontrolü
-    const { data: canCreate, error: checkError } = await supabase.rpc('can_create_proposal', {
-      p_user_id: userId
-    });
-
-    if (checkError) throw checkError;
-
-    if (!canCreate) {
-      throw new Error('Günlük teklif hakkınız bitti. Teklif gönderebilmek için premium ol.');
-    }
+    // Teklif kredisi kontrolü kaldırıldı - eşleşme isteği için gereksiz
 
     // Günlük eşleşme isteği limiti kontrolü
     const { data: canSendRequest, error: requestCheckError } = await supabase.rpc('can_send_request_today', {
