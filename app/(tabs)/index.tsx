@@ -55,7 +55,7 @@ export default function DiscoverScreen() {
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [editingCity, setEditingCity] = useState(false);
   const [premiumPopupVisible, setPremiumPopupVisible] = useState(false);
-  const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'filters'>('likes');
+  const [premiumFeature, setPremiumFeature] = useState<'likes' | 'superLikes' | 'filters' | 'requests'>('likes');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
@@ -475,14 +475,14 @@ export default function DiscoverScreen() {
     } catch (error: any) {
       if (error.message.includes('limit') || error.message.includes('başvurdunuz') || error.message.includes('hakkınız bitti')) {
         // Limit hatası - Premium popup göster veya premium sayfasına yönlendir
-        if (error.message.includes('limit') || error.message.includes('hakkınız bitti')) {
-          if (error.message.includes('hakkınız bitti')) {
-            // Teklif kredisi bitti - Premium modal göster
-            setShowProposalLimitModal(true);
-          } else {
-            setPremiumFeature(isSuperLike ? 'superLikes' : 'likes');
-            setPremiumPopupVisible(true);
-          }
+        if (error.message.includes('Günlük eşleşme isteği hakkınız bitti')) {
+          // Eşleşme isteği limiti bitti - Premium modal göster
+          setPremiumFeature('requests');
+          setPremiumPopupVisible(true);
+        } else if (error.message.includes('super like hakkınız')) {
+          // Super like limiti bitti
+          setPremiumFeature('superLikes');
+          setPremiumPopupVisible(true);
         } else {
           setInfoMessage(error.message);
           setShowInfoToast(true);
@@ -1422,7 +1422,7 @@ function CreateProposalModal({
         latitude: userData?.latitude,
         longitude: userData?.longitude,
         event_datetime: eventDate.toISOString(),
-        venue_name: venueName.trim() || undefined,
+        venue_name: venueName.trim() || undefined
       });
 
       // Form'u temizle
@@ -1436,7 +1436,8 @@ function CreateProposalModal({
       
       onCreated();
     } catch (error: any) {
-      if (error.message?.includes('kredi')) {
+      if (error.message?.includes('Günlük teklif') || error.message?.includes('hakkınız bitti') || error.message?.includes('Bu tarih için zaten')) {
+        // Tüm limit hataları için ProposalLimitModal göster
         onShowProposalLimit();
       } else {
         setErrorMessage(error.message);

@@ -59,7 +59,8 @@ export const discoverAPI = {
         interest:interests(name)
       `)
       .eq('status', 'active')
-      .neq('creator_id', userId); // Kendi tekliflerini gösterme
+      .neq('creator_id', userId) // Kendi tekliflerini gösterme
+      .or('event_datetime.is.null,event_datetime.gte.' + new Date().toISOString()); // Expired olmayan teklifler
 
     // Daha önce başvuru yapılmış teklifleri hariç tut
     if (appliedProposalIds.length > 0) {
@@ -179,6 +180,17 @@ export const discoverAPI = {
       throw new Error('Günlük teklif hakkınız bitti. Teklif gönderebilmek için premium ol.');
     }
 
+    // Günlük eşleşme isteği limiti kontrolü
+    const { data: canSendRequest, error: requestCheckError } = await supabase.rpc('can_send_request_today', {
+      p_user_id: userId
+    });
+
+    if (requestCheckError) throw requestCheckError;
+
+    if (!canSendRequest) {
+      throw new Error('Günlük eşleşme isteği hakkınız bitti');
+    }
+
     // Super like kontrolü - database fonksiyonu ile kontrol et
     if (isSuperLike) {
       const { data: canUse } = await supabase.rpc('can_use_super_like', { p_user_id: userId });
@@ -199,6 +211,17 @@ export const discoverAPI = {
       throw new Error('Bu teklife daha önce başvurdunuz');
     }
 
+    // Günlük eşleşme isteği kotasını kullan
+    const { data: useRequestResult, error: useRequestError } = await supabase.rpc('use_daily_request_quota', {
+      p_user_id: userId
+    });
+
+    if (useRequestError) throw useRequestError;
+
+    if (!useRequestResult) {
+      throw new Error('Günlük eşleşme isteği kotası kontrolü başarısız oldu');
+    }
+
     // Başvuru oluştur
     const { error } = await supabase
       .from('proposal_requests')
@@ -209,17 +232,6 @@ export const discoverAPI = {
       });
 
     if (error) throw error;
-
-    // Teklif kredisini düş
-    const { data: useResult, error: useError } = await supabase.rpc('use_proposal_credit', {
-      p_user_id: userId
-    });
-
-    if (useError) throw useError;
-
-    if (!useResult) {
-      throw new Error('Teklif kredisi kontrolü başarısız oldu');
-    }
 
     // Super like kullanıldıysa sayacı güncelle
     if (isSuperLike) {
@@ -346,5 +358,25 @@ export const discoverAPI = {
     }
 
     return { matched: false };
+  },
+
+  // Bugün için kalan eşleşme isteği sayısını al
+  getRemainingRequestsToday: async (userId: string) => {
+    const { data, error } = await supabase.rpc('get_remaining_requests_today', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    return data || 0;
+  },
+
+  // Günlük eşleşme isteği limitini al
+  getDailyRequestLimit: async (userId: string) => {
+    const { data, error } = await supabase.rpc('get_daily_request_limit', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    return data || 0;
   },
 };

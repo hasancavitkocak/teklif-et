@@ -10,6 +10,8 @@ export interface Proposal {
   city: string;
   status: string;
   created_at: string;
+  event_datetime?: string;
+  venue_name?: string;
   interest: {
     id?: string;
     name: string;
@@ -61,9 +63,12 @@ export const proposalsAPI = {
         city,
         status,
         created_at,
+        event_datetime,
+        venue_name,
         interest:interests(id, name)
       `)
       .eq('creator_id', userId)
+      .in('status', ['active', 'matched', 'completed']) // Expired olanları hiç gösterme
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -108,6 +113,7 @@ export const proposalsAPI = {
       `)
       .eq('proposals.creator_id', userId)
       .in('status', ['pending', 'accepted'])
+      .in('proposals.status', ['active', 'matched', 'completed']) // Expired tekliflerin taleplerini gösterme
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -159,6 +165,7 @@ export const proposalsAPI = {
       `)
       .eq('requester_id', userId)
       .neq('status', 'auto_rejected')
+      .in('proposals.status', ['active', 'matched', 'completed']) // Expired tekliflerin taleplerini gösterme
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -199,32 +206,52 @@ export const proposalsAPI = {
     longitude?: number;
     event_datetime?: string;
     venue_name?: string;
+
   }) => {
-    // Önce teklif kredisi kontrolü yap
-    const { data: canCreate, error: checkError } = await supabase.rpc('can_create_proposal', {
-      p_user_id: data.creator_id
+    // Teklif tarihi kontrolü - event_datetime'dan çıkar
+    const proposalDate = data.event_datetime ? new Date(data.event_datetime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    // Önce bu tarih için zaten teklif var mı kontrol et
+    const { data: canCreateForDate, error: dateCheckError } = await supabase.rpc('can_create_proposal_for_date', {
+      p_user_id: data.creator_id,
+      p_date: proposalDate
     });
 
-    if (checkError) throw checkError;
+    if (dateCheckError) throw dateCheckError;
 
-    if (!canCreate) {
-      throw new Error('Teklif krediniz yetersiz');
+    if (!canCreateForDate) {
+      throw new Error('Bu tarih için zaten bir teklifiniz bulunuyor');
     }
 
-    // Teklif kredisini düş
-    const { data: useResult, error: useError } = await supabase.rpc('use_proposal_credit', {
-      p_user_id: data.creator_id
-    });
+    // Günlük limit kontrolü yap (sadece bugün için)
+    const today = new Date().toISOString().split('T')[0];
+    if (proposalDate === today) {
+      const { data: canCreateToday, error: todayCheckError } = await supabase.rpc('can_create_proposal_today', {
+        p_user_id: data.creator_id
+      });
 
-    if (useError) throw useError;
+      if (todayCheckError) throw todayCheckError;
 
-    if (!useResult) {
-      throw new Error('Teklif kredisi kontrolü başarısız oldu');
+      if (!canCreateToday) {
+        throw new Error('Günlük teklif oluşturma hakkınız bitti');
+      }
+
+      // Günlük kotayı kullan
+      const { data: useResult, error: useError } = await supabase.rpc('use_daily_proposal_quota', {
+        p_user_id: data.creator_id
+      });
+
+      if (useError) throw useError;
+
+      if (!useResult) {
+        throw new Error('Günlük teklif kotası kontrolü başarısız oldu');
+      }
     }
 
+    // Teklifi oluştur
     const { data: proposal, error } = await supabase
       .from('proposals')
-      .insert(data)
+      .insert(data) // date alanını kaldırdık, event_datetime zaten var
       .select()
       .single();
 
@@ -367,5 +394,25 @@ export const proposalsAPI = {
       .eq('status', 'pending');
 
     return count || 0;
+  },
+
+  // Bugün için kalan teklif hakkını al
+  getRemainingProposalsToday: async (userId: string) => {
+    const { data, error } = await supabase.rpc('get_remaining_proposals_today', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    return data || 0;
+  },
+
+  // Günlük teklif limitini al
+  getDailyProposalLimit: async (userId: string) => {
+    const { data, error } = await supabase.rpc('get_daily_proposal_limit', {
+      p_user_id: userId
+    });
+
+    if (error) throw error;
+    return data || 0;
   },
 };

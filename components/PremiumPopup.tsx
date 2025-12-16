@@ -17,7 +17,7 @@ const { width, height } = Dimensions.get('window');
 interface PremiumPopupProps {
   visible: boolean;
   onClose: () => void;
-  feature?: 'likes' | 'superLikes' | 'filters';
+  feature?: 'likes' | 'superLikes' | 'filters' | 'requests';
 }
 
 const featureMessages = {
@@ -35,6 +35,11 @@ const featureMessages = {
     title: 'Gelişmiş Filtreler',
     description: 'Premium üyeler detaylı arama kriterleri ile tam istediği kişiyi bulabilir!',
     icon: Eye,
+  },
+  requests: {
+    title: 'Eşleşme İsteği Limiti',
+    description: 'Bugün için eşleşme isteği hakkın bitti. Premium ile sınırsız eşleşme isteği gönder!',
+    icon: Heart,
   },
 };
 

@@ -12,9 +12,15 @@ interface AuthContextType {
   isPremium: boolean;
   isAccountFrozen: boolean;
   currentCity: string;
+  remainingProposalsToday: number;
+  dailyProposalLimit: number;
+  remainingRequestsToday: number;
+  dailyRequestLimit: number;
   refreshPremiumStatus: () => Promise<void>;
   refreshAccountStatus: () => Promise<void>;
   refreshUserStats: () => Promise<void>;
+  refreshProposalLimits: () => Promise<void>;
+  refreshRequestLimits: () => Promise<void>;
   unfreezeAccount: () => Promise<boolean>;
   updateLocationManually: () => Promise<{ success: boolean; city?: string; error?: string }>;
   updateCityFromSettings: (newCity: string) => Promise<boolean>;
@@ -34,6 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isPremium, setIsPremium] = useState(false);
   const [isAccountFrozen, setIsAccountFrozen] = useState(false);
   const [currentCity, setCurrentCity] = useState<string>('');
+  const [remainingProposalsToday, setRemainingProposalsToday] = useState(0);
+  const [dailyProposalLimit, setDailyProposalLimit] = useState(0);
+  const [remainingRequestsToday, setRemainingRequestsToday] = useState(0);
+  const [dailyRequestLimit, setDailyRequestLimit] = useState(0);
 
   const refreshPremiumStatus = async () => {
     if (!user?.id) return;
@@ -86,6 +96,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Bu fonksiyon profile sayfasının stats'larını yenilemek için kullanılacak
     // Event emitter gibi çalışacak
     console.log('🔄 User stats refresh triggered');
+    await refreshProposalLimits();
+    await refreshRequestLimits();
+  };
+
+  const refreshProposalLimits = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Kalan teklif sayısını al
+      const { data: remaining, error: remainingError } = await supabase.rpc('get_remaining_proposals_today', {
+        p_user_id: user.id
+      });
+
+      if (remainingError) throw remainingError;
+
+      // Günlük limiti al
+      const { data: limit, error: limitError } = await supabase.rpc('get_daily_proposal_limit', {
+        p_user_id: user.id
+      });
+
+      if (limitError) throw limitError;
+
+      setRemainingProposalsToday(remaining || 0);
+      setDailyProposalLimit(limit || 0);
+    } catch (error) {
+      console.error('Error refreshing proposal limits:', error);
+    }
+  };
+
+  const refreshRequestLimits = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Kalan eşleşme isteği sayısını al
+      const { data: remaining, error: remainingError } = await supabase.rpc('get_remaining_requests_today', {
+        p_user_id: user.id
+      });
+
+      if (remainingError) throw remainingError;
+
+      // Günlük limiti al
+      const { data: limit, error: limitError } = await supabase.rpc('get_daily_request_limit', {
+        p_user_id: user.id
+      });
+
+      if (limitError) throw limitError;
+
+      setRemainingRequestsToday(remaining || 0);
+      setDailyRequestLimit(limit || 0);
+    } catch (error) {
+      console.error('Error refreshing request limits:', error);
+    }
   };
 
   const unfreezeAccount = async (): Promise<boolean> => {
@@ -263,12 +325,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user?.id) {
       refreshPremiumStatus();
       refreshAccountStatus();
+      refreshProposalLimits();
+      refreshRequestLimits();
       
       // Premium kullanıcılar için otomatik konum güncellemesi yapma
       // Sadece ilk login'de veya manuel olarak güncellenecek
     } else {
       setIsPremium(false);
       setIsAccountFrozen(false);
+      setRemainingProposalsToday(0);
+      setDailyProposalLimit(0);
+      setRemainingRequestsToday(0);
+      setDailyRequestLimit(0);
     }
   }, [user?.id]);
 
@@ -666,9 +734,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPremium,
         isAccountFrozen,
         currentCity,
+        remainingProposalsToday,
+        dailyProposalLimit,
+        remainingRequestsToday,
+        dailyRequestLimit,
         refreshPremiumStatus,
         refreshAccountStatus,
         refreshUserStats,
+        refreshProposalLimits,
+        refreshRequestLimits,
         unfreezeAccount,
         updateLocationManually,
         updateCityFromSettings,

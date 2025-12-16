@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 
-import { Clock, Check, X as XIcon, Zap, Trash2, UserPlus } from 'lucide-react-native';
+import { Clock, Check, X as XIcon, Zap, Trash2, UserPlus, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
@@ -492,22 +492,46 @@ export default function ProposalsScreen() {
                 )}
                 <View style={styles.proposalDetails}>
                   {proposal.location_name && (
-                    <Text style={styles.proposalDetail}>📍 {proposal.location_name}</Text>
+                    <View style={styles.locationRow}>
+                      <MapPin size={14} color="#8B5CF6" />
+                      <Text style={styles.proposalDetail}>{proposal.location_name}</Text>
+                    </View>
                   )}
-                  <Text style={styles.proposalDetail}>
-                    👥 {proposal.participant_count} kişi
-                    {proposal.is_group && ' (Grup)'}
-                  </Text>
-                  <Text style={styles.proposalDetail}>📍 {proposal.city}</Text>
+                  <View style={styles.locationRow}>
+                    <MapPin size={14} color="#8B5CF6" />
+                    <Text style={styles.proposalDetail}>{proposal.city}</Text>
+                  </View>
                 </View>
-                <Text style={styles.proposalDate}>
-                  {new Date(proposal.created_at).toLocaleDateString('tr-TR', {
-                    day: 'numeric',
-                    month: 'long',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </Text>
+                
+                {/* Oluşturma Tarihi */}
+                <View style={styles.dateContainer}>
+                  <Text style={styles.dateLabel}>Oluşturma tarihi:</Text>
+                  <Text style={styles.dateValue}>
+                    {new Date(proposal.created_at).toLocaleDateString('tr-TR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
+                </View>
+
+                {/* Etkinlik Tarihi */}
+                {proposal.event_datetime && (
+                  <View style={styles.dateContainer}>
+                    <Text style={styles.dateLabel}>Etkinlik tarihi:</Text>
+                    <Text style={styles.dateValue}>
+                      {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })} - {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
+                        weekday: 'long'
+                      })}
+                    </Text>
+                  </View>
+                )}
               </View>
             ))
           ) : (
@@ -926,6 +950,28 @@ const styles = StyleSheet.create({
   proposalDate: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  dateValue: {
+    fontSize: 12,
+    color: '#374151',
+    flex: 1,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
   sectionTitle: {
     fontSize: 16,

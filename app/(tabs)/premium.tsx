@@ -36,10 +36,10 @@ export default function PremiumScreen() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const features = [
-    { icon: Eye, title: 'Sınırsız Teklif', description: 'Günde 10 yerine sınırsız teklif gönder' },
-    { icon: Sparkles, title: 'Günlük Super Like', description: 'Her gün 1 super like hakkı' },
-    { icon: Crown, title: 'Sınırsız Davet', description: 'Tekliflerine sınırsız davet hakkı' },
-    { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Detaylı arama kriterleri' },
+    { icon: Eye, title: 'Günde 5 Teklif', description: 'Günde 1 teklif yerine 5 teklif oluştur' },
+    { icon: Sparkles, title: 'Sınırsız Eşleşme İsteği', description: 'Günde 10 eşleşme isteği yerine sınırsız eşleşme isteği' },
+    { icon: Crown, title: 'Sınırsız Davet', description: 'Günde 10 davet yerine sınırsız davet' },
+    { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Yaş, konum ve diğer detaylı filtreler' },
   ];
 
   const plans = [

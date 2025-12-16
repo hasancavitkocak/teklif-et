@@ -7,22 +7,22 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { Crown, X, Zap } from 'lucide-react-native';
+import { Users, X, Gift, Crown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
-interface ProposalLimitModalProps {
+interface InvitationCreditModalProps {
   visible: boolean;
   onClose: () => void;
-  onUpgrade: () => void;
+  onUpgrade?: () => void;
 }
 
-export default function ProposalLimitModal({
+export default function InvitationCreditModal({
   visible,
   onClose,
   onUpgrade,
-}: ProposalLimitModalProps) {
+}: InvitationCreditModalProps) {
   return (
     <Modal
       visible={visible}
@@ -40,32 +40,32 @@ export default function ProposalLimitModal({
           {/* Icon */}
           <View style={styles.iconContainer}>
             <LinearGradient
-              colors={['#F59E0B', '#FBBF24']}
+              colors={['#EF4444', '#F87171']}
               style={styles.iconGradient}
             >
-              <Crown size={32} color="#FFF" fill="#FFF" />
+              <Users size={32} color="#FFF" fill="#FFF" />
             </LinearGradient>
           </View>
 
           {/* Content */}
-          <Text style={styles.title}>Teklif Oluşturma Limiti</Text>
+          <Text style={styles.title}>Davet Krediniz Yetersiz</Text>
           <Text style={styles.message}>
-            Teklif oluşturma hakkınız bitti. Premium ol ve günde 5 teklif oluştur!
+            Daha fazla kişiyi davet edebilmek için Premium üyeliğe geçmeniz gerekiyor.
           </Text>
 
           {/* Features */}
           <View style={styles.featuresList}>
             <View style={styles.featureItem}>
-              <Zap size={16} color="#F59E0B" />
-              <Text style={styles.featureText}>Günde 5 teklif oluşturma</Text>
+              <Users size={16} color="#F59E0B" />
+              <Text style={styles.featureText}>Sınırsız davet gönderme</Text>
             </View>
             <View style={styles.featureItem}>
-              <Zap size={16} color="#F59E0B" />
-              <Text style={styles.featureText}>Gelişmiş filtreler</Text>
+              <Crown size={16} color="#F59E0B" />
+              <Text style={styles.featureText}>Premium özellikler</Text>
             </View>
             <View style={styles.featureItem}>
-              <Zap size={16} color="#F59E0B" />
-              <Text style={styles.featureText}>Süper beğeni</Text>
+              <Gift size={16} color="#F59E0B" />
+              <Text style={styles.featureText}>Özel avantajlar</Text>
             </View>
           </View>
 
@@ -74,15 +74,18 @@ export default function ProposalLimitModal({
             <TouchableOpacity style={styles.laterButton} onPress={onClose}>
               <Text style={styles.laterButtonText}>Daha Sonra</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
-              <LinearGradient
-                colors={['#F59E0B', '#FBBF24']}
-                style={styles.upgradeButtonGradient}
-              >
-                <Crown size={18} color="#FFF" fill="#FFF" />
-                <Text style={styles.upgradeButtonText}>Premium Ol</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            
+            {onUpgrade && (
+              <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+                <LinearGradient
+                  colors={['#F59E0B', '#FBBF24']}
+                  style={styles.upgradeButtonGradient}
+                >
+                  <Crown size={18} color="#FFF" fill="#FFF" />
+                  <Text style={styles.upgradeButtonText}>Premium Ol</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -179,6 +182,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
+
   upgradeButton: {
     flex: 1,
   },

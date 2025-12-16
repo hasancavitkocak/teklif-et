@@ -20,6 +20,7 @@ import { PROVINCES } from '@/constants/cities';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import SimplePremiumAlert from './SimplePremiumAlert';
+import InvitationCreditModal from './InvitationCreditModal';
 
 interface User {
   id: string;
@@ -63,6 +64,7 @@ export default function InviteUsersModal({
   const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+  const [showInvitationCreditModal, setShowInvitationCreditModal] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [editingCity, setEditingCity] = useState(false);
@@ -320,21 +322,7 @@ export default function InviteUsersModal({
     } else {
       // Premium olmayan kullanıcılar için limit kontrolü
       if (!isPremium && newSelected.size >= remainingInvitations) {
-        Alert.alert(
-          'Davet Kredisi Yetersiz',
-          `Davet krediniz yetersiz. Kalan davet krediniz: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
-          [
-            { text: 'Tamam', style: 'default' },
-            { 
-              text: 'Premium Ol', 
-              style: 'default',
-              onPress: () => {
-                onClose();
-                router.push('/(tabs)/premium');
-              }
-            }
-          ]
-        );
+        setShowInvitationCreditModal(true);
         return;
       }
       newSelected.add(userId);
@@ -347,21 +335,7 @@ export default function InviteUsersModal({
 
     // Premium olmayan kullanıcılar için limit kontrolü
     if (!isPremium && selectedUsers.size > remainingInvitations) {
-      Alert.alert(
-        'Davet Kredisi Yetersiz',
-        `Davet krediniz yetersiz. Kalan davet krediniz: ${remainingInvitations}\n\nPremium üyelik ile sınırsız davet gönderebilirsiniz.`,
-        [
-          { text: 'Tamam', style: 'default' },
-          { 
-            text: 'Premium Ol', 
-            style: 'default',
-            onPress: () => {
-              onClose();
-              router.push('/(tabs)/premium');
-            }
-          }
-        ]
-      );
+      setShowInvitationCreditModal(true);
       return;
     }
 
@@ -911,6 +885,17 @@ export default function InviteUsersModal({
       <SimplePremiumAlert
         visible={showPremiumAlert}
         onClose={() => setShowPremiumAlert(false)}
+      />
+
+      {/* Invitation Credit Modal */}
+      <InvitationCreditModal
+        visible={showInvitationCreditModal}
+        onClose={() => setShowInvitationCreditModal(false)}
+        onUpgrade={() => {
+          setShowInvitationCreditModal(false);
+          onClose();
+          router.push('/(tabs)/premium');
+        }}
       />
     </>
   );
