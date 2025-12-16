@@ -13,6 +13,8 @@ import {
   Compass, 
   Mail, 
   BarChart3,
+  Settings,
+  Database,
   LogOut
 } from 'lucide-react'
 
@@ -26,6 +28,8 @@ const menuItems = [
   { name: 'Bildirimler', path: '/dashboard/notifications', icon: Bell },
   { name: 'Keşfet Feed', path: '/dashboard/discover', icon: Compass },
   { name: 'Davetler', path: '/dashboard/invitations', icon: Mail },
+  { name: 'Job Yönetimi', path: '/dashboard/jobs', icon: Settings },
+  { name: 'Sistem Yönetimi', path: '/dashboard/system', icon: Database },
   { name: 'Raporlar', path: '/dashboard/reports', icon: BarChart3 },
 ]
 
