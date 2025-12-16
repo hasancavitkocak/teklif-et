@@ -30,6 +30,7 @@ export default function PremiumScreen() {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [cancelledModalVisible, setCancelledModalVisible] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'plans' | 'addons'>('plans');
   
   // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
@@ -37,8 +38,8 @@ export default function PremiumScreen() {
 
   const features = [
     { icon: Eye, title: 'Günde 5 Teklif', description: 'Günde 1 teklif yerine 5 teklif oluştur' },
-    { icon: Sparkles, title: 'Sınırsız Eşleşme İsteği', description: 'Günde 10 eşleşme isteği yerine sınırsız eşleşme isteği' },
-    { icon: Crown, title: 'Sınırsız Davet', description: 'Günde 10 davet yerine sınırsız davet' },
+    { icon: Sparkles, title: 'Günde 3 Super Like', description: 'Günde 1 super like yerine 3 super like gönder' },
+    { icon: Crown, title: 'Sınırsız Eşleşme İsteği', description: 'Günde 10 eşleşme isteği yerine sınırsız eşleşme isteği' },
     { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Yaş, konum ve diğer detaylı filtreler' },
   ];
 
@@ -143,6 +144,37 @@ export default function PremiumScreen() {
     setCancelModalVisible(true);
   };
 
+  const handlePurchaseSuperLikes = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    try {
+      // Simulate purchase (gerçek ödeme entegrasyonu sonra eklenecek)
+      const { error } = await supabase.rpc('purchase_super_like_credits', {
+        p_user_id: user.id,
+        p_package_type: 'super_like_10',
+        p_credits_amount: 10,
+        p_price_paid: 9900, // ₺99 in kuruş
+        p_payment_method: 'test',
+        p_transaction_id: `test_${Date.now()}`
+      });
+
+      if (error) throw error;
+
+      // Başarı mesajı göster
+      alert('🎉 Super Like paketi başarıyla satın alındı!\n+10 Super Like kredisi hesabınıza eklendi.');
+      
+      // Premium durumunu yenile (profil stats'ları için)
+      refreshPremiumStatus();
+      
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Satın alma işlemi başarısız oldu');
+      setShowErrorToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmCancelSubscription = async () => {
     setLoading(true);
     try {
@@ -231,9 +263,31 @@ export default function PremiumScreen() {
           ))}
         </View>
 
-        {!isPremium && (
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'plans' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('plans')}
+          >
+            <Crown size={20} color={activeTab === 'plans' ? '#8B5CF6' : '#6B7280'} />
+            <Text style={[styles.tabText, activeTab === 'plans' && styles.tabTextActive]}>
+              Planlar
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'addons' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('addons')}
+          >
+            <Sparkles size={20} color={activeTab === 'addons' ? '#8B5CF6' : '#6B7280'} />
+            <Text style={[styles.tabText, activeTab === 'addons' && styles.tabTextActive]}>
+              Ek Paketler
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tab Content */}
+        {activeTab === 'plans' && !isPremium && (
           <View style={styles.plansSection}>
-            <Text style={styles.sectionTitle}>Planlar</Text>
             {plans.map((plan, index) => (
               <TouchableOpacity
                 key={index}
@@ -272,6 +326,66 @@ export default function PremiumScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        )}
+
+        {activeTab === 'addons' && (
+          <View style={styles.addOnsSection}>
+            <Text style={styles.addOnsSubtitle}>
+              İhtiyacınız olan özellikleri tek seferlik satın alın
+            </Text>
+          
+          {/* Super Like Paketi */}
+          <TouchableOpacity 
+            style={styles.addOnCard} 
+            activeOpacity={0.9}
+            onPress={() => handlePurchaseSuperLikes()}
+          >
+            <View style={styles.addOnIcon}>
+              <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />
+            </View>
+            <View style={styles.addOnContent}>
+              <Text style={styles.addOnTitle}>Super Like Paketi</Text>
+              <Text style={styles.addOnDescription}>10 adet Super Like kredisi</Text>
+              <Text style={styles.addOnSubtext}>Günlük limitten bağımsız kullanın</Text>
+            </View>
+            <View style={styles.addOnPricing}>
+              <Text style={styles.addOnPrice}>₺99</Text>
+              <Text style={styles.addOnPriceUnit}>tek seferlik</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Boost Paketi */}
+          <TouchableOpacity style={[styles.addOnCard, { opacity: 0.6 }]} activeOpacity={0.9} disabled>
+            <View style={[styles.addOnIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Crown size={24} color="#F59E0B" />
+            </View>
+            <View style={styles.addOnContent}>
+              <Text style={styles.addOnTitle}>Boost</Text>
+              <Text style={styles.addOnDescription}>30 dakika öne çıkarma</Text>
+              <Text style={styles.addOnSubtext}>Yakında geliyor...</Text>
+            </View>
+            <View style={styles.addOnPricing}>
+              <Text style={styles.addOnPrice}>₺49</Text>
+              <Text style={styles.addOnPriceUnit}>tek seferlik</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Profile Views Paketi */}
+          <TouchableOpacity style={[styles.addOnCard, { opacity: 0.6 }]} activeOpacity={0.9} disabled>
+            <View style={[styles.addOnIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Eye size={24} color="#3B82F6" />
+            </View>
+            <View style={styles.addOnContent}>
+              <Text style={styles.addOnTitle}>Profilimi Kim İnceledi</Text>
+              <Text style={styles.addOnDescription}>7 gün boyunca aktif</Text>
+              <Text style={styles.addOnSubtext}>Yakında geliyor...</Text>
+            </View>
+            <View style={styles.addOnPricing}>
+              <Text style={styles.addOnPrice}>₺79</Text>
+              <Text style={styles.addOnPriceUnit}>7 günlük</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
         )}
 
         <View style={styles.termsSection}>
@@ -540,5 +654,104 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+  },
+  // Add-ons Styles
+  addOnsSection: {
+    marginBottom: 32,
+  },
+  addOnsSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  addOnCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  addOnIcon: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  addOnContent: {
+    flex: 1,
+  },
+  addOnTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  addOnDescription: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 2,
+  },
+  addOnSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  addOnPricing: {
+    alignItems: 'flex-end',
+  },
+  addOnPrice: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  addOnPriceUnit: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  // Tab Styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 24,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  tabTextActive: {
+    color: '#8B5CF6',
   },
 });

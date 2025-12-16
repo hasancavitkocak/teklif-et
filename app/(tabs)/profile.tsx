@@ -693,7 +693,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
-              {remainingSuperLikes}
+              {remainingSuperLikes === 999 ? '∞' : remainingSuperLikes}
             </Text>
             <Text style={styles.statLabel}>Super Like</Text>
           </View>
