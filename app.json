@@ -47,7 +47,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.0.0"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRouNames": true
