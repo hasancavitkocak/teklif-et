@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -102,6 +102,12 @@ export default function DiscoverScreen() {
   // Batch update için counter
   const [actionCount, setActionCount] = useState(0);
   const batchUpdateThreshold = 3; // Her 3 aksiyonda bir güncelle
+  
+  // Debounce ref'i artık gerekmiyor (manuel filtreleme)
+  
+  // Duplicate çağrı engelleme için ref'ler
+  const isLoadingProposalsRef = useRef(false);
+  const isUpdatingLocationRef = useRef(false);
   
   const sliderWidth = useRef(0);
 
@@ -215,7 +221,7 @@ export default function DiscoverScreen() {
           setSelectedCity(currentCity);
         }
       }
-    }, [user?.id, selectedCity, selectedInterest, isPremium])
+    }, [user?.id, isPremium]) // selectedCity ve selectedInterest dependency'lerini kaldır
   );
 
   const loadRemainingProposals = async () => {
@@ -254,14 +260,10 @@ export default function DiscoverScreen() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id, selectedCity, selectedInterest]);
+  }, [user?.id]); // Sadece user değiştiğinde çalış
 
-  // Filtre değiştiğinde otomatik yükle
-  useEffect(() => {
-    if (user?.id) {
-      loadProposals();
-    }
-  }, [selectedCity, selectedInterest, selectedDate]);
+  // Filtre değiştiğinde otomatik yükleme KALDIRILDI
+  // Artık sadece "Uygula" butonuna basıldığında filtreleme yapılacak
 
   // AuthContext'teki currentCity değiştiğinde selectedCity'yi güncelle
   useEffect(() => {
@@ -270,15 +272,25 @@ export default function DiscoverScreen() {
       setSelectedCity(currentCity);
     }
   }, [currentCity]);
+  
+  // Manuel filtreleme için - hiçbir filtre değişikliği otomatik API çağırmayacak
 
   const updateUserLocationOnFocus = async () => {
     if (!user?.id) return;
+    
+    // Duplicate konum güncelleme engelle
+    if (isUpdatingLocationRef.current) {
+      console.log('⚠️ Konum güncelleme zaten çalışıyor, duplicate çağrı engellendi');
+      return;
+    }
     
     // Premium kullanıcılar için otomatik konum güncellemesi yapma
     if (isPremium) {
       console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
       return;
     }
+    
+    isUpdatingLocationRef.current = true;
     
     try {
       console.log('🔄 Ana sayfada konum güncelleniyor...');
@@ -358,6 +370,8 @@ export default function DiscoverScreen() {
     } catch (error) {
       // Sessizce logla, kullanıcıyı rahatsız etme
       console.log('⚠️ Ana sayfa konum güncelleme hatası:', error);
+    } finally {
+      isUpdatingLocationRef.current = false; // Guard'ı serbest bırak
     }
   };
 
@@ -396,7 +410,16 @@ export default function DiscoverScreen() {
       return;
     }
 
+    // Güçlü duplicate engelleme
+    if (isLoadingProposalsRef.current) {
+      console.log('⚠️ loadProposals zaten çalışıyor, duplicate çağrı engellendi');
+      return;
+    }
+
+    isLoadingProposalsRef.current = true;
+
     try {
+      setLoading(true);
       const data = await discoverAPI.getProposals(user.id, {
         city: selectedCity,
         interestId: selectedInterest,
@@ -420,6 +443,7 @@ export default function DiscoverScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isLoadingProposalsRef.current = false; // Guard'ı serbest bırak
     }
   };
 
@@ -430,11 +454,18 @@ export default function DiscoverScreen() {
   };
 
   const clearFilters = () => {
+    setFilterModalVisible(false);
+    
+    // Filtreleri temizle
     setSelectedCity('');
     setSelectedInterest('');
-    setFilterModalVisible(false);
-    setLoading(true);
-    loadProposals();
+    setSelectedDate(null);
+    
+    // Temizledikten sonra hemen uygula
+    console.log('🧹 Filtreler temizlendi, proposals yükleniyor...');
+    setTimeout(() => {
+      loadProposals();
+    }, 10);
   };
 
   const calculateAge = (birthDate: string) => {

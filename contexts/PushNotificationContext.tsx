@@ -129,7 +129,9 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
         }
         
         token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        console.log('✅ Push token alındı:', token);
+        if (token !== expoPushToken) {
+          console.log('✅ Push token alındı:', token);
+        }
         setPermissionStatus('granted');
       } catch (error) {
         console.error('❌ Push token alma hatası:', error);
