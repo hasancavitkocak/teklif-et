@@ -15,7 +15,8 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "EXPO_USE_METRO_WORKSPACE_ROOT": "1"
+        "EXPO_USE_METRO_WORKSPACE_ROOT": "1",
+        "EXPO_NO_CAPABILITY_SYNC": "1"
       }
     },
     "production": {
