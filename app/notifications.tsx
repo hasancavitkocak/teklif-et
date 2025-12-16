@@ -6,18 +6,22 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Check, Trash2, Heart, MessageCircle, UserCheck } from 'lucide-react-native';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import InfoToast from '@/components/InfoToast';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const { notifications, unreadCount, loading, refreshNotifications, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Toast states
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -55,18 +59,9 @@ export default function NotificationsScreen() {
   };
 
   const handleDelete = (notificationId: string) => {
-    Alert.alert(
-      'Bildirimi Sil',
-      'Bu bildirimi silmek istediğinize emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: () => deleteNotification(notificationId),
-        },
-      ]
-    );
+    deleteNotification(notificationId);
+    setInfoMessage('Bildirim silindi');
+    setShowInfoToast(true);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -162,6 +157,12 @@ export default function NotificationsScreen() {
           </View>
         )}
       </ScrollView>
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
     </View>
   );
 }

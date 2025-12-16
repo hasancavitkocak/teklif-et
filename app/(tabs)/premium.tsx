@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, Filter, Eye, Check, Sparkles, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
 import PremiumSuccessModal from '@/components/PremiumSuccessModal';
 import PremiumCancelledModal from '@/components/PremiumCancelledModal';
+import ErrorToast from '@/components/ErrorToast';
 
 interface Subscription {
   id: string;
@@ -29,6 +30,10 @@ export default function PremiumScreen() {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [cancelledModalVisible, setCancelledModalVisible] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const features = [
     { icon: Eye, title: 'Sınırsız Teklif', description: 'Günde 10 yerine sınırsız teklif gönder' },
@@ -127,7 +132,8 @@ export default function PremiumScreen() {
       setSuccessModalVisible(true);
       
     } catch (error: any) {
-      Alert.alert('Hata', error.message || 'Abonelik oluşturulamadı');
+      setErrorMessage(error.message || 'Abonelik oluşturulamadı');
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -151,10 +157,12 @@ export default function PremiumScreen() {
         setCancelModalVisible(false);
         setCancelledModalVisible(true);
       } else {
-        Alert.alert('Hata', 'Aktif abonelik bulunamadı');
+        setErrorMessage('Aktif abonelik bulunamadı');
+        setShowErrorToast(true);
       }
     } catch (error: any) {
-      Alert.alert('Hata', error.message || 'Abonelik iptal edilemedi');
+      setErrorMessage(error.message || 'Abonelik iptal edilemedi');
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -305,6 +313,13 @@ export default function PremiumScreen() {
         visible={cancelledModalVisible}
         onClose={() => setCancelledModalVisible(false)}
         expiryDate={subscription?.end_date}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
       />
     </View>
   );

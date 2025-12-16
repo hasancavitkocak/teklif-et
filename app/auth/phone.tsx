@@ -1,19 +1,28 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function PhoneScreen() {
   const router = useRouter();
   const { signInWithPhone } = useAuth();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleContinue = async () => {
     if (phone.length < 10) {
-      Alert.alert('Hata', 'Lütfen geçerli bir telefon numarası girin');
+      setWarningMessage('Lütfen geçerli bir telefon numarası girin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -22,7 +31,8 @@ export default function PhoneScreen() {
       await signInWithPhone('+90' + phone);
       router.push({ pathname: '/auth/verify', params: { phone: '+90' + phone } });
     } catch (error: any) {
-      Alert.alert('Hata', error.message || 'Bir hata oluştu');
+      setErrorMessage(error.message || 'Bir hata oluştu');
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -78,6 +88,20 @@ export default function PhoneScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </View>
   );
 }

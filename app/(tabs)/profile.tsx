@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   Modal,
   TextInput,
   Platform,
@@ -22,6 +21,8 @@ import FreezeAccountModal from '@/components/FreezeAccountModal';
 import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 import SignOutModal from '@/components/SignOutModal';
+import ErrorToast from '@/components/ErrorToast';
+import InfoToast from '@/components/InfoToast';
 import { PROVINCES } from '@/constants/cities';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
@@ -83,6 +84,12 @@ export default function ProfileScreen() {
   const [remainingSuperLikes, setRemainingSuperLikes] = useState<number>(0);
   const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
   const [remainingProposals, setRemainingProposals] = useState<number>(0);
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -286,7 +293,8 @@ export default function ProfileScreen() {
         setRemainingProposals(remainingProps || 0);
       }
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     }
   };
 
@@ -302,7 +310,8 @@ export default function ProfileScreen() {
       router.replace('/auth/welcome');
     } catch (error: any) {
       console.error('Sign out error:', error);
-      Alert.alert('Hata', error.message || 'Çıkış yapılırken bir hata oluştu');
+      setErrorMessage(error.message || 'Çıkış yapılırken bir hata oluştu');
+      setShowErrorToast(true);
     } finally {
       setSignOutLoading(false);
     }
@@ -316,14 +325,14 @@ export default function ProfileScreen() {
         console.log('🔄 Şehir değişti, AuthContext üzerinden güncelleniyor:', editCity);
         cityUpdateSuccess = await updateCityFromSettings(editCity);
         if (!cityUpdateSuccess) {
-          Alert.alert('Hata', 'Şehir bilgisi güncellenirken bir hata oluştu');
+          setErrorMessage('Şehir bilgisi güncellenirken bir hata oluştu');
+          setShowErrorToast(true);
           return;
         }
       }
 
       // Diğer profil bilgilerini güncelle (şehir hariç, çünkü AuthContext'te güncellendi)
       const updateData: any = {
-        name: editName,
         smoking: editSmoking,
         drinking: editDrinking,
         notification_messages: editNotificationMessages,
@@ -345,12 +354,14 @@ export default function ProfileScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Başarılı', 'Profiliniz güncellendi');
+      setInfoMessage('Profiliniz güncellendi');
+      setShowInfoToast(true);
       setSettingsVisible(false);
       loadProfile();
     } catch (error: any) {
       console.error('Save settings error:', error);
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     }
   };
 
@@ -410,7 +421,8 @@ export default function ProfileScreen() {
       console.error('❌ Hesap dondurma hatası:', error);
       setFreezeLoading(false);
       setShowFreezeModal(false);
-      Alert.alert('Hata', 'Hesap dondurulurken bir hata oluştu: ' + error.message);
+      setErrorMessage('Hesap dondurulurken bir hata oluştu: ' + error.message);
+      setShowErrorToast(true);
     }
   };
 
@@ -532,26 +544,20 @@ export default function ProfileScreen() {
       setShowDeleteModal(false);
       setDeleteLoading(false);
       
-      Alert.alert(
-        'Hesap Silindi',
-        'Hesabınız ve tüm verileriniz kalıcı olarak silindi.',
-        [
-          {
-            text: 'Tamam',
-            onPress: () => {
-              router.replace('/auth/welcome');
-            }
-          }
-        ]
-      );
+      // Başarılı silme mesajı göster ve yönlendir
+      setInfoMessage('Hesabınız başarıyla silindi');
+      setShowInfoToast(true);
+      
+      // 2 saniye sonra yönlendir
+      setTimeout(() => {
+        router.replace('/auth/welcome');
+      }, 2000);
     } catch (error: any) {
       console.error('❌ Hesap silme hatası:', error);
       setDeleteLoading(false);
       setShowDeleteModal(false);
-      Alert.alert(
-        'Hata', 
-        'Hesap silinirken bir hata oluştu: ' + error.message + '\n\nLütfen tekrar deneyin veya destek ekibiyle iletişime geçin.'
-      );
+      setErrorMessage('Hesap silinirken bir hata oluştu: ' + error.message + '\n\nLütfen tekrar deneyin veya destek ekibiyle iletişime geçin.');
+      setShowErrorToast(true);
     }
   };
 
@@ -601,7 +607,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profil</Text>
@@ -785,12 +791,15 @@ export default function ProfileScreen() {
                 <View style={styles.settingItem}>
                   <Text style={styles.settingLabel}>İsim</Text>
                   <TextInput
-                    style={styles.settingInput}
+                    style={[styles.settingInput, styles.disabledInput]}
                     value={editName}
-                    onChangeText={setEditName}
+                    editable={false}
                     placeholder="İsminiz"
                     placeholderTextColor="#9CA3AF"
                   />
+                  <Text style={styles.tooltipText}>
+                    💡 Üye olduktan sonra isim değiştirilemez
+                  </Text>
                 </View>
 
                 <View style={styles.settingItem}>
@@ -1026,26 +1035,12 @@ export default function ProfileScreen() {
                       onPress={async () => {
                         const token = await registerForPushNotifications();
                         if (token) {
-                          Alert.alert('Başarılı', 'Bildirim izni verildi!');
+                          setInfoMessage('Bildirim izni verildi!');
+                          setShowInfoToast(true);
                           await checkPermissionStatus();
                         } else {
-                          Alert.alert(
-                            'İzin Gerekli',
-                            'Bildirim izni için cihaz ayarlarına gidin.',
-                            [
-                              { text: 'İptal', style: 'cancel' },
-                              { 
-                                text: 'Ayarlara Git', 
-                                onPress: () => {
-                                  if (Platform.OS === 'ios') {
-                                    Linking.openURL('app-settings:');
-                                  } else {
-                                    Linking.openSettings();
-                                  }
-                                }
-                              }
-                            ]
-                          );
+                          setErrorMessage('Bildirim izni için cihaz ayarlarına gidin.');
+                          setShowErrorToast(true);
                         }
                       }}
                     >
@@ -1222,6 +1217,20 @@ export default function ProfileScreen() {
         onClose={() => setShowSignOutModal(false)}
         onConfirm={confirmSignOut}
         loading={signOutLoading}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
       />
 
     </SafeAreaView>
@@ -1536,6 +1545,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#1F2937',
+  },
+  disabledInput: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+    color: '#6B7280',
+  },
+  tooltipText: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   cityDisplayContainer: {
     flexDirection: 'row',

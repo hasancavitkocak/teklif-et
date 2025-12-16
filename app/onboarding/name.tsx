@@ -1,15 +1,23 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function NameScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogout = async () => {
     await signOut();
@@ -24,7 +32,8 @@ export default function NameScreen() {
 
   const handleContinue = async () => {
     if (name.trim().length < 2) {
-      Alert.alert('Eksik Bilgi', 'Lütfen adınızı girin');
+      setWarningMessage('Lütfen adınızı girin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -71,7 +80,8 @@ export default function NameScreen() {
       // Yaşınız sayfasına git (popup orada açılacak)
       router.push('/onboarding/birthdate');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -118,6 +128,20 @@ export default function NameScreen() {
           <Text style={styles.logoutText}>Çıkış Yap (Debug)</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </View>
   );
 }

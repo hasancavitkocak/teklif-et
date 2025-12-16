@@ -1,17 +1,25 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function GenderScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [gender, setGender] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -27,7 +35,8 @@ export default function GenderScreen() {
 
   const handleContinue = async () => {
     if (!gender) {
-      Alert.alert('Eksik Bilgi', 'Lütfen cinsiyetinizi seçin');
+      setWarningMessage('Lütfen cinsiyetinizi seçin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -51,7 +60,8 @@ export default function GenderScreen() {
       router.push('/onboarding/interests');
     } catch (error: any) {
       console.error('Gender save error:', error);
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -119,6 +129,20 @@ export default function GenderScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

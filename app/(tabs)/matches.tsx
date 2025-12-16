@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
-  Alert,
   Modal,
 } from 'react-native';
 import { MessageCircle, MoreVertical, XCircle, Flag } from 'lucide-react-native';
@@ -16,6 +15,8 @@ import { useUnread } from '@/contexts/UnreadContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { matchesAPI, type Match as MatchType } from '@/api/matches';
+import ErrorToast from '@/components/ErrorToast';
+import InfoToast from '@/components/InfoToast';
 
 export default function MatchesScreen() {
   const { user } = useAuth();
@@ -28,6 +29,12 @@ export default function MatchesScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [matchToDelete, setMatchToDelete] = useState<MatchType | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   // Sayfa her açıldığında veri yükle
   useFocusEffect(
@@ -89,7 +96,8 @@ export default function MatchesScreen() {
       const unreadPeopleCount = data.filter(match => (match.unreadCount || 0) > 0).length;
       setUnreadCount(unreadPeopleCount);
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -144,7 +152,8 @@ export default function MatchesScreen() {
       await matchesAPI.deleteMatch(matchIdToDelete, user.id);
     } catch (error: any) {
       console.error('Delete error:', error);
-      Alert.alert('Hata', 'Sohbet sonlandırılamadı: ' + error.message);
+      setErrorMessage('Sohbet sonlandırılamadı: ' + error.message);
+      setShowErrorToast(true);
       // Hata olursa geri yükle
       loadMatches();
     }
@@ -152,7 +161,8 @@ export default function MatchesScreen() {
 
   const handleReport = () => {
     setSelectedMatchForMenu(null);
-    Alert.alert('Rapor Et', 'Bu özellik yakında eklenecek');
+    setInfoMessage('Bu özellik yakında eklenecek');
+    setShowInfoToast(true);
   };
 
 
@@ -304,6 +314,20 @@ export default function MatchesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
     </View>
   );
 }

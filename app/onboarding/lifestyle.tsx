@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert ,  Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function LifestyleScreen() {
   const router = useRouter();
@@ -12,6 +14,12 @@ export default function LifestyleScreen() {
   const [smoking, setSmoking] = useState<string | null>(null);
   const [drinking, setDrinking] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -21,7 +29,8 @@ export default function LifestyleScreen() {
 
   const handleContinue = async () => {
     if (smoking === null || drinking === null) {
-      Alert.alert('Eksik Bilgi', 'Lütfen tüm seçenekleri işaretleyin');
+      setWarningMessage('Lütfen tüm seçenekleri işaretleyin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -40,7 +49,8 @@ export default function LifestyleScreen() {
       if (error) throw error;
       router.push('/onboarding/location');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -178,6 +188,20 @@ export default function LifestyleScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </View>
   );
 }

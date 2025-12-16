@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView ,  Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 interface Interest {
   id: string;
@@ -19,6 +21,12 @@ export default function InterestsScreen() {
   const [interests, setInterests] = useState<Interest[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -41,7 +49,8 @@ export default function InterestsScreen() {
       setSelectedInterests(selectedInterests.filter(i => i !== id));
     } else {
       if (selectedInterests.length >= 5) {
-        Alert.alert('Maksimum Seçim', 'En fazla 5 ilgi alanı seçebilirsiniz');
+        setWarningMessage('En fazla 5 ilgi alanı seçebilirsiniz');
+        setShowWarningToast(true);
         return;
       }
       triggerHaptic();
@@ -51,7 +60,8 @@ export default function InterestsScreen() {
 
   const handleContinue = async () => {
     if (selectedInterests.length < 3) {
-      Alert.alert('Eksik Bilgi', 'Lütfen en az 3 ilgi alanı seçin');
+      setWarningMessage('Lütfen en az 3 ilgi alanı seçin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -70,7 +80,8 @@ export default function InterestsScreen() {
       if (error) throw error;
       router.push('/onboarding/lifestyle');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -153,6 +164,20 @@ export default function InterestsScreen() {
           <Text style={styles.buttonText}>Devam Et</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

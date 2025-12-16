@@ -6,7 +6,6 @@ import {
   Dimensions,
   TouchableOpacity,
   Image,
-  Alert,
   Modal,
   TextInput,
   ScrollView,
@@ -31,6 +30,12 @@ import SimplePremiumAlert from '@/components/SimplePremiumAlert';
 import SuperLikeSuccessModal from '@/components/SuperLikeSuccessModal';
 import ProposalSentToast from '@/components/ProposalSentToast';
 import ProposalCreatedToast from '@/components/ProposalCreatedToast';
+import LocationPermissionModal from '@/components/LocationPermissionModal';
+import MatchSuccessModal from '@/components/MatchSuccessModal';
+import ProposalLimitModal from '@/components/ProposalLimitModal';
+import ErrorToast from '@/components/ErrorToast';
+import InfoToast from '@/components/InfoToast';
+import WarningToast from '@/components/WarningToast';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -72,6 +77,21 @@ export default function DiscoverScreen() {
   const [showProposalSentToast, setShowProposalSentToast] = useState(false);
   const [isToastSuperLike, setIsToastSuperLike] = useState(false);
   const [showProposalCreatedToast, setShowProposalCreatedToast] = useState(false);
+  
+  // Modal states
+  const [showLocationPermissionModal, setShowLocationPermissionModal] = useState(false);
+  const [showMatchSuccessModal, setShowMatchSuccessModal] = useState(false);
+  const [matchedUserName, setMatchedUserName] = useState('');
+  const [showProposalLimitModal, setShowProposalLimitModal] = useState(false);
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  
   const sliderWidth = useRef(0);
 
   // Slider için ref
@@ -331,31 +351,21 @@ export default function DiscoverScreen() {
   };
 
   const showLocationPermissionAlert = () => {
-    Alert.alert(
-      'Konum İzni Gerekli',
-      'Keşfet sayfasını görüntüleyebilmek için konum izni gereklidir. Size yakın teklifleri gösterebilmemiz için konumunuza ihtiyacımız var.',
-      [
-        {
-          text: 'İptal',
-          style: 'cancel',
-        },
-        {
-          text: 'İzin Ver',
-          onPress: async () => {
-            const result = await requestLocationPermission();
-            if (result.granted) {
-              // İzin verildi, konum güncellemeyi tekrar dene
-              updateUserLocationOnFocus();
-            } else {
-              // İzin reddedildi, tekrar sor
-              setTimeout(() => {
-                showLocationPermissionAlert();
-              }, 1000);
-            }
-          },
-        },
-      ]
-    );
+    setShowLocationPermissionModal(true);
+  };
+
+  const handleLocationPermissionGrant = async () => {
+    setShowLocationPermissionModal(false);
+    const result = await requestLocationPermission();
+    if (result.granted) {
+      // İzin verildi, konum güncellemeyi tekrar dene
+      updateUserLocationOnFocus();
+    } else {
+      // İzin reddedildi, tekrar sor
+      setTimeout(() => {
+        setShowLocationPermissionModal(true);
+      }, 1000);
+    }
   };
 
   const loadInterests = async () => {
@@ -393,7 +403,8 @@ export default function DiscoverScreen() {
         setCurrentIndex(0);
       }
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -446,7 +457,8 @@ export default function DiscoverScreen() {
       }
       
       if (result.matched) {
-        Alert.alert('Eşleşme!', `${proposal.creator.name} ile eşleştiniz! Artık mesajlaşabilirsiniz.`);
+        setMatchedUserName(proposal.creator.name);
+        setShowMatchSuccessModal(true);
       } else {
         // Eşleşme yoksa toast göster
         setIsToastSuperLike(isSuperLike);
@@ -465,31 +477,22 @@ export default function DiscoverScreen() {
         // Limit hatası - Premium popup göster veya premium sayfasına yönlendir
         if (error.message.includes('limit') || error.message.includes('hakkınız bitti')) {
           if (error.message.includes('hakkınız bitti')) {
-            // Teklif kredisi bitti - Premium sayfasına yönlendir
-            Alert.alert(
-              'Günlük Teklif Hakkınız Bitti',
-              'Teklif gönderebilmek için premium ol.',
-              [
-                { text: 'Tamam', style: 'default' },
-                { 
-                  text: 'Premium Ol', 
-                  style: 'default',
-                  onPress: () => router.push('/(tabs)/premium')
-                }
-              ]
-            );
+            // Teklif kredisi bitti - Premium modal göster
+            setShowProposalLimitModal(true);
           } else {
             setPremiumFeature(isSuperLike ? 'superLikes' : 'likes');
             setPremiumPopupVisible(true);
           }
         } else {
-          Alert.alert('Bilgi', error.message);
+          setInfoMessage(error.message);
+          setShowInfoToast(true);
         }
         if (error.message.includes('başvurdunuz')) {
           setCurrentIndex(currentIndex + 1);
         }
       } else {
-        Alert.alert('Hata', error.message);
+        setErrorMessage(error.message);
+        setShowErrorToast(true);
       }
     }
   };
@@ -521,7 +524,14 @@ export default function DiscoverScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logoText}>Test</Text>
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('@/assets/images/puzzle-iconnew.png')} 
+            style={styles.logoIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>Teklif Et</Text>
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.iconButton}
@@ -665,6 +675,7 @@ export default function DiscoverScreen() {
             router.push('/(tabs)/proposals');
           }, 3000);
         }}
+        onShowProposalLimit={() => setShowProposalLimitModal(true)}
       />
 
       {/* Premium Popup */}
@@ -959,7 +970,8 @@ export default function DiscoverScreen() {
                                 setShowProvinceDropdown(false);
                                 setShowDistrictDropdown(false);
                               } else {
-                                Alert.alert('Uyarı', 'Lütfen il ve ilçe seçin');
+                                setWarningMessage('Lütfen il ve ilçe seçin');
+                                setShowWarningToast(true);
                               }
                             }}
                           >
@@ -1269,6 +1281,55 @@ export default function DiscoverScreen() {
         visible={showProposalCreatedToast}
         onHide={() => setShowProposalCreatedToast(false)}
       />
+
+      {/* Location Permission Modal */}
+      <LocationPermissionModal
+        visible={showLocationPermissionModal}
+        onClose={() => setShowLocationPermissionModal(false)}
+        onGrantPermission={handleLocationPermissionGrant}
+      />
+
+      {/* Match Success Modal */}
+      <MatchSuccessModal
+        visible={showMatchSuccessModal}
+        onClose={() => setShowMatchSuccessModal(false)}
+        userName={matchedUserName}
+        onMessage={() => {
+          setShowMatchSuccessModal(false);
+          // TODO: Navigate to messages
+        }}
+      />
+
+      {/* Proposal Limit Modal */}
+      <ProposalLimitModal
+        visible={showProposalLimitModal}
+        onClose={() => setShowProposalLimitModal(false)}
+        onUpgrade={() => {
+          setShowProposalLimitModal(false);
+          router.push('/(tabs)/premium');
+        }}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
     </View>
   );
 }
@@ -1277,10 +1338,12 @@ function CreateProposalModal({
   visible,
   onClose,
   onCreated,
+  onShowProposalLimit,
 }: {
   visible: boolean;
   onClose: () => void;
   onCreated: () => void;
+  onShowProposalLimit: () => void;
 }) {
   const { user, currentCity, refreshUserStats } = useAuth();
   const [activityName, setActivityName] = useState('');
@@ -1290,6 +1353,12 @@ function CreateProposalModal({
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [interests, setInterests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Toast states for CreateProposalModal
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -1323,12 +1392,14 @@ function CreateProposalModal({
 
   const handleCreate = async () => {
     if (!activityName.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen aktivite adı girin');
+      setWarningMessage('Lütfen aktivite adı girin');
+      setShowWarningToast(true);
       return;
     }
     
     if (!selectedInterest) {
-      Alert.alert('Eksik Bilgi', 'Lütfen kategori seçin');
+      setWarningMessage('Lütfen kategori seçin');
+      setShowWarningToast(true);
       return;
     }
 
@@ -1366,9 +1437,10 @@ function CreateProposalModal({
       onCreated();
     } catch (error: any) {
       if (error.message?.includes('kredi')) {
-        Alert.alert('Teklif Kredisi Yetersiz', 'Teklif krediniz yetersiz. Premium üyelik ile sınırsız teklif oluşturabilirsiniz.');
+        onShowProposalLimit();
       } else {
-        Alert.alert('Hata', error.message);
+        setErrorMessage(error.message);
+        setShowErrorToast(true);
       }
     } finally {
       setLoading(false);
@@ -1515,6 +1587,20 @@ function CreateProposalModal({
           minimumDate={new Date()}
         />
       )}
+      
+      {/* Warning Toast - CreateProposalModal içinde */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast - CreateProposalModal içinde */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </Modal>
   );
 }
@@ -1535,7 +1621,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   header: {
-    paddingTop: 50,
+    paddingTop: 35,
     paddingBottom: 16,
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -1545,9 +1631,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 1,
+  },
+  logoIcon: {
+    width: 35,
+    height: 35,
+    tintColor: '#8B5CF6',
+    marginTop: -2,
+  },
   logoText: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#8B5CF6',
     letterSpacing: -0.5,
   },

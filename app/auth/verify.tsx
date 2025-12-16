@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import InfoToast from '@/components/InfoToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -14,6 +16,12 @@ export default function VerifyScreen() {
   const [countdown, setCountdown] = useState(60); // 60 saniye geri sayım
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  
+  // Toast states
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Geri sayım timer
   useEffect(() => {
@@ -37,10 +45,12 @@ export default function VerifyScreen() {
         setCanResend(false);
         setOtp(['', '', '', '', '', '']); // Kodu temizle
         inputRefs.current[0]?.focus(); // İlk input'a odaklan
-        Alert.alert('Başarılı', 'Doğrulama kodu tekrar gönderildi');
+        setInfoMessage('Doğrulama kodu tekrar gönderildi');
+        setShowInfoToast(true);
       }
     } catch (error) {
-      Alert.alert('Hata', 'Kod gönderilemedi, lütfen tekrar deneyin');
+      setErrorMessage('Kod gönderilemedi, lütfen tekrar deneyin');
+      setShowErrorToast(true);
     }
   };
 
@@ -98,7 +108,8 @@ export default function VerifyScreen() {
       }
     } catch (error: any) {
       console.log('❌ Verify error:', error.message);
-      Alert.alert('Hata', 'Doğrulama kodu hatalı');
+      setErrorMessage('Doğrulama kodu hatalı');
+      setShowErrorToast(true);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
@@ -156,6 +167,20 @@ export default function VerifyScreen() {
           )}
         </View>
       </View>
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </View>
   );
 }

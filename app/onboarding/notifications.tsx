@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Platform,
   Linking,
 } from 'react-native';
@@ -13,11 +12,19 @@ import { useRouter } from 'expo-router';
 import { Bell, BellOff, MessageCircle, Heart, Gift, Crown } from 'lucide-react-native';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import * as Notifications from 'expo-notifications';
+import InfoToast from '@/components/InfoToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function NotificationsOnboardingScreen() {
   const router = useRouter();
   const { registerForPushNotifications } = usePushNotifications();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Toast states
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleEnableNotifications = async () => {
     setIsLoading(true);
@@ -26,74 +33,36 @@ export default function NotificationsOnboardingScreen() {
       const token = await registerForPushNotifications();
       
       if (token) {
-        Alert.alert(
-          'Harika! 🎉',
-          'Bildirimler başarıyla etkinleştirildi. Artık önemli güncellemeleri kaçırmayacaksın!',
-          [
-            {
-              text: 'Devam Et',
-              onPress: () => router.replace('/(tabs)'),
-            },
-          ]
-        );
+        setInfoMessage('Harika! 🎉 Bildirimler başarıyla etkinleştirildi. Artık önemli güncellemeleri kaçırmayacaksın!');
+        setShowInfoToast(true);
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 2000);
       } else {
         // İzin reddedildi
-        Alert.alert(
-          'Bildirim İzni',
-          'Bildirim izni reddedildi. İstersen daha sonra ayarlardan etkinleştirebilirsin.',
-          [
-            {
-              text: 'Ayarlara Git',
-              onPress: () => {
-                // iOS ve Android için ayarları açma
-                if (Platform.OS === 'ios') {
-                  Linking.openURL('app-settings:');
-                } else {
-                  Linking.openSettings();
-                }
-              },
-            },
-            {
-              text: 'Şimdilik Geç',
-              onPress: () => router.replace('/(tabs)'),
-              style: 'cancel',
-            },
-          ]
-        );
+        setShowInfoToast(true);
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 2000);
       }
     } catch (error) {
       console.error('Bildirim izni hatası:', error);
-      Alert.alert(
-        'Hata',
-        'Bildirim ayarları yapılırken bir hata oluştu. Daha sonra tekrar deneyebilirsin.',
-        [
-          {
-            text: 'Tamam',
-            onPress: () => router.replace('/(tabs)'),
-          },
-        ]
-      );
+      setErrorMessage('Bildirim ayarları yapılırken bir hata oluştu. Daha sonra tekrar deneyebilirsin.');
+      setShowErrorToast(true);
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 2000);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSkip = () => {
-    Alert.alert(
-      'Bildirimleri Atla',
-      'Emin misin? Bildirimler sayesinde yeni eşleşmeler, mesajlar ve önemli güncellemeleri anında öğrenebilirsin.',
-      [
-        {
-          text: 'Geri Dön',
-          style: 'cancel',
-        },
-        {
-          text: 'Evet, Atla',
-          onPress: () => router.replace('/(tabs)'),
-          style: 'destructive',
-        },
-      ]
-    );
+    setInfoMessage('Bildirimler atlandı. İstediğin zaman ayarlardan etkinleştirebilirsin.');
+    setShowInfoToast(true);
+    setTimeout(() => {
+      router.replace('/(tabs)');
+    }, 2000);
   };
 
   return (
@@ -190,6 +159,20 @@ export default function NotificationsOnboardingScreen() {
           <Text style={styles.skipButtonText}>Şimdilik Geç</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

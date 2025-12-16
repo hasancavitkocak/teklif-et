@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function LocationScreen() {
   const router = useRouter();
@@ -12,6 +14,12 @@ export default function LocationScreen() {
   const [city, setCity] = useState('');
   const [detectingLocation, setDetectingLocation] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -71,20 +79,9 @@ export default function LocationScreen() {
       
       // 3 deneme de başarısız
       setDetectingLocation(false);
-      Alert.alert(
-        'Konum Tespiti Başarısız', 
-        'Konumunuz tespit edilemedi. Manuel olarak devam etmek ister misiniz?',
-        [
-          { text: 'Geri Dön', onPress: () => router.back() },
-          { 
-            text: 'Manuel Devam', 
-            onPress: async () => {
-              setCity('Manuel konum');
-              setDetectingLocation(false);
-            }
-          }
-        ]
-      );
+      setWarningMessage('Konumunuz tespit edilemedi. Manuel olarak devam etmek ister misiniz?');
+      setShowWarningToast(true);
+      setCity('Manuel konum');
     }
   };
 
@@ -92,7 +89,8 @@ export default function LocationScreen() {
 
   const handleContinue = () => {
     if (!city.trim()) {
-      Alert.alert('Hata', 'Konum tespit edilemedi');
+      setErrorMessage('Konum tespit edilemedi');
+      setShowErrorToast(true);
       return;
     }
     
@@ -160,6 +158,20 @@ export default function LocationScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

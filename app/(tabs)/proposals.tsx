@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
-  Alert,
 } from 'react-native';
 
 import { Clock, Check, X as XIcon, Zap, Trash2, UserPlus } from 'lucide-react-native';
@@ -22,6 +21,8 @@ import InvitationsList from '@/components/InvitationsList';
 import ProposalSwipeCards from '@/components/ProposalSwipeCards';
 import ProposalDeletedToast from '@/components/ProposalDeletedToast';
 import ProposalDeleteConfirmModal from '@/components/ProposalDeleteConfirmModal';
+import ErrorToast from '@/components/ErrorToast';
+import MatchSuccessModal from '@/components/MatchSuccessModal';
 
 export default function ProposalsScreen() {
   const { user } = useAuth();
@@ -46,6 +47,12 @@ export default function ProposalsScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showMatchSuccessModal, setShowMatchSuccessModal] = useState(false);
+  const [matchedUserName, setMatchedUserName] = useState('');
 
   // Sayfa her açıldığında veri yükle
   useFocusEffect(
@@ -133,7 +140,8 @@ export default function ProposalsScreen() {
       setSentInvitations(sentInvitationsData);
       setProposalsCount(pendingCount);
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -174,22 +182,16 @@ export default function ProposalsScreen() {
     try {
       await proposalsAPI.acceptRequest(requestId, proposalId, requesterId, user.id);
 
-      Alert.alert(
-        'Başarılı',
-        'Teklif kabul edildi! Artık mesajlaşabilirsiniz.',
-        [
-          {
-            text: 'Mesajlaşmaya Başla',
-            onPress: () => router.push('/(tabs)/matches'),
-          },
-          {
-            text: 'Tamam',
-            onPress: () => loadProposals(),
-          },
-        ]
-      );
+      // Eşleşme başarılı - kullanıcı adını al ve modal göster
+      const matchedUser = received.find(r => r.id === requestId)?.requester;
+      if (matchedUser) {
+        setMatchedUserName(matchedUser.name);
+        setShowMatchSuccessModal(true);
+      }
+      loadProposals();
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     }
   };
 
@@ -198,7 +200,8 @@ export default function ProposalsScreen() {
       await proposalsAPI.rejectRequest(requestId);
       loadProposals();
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     }
   };
 
@@ -217,7 +220,8 @@ export default function ProposalsScreen() {
       setShowDeletedToast(true);
       loadProposals();
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setDeleteLoading(false);
       setProposalToDelete(null);
@@ -633,6 +637,24 @@ export default function ProposalsScreen() {
       <ProposalDeletedToast
         visible={showDeletedToast}
         onHide={() => setShowDeletedToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Match Success Modal */}
+      <MatchSuccessModal
+        visible={showMatchSuccessModal}
+        onClose={() => setShowMatchSuccessModal(false)}
+        userName={matchedUserName}
+        onMessage={() => {
+          setShowMatchSuccessModal(false);
+          router.push('/(tabs)/matches');
+        }}
       />
     </View>
   );

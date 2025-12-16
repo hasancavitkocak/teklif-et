@@ -1,54 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Snowflake, RefreshCw, LogOut } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import InfoToast from '@/components/InfoToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function AccountFrozenScreen() {
   const { unfreezeAccount, signOut } = useAuth();
   const router = useRouter();
+  
+  // Toast states
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleUnfreeze = async () => {
-    Alert.alert(
-      'Hesabı Aktif Et',
-      'Hesabınızı tekrar aktif hale getirmek istediğinize emin misiniz?\n\n• Profiliniz tekrar görünür olacak\n• Teklifleriniz aktif hale gelecek\n• Mesajlarınız açılacak',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Aktif Et',
-          style: 'default',
-          onPress: async () => {
-            const success = await unfreezeAccount();
-            if (success) {
-              Alert.alert(
-                'Hesap Aktif Edildi',
-                'Hesabınız başarıyla aktif hale getirildi. Artık uygulamayı normal şekilde kullanabilirsiniz.',
-                [
-                  {
-                    text: 'Tamam',
-                    onPress: () => {
-                      router.replace('/(tabs)');
-                    }
-                  }
-                ]
-              );
-            } else {
-              Alert.alert(
-                'Hata',
-                'Hesabınız aktif edilirken bir hata oluştu. Lütfen tekrar deneyin.'
-              );
-            }
-          },
-        },
-      ]
-    );
+    try {
+      const success = await unfreezeAccount();
+      if (success) {
+        setInfoMessage('Hesabınız başarıyla aktif hale getirildi! Yönlendiriliyorsunuz...');
+        setShowInfoToast(true);
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 2000);
+      } else {
+        setErrorMessage('Hesabınız aktif edilirken bir hata oluştu. Lütfen tekrar deneyin.');
+        setShowErrorToast(true);
+      }
+    } catch (error) {
+      setErrorMessage('Hesabınız aktif edilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      setShowErrorToast(true);
+    }
   };
 
   const handleSignOut = async () => {
@@ -111,6 +101,20 @@ export default function AccountFrozenScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

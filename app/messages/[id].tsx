@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  Alert,
   Keyboard,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +17,8 @@ import { ArrowLeft, Send, MoreVertical, XCircle, Flag } from 'lucide-react-nativ
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import ErrorToast from '@/components/ErrorToast';
+import InfoToast from '@/components/InfoToast';
 import { messagesAPI, type Message, type MatchInfo } from '@/api/messages';
 
 export default function MessageDetailScreen() {
@@ -35,6 +36,12 @@ export default function MessageDetailScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const flatListRef = useRef<FlatList>(null);
+  
+  // Toast states
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   useEffect(() => {
     if (!matchId || !user?.id) return;
@@ -101,14 +108,16 @@ export default function MessageDetailScreen() {
       }, 300);
     } catch (error: any) {
       console.error('Delete error:', error);
-      Alert.alert('Hata', error.message || 'Sohbet sonlandırılamadı');
+      setErrorMessage(error.message || 'Sohbet sonlandırılamadı');
+      setShowErrorToast(true);
       setShowDeleteConfirm(false);
     }
   };
 
   const handleReport = () => {
     setShowMenu(false);
-    Alert.alert('Rapor Et', 'Bu özellik yakında eklenecek');
+    setInfoMessage('Bu özellik yakında eklenecek');
+    setShowInfoToast(true);
   };
 
   const loadMessages = async () => {
@@ -339,6 +348,20 @@ export default function MessageDetailScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
     </SafeAreaView>
   );
 }

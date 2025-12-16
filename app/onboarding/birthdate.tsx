@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Calendar } from 'lucide-react-native';
@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function BirthdateScreen() {
   const router = useRouter();
@@ -14,6 +16,12 @@ export default function BirthdateScreen() {
   const [date, setDate] = useState(new Date(2000, 0, 1));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -54,7 +62,8 @@ export default function BirthdateScreen() {
   const handleContinue = async () => {
     const age = calculateAge(date);
     if (age < 18) {
-      Alert.alert('Yaş Sınırı', 'Uygulamayı kullanmak için en az 18 yaşında olmalısınız.');
+      setWarningMessage('Uygulamayı kullanmak için en az 18 yaşında olmalısınız.');
+      setShowWarningToast(true);
       return;
     }
 
@@ -72,7 +81,8 @@ export default function BirthdateScreen() {
       if (error) throw error;
       router.push('/onboarding/gender');
     } catch (error: any) {
-      Alert.alert('Hata', error.message);
+      setErrorMessage(error.message);
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -174,6 +184,20 @@ export default function BirthdateScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }

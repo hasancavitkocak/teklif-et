@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera as CameraIcon, Image as ImageIcon, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import WarningToast from '@/components/WarningToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function PhotosScreen() {
   const router = useRouter();
@@ -13,6 +15,12 @@ export default function PhotosScreen() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<any>(null);
+  
+  // Toast states
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
@@ -37,7 +45,8 @@ export default function PhotosScreen() {
       console.log('Camera permission result:', permissionResult);
 
       if (permissionResult.status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Kamera kullanmak için izin vermelisiniz');
+        setWarningMessage('Kamera kullanmak için izin vermelisiniz');
+        setShowWarningToast(true);
         return;
       }
 
@@ -57,7 +66,8 @@ export default function PhotosScreen() {
       }
     } catch (error: any) {
       console.error('Camera error:', error);
-      Alert.alert('Hata', `Fotoğraf çekilemedi: ${error.message || 'Bilinmeyen hata'}`);
+      setErrorMessage(`Fotoğraf çekilemedi: ${error.message || 'Bilinmeyen hata'}`);
+      setShowErrorToast(true);
     }
   };
 
@@ -78,7 +88,8 @@ export default function PhotosScreen() {
       console.log('Gallery permission result:', permissionResult);
 
       if (permissionResult.status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Galeri erişimi için izin vermelisiniz');
+        setWarningMessage('Galeri erişimi için izin vermelisiniz');
+        setShowWarningToast(true);
         return;
       }
 
@@ -99,7 +110,8 @@ export default function PhotosScreen() {
       }
     } catch (error: any) {
       console.error('Gallery error:', error);
-      Alert.alert('Hata', `Fotoğraf seçilemedi: ${error.message || 'Bilinmeyen hata'}`);
+      setErrorMessage(`Fotoğraf seçilemedi: ${error.message || 'Bilinmeyen hata'}`);
+      setShowErrorToast(true);
     }
   };
 
@@ -166,7 +178,8 @@ export default function PhotosScreen() {
 
   const handleComplete = async () => {
     if (photos.length < 2) {
-      Alert.alert('En Az 2 Fotoğraf', 'Devam etmek için en az 2 fotoğraf eklemelisiniz');
+      setWarningMessage('Devam etmek için en az 2 fotoğraf eklemelisiniz');
+      setShowWarningToast(true);
       return;
     }
 
@@ -205,7 +218,8 @@ export default function PhotosScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Complete error:', error);
-      Alert.alert('Hata', error.message || 'Fotoğraflar yüklenemedi');
+      setErrorMessage(error.message || 'Fotoğraflar yüklenemedi');
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -319,6 +333,20 @@ export default function PhotosScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Warning Toast */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
+
+      {/* Error Toast */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
     </SafeAreaView>
   );
 }
