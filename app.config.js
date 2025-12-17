@@ -8,7 +8,7 @@ module.exports = {
     icon: "./assets/images/app-icon-new.png",
     scheme: "myapp",
     userInterfaceStyle: "automatic",
-    newArchEnabled: false,
+    newArchEnabled: true,
     jsEngine: "hermes",
     splash: {
       image: "./assets/images/app-icon-new.png",
@@ -42,7 +42,7 @@ module.exports = {
       ],
       blockedPermissions: [],
       gradleProperties: {
-        "newArchEnabled": "false",
+        "newArchEnabled": "true",
         "hermesEnabled": "true"
       }
     },
