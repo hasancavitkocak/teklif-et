@@ -23,8 +23,6 @@
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.teklifet.app",
       "versionCode": 2,
-      "minSdkVersion": 23,
-      "targetSdkVersion": 34,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-new.png",
         "backgroundColor": "#8B5CF6"

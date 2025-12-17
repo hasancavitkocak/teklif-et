@@ -12,8 +12,16 @@ import {
 } from 'react-native';
 import { X, Camera as CameraIcon, Image as ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import * as Haptics from 'expo-haptics';
-import { readAsStringAsync } from 'expo-file-system/legacy';
+// Platform-specific haptics import
+let Haptics: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Haptics = require('expo-haptics');
+  } catch (e) {
+    console.warn('expo-haptics not available');
+  }
+}
+
 
 interface Photo {
   id: string;
@@ -39,8 +47,12 @@ export default function PhotoManagementModal({
   const fileInputRef = useRef<any>(null);
 
   const triggerHaptic = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== 'web' && Haptics) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (e) {
+        console.warn('Haptics not available');
+      }
     }
   };
 
@@ -159,48 +171,26 @@ export default function PhotoManagementModal({
       
       let uploadedUrl = uri;
 
-      // Eğer local file ise (file:// ile başlıyorsa), Supabase storage'a yükle
-      if (uri.startsWith('file://')) {
+      // Eğer local file ise (file:// ile başlıyorsa) veya data URL ise, Supabase storage'a yükle
+      if (uri.startsWith('file://') || uri.startsWith('data:')) {
         // Dosya adı oluştur
         const timestamp = Date.now();
         const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
         
-        // Dosyayı base64 olarak oku
-        const base64 = await readAsStringAsync(uri, {
-          encoding: 'base64',
-        });
+        let base64Data: string;
+        
+        if (uri.startsWith('file://')) {
+          // Mobile için - expo-file-system kullan
+          const FileSystem = require('expo-file-system');
+          base64Data = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } else {
+          // Web için - data URL'den base64 kısmını al
+          base64Data = uri.split(',')[1];
+        }
         
         // Base64'ü ArrayBuffer'a çevir
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        
-        // Supabase storage'a yükle
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('profile-photos')
-          .upload(`profile-photos/${fileName}`, byteArray, {
-            contentType: 'image/jpeg',
-            upsert: false,
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Public URL'i al
-        const { data: urlData } = supabase.storage
-          .from('profile-photos')
-          .getPublicUrl(`profile-photos/${fileName}`);
-        
-        uploadedUrl = urlData.publicUrl;
-      } else if (uri.startsWith('data:')) {
-        // Web için base64 data URL
-        const timestamp = Date.now();
-        const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
-        
-        // Base64 string'den data kısmını al
-        const base64Data = uri.split(',')[1];
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -209,7 +199,7 @@ export default function PhotoManagementModal({
         const byteArray = new Uint8Array(byteNumbers);
         
         // Supabase storage'a yükle
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('profile-photos')
           .upload(`profile-photos/${fileName}`, byteArray, {
             contentType: 'image/jpeg',
