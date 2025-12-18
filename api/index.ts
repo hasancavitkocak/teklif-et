@@ -6,3 +6,4 @@ export * from './discover';
 export * from './interests';
 export * from './notifications';
 export * from './invitations';
+export * from './user-interactions';

@@ -495,6 +495,16 @@ export default function DiscoverScreen() {
     }
 
     try {
+      // Like/Super like etkileşimini kaydet
+      const { userInteractionsAPI } = await import('@/api/user-interactions');
+      await userInteractionsAPI.recordInteraction(
+        user.id, 
+        proposal.id, 
+        isSuperLike ? 'super_like' : 'like'
+      );
+      
+      console.log(`${isSuperLike ? '⚡' : '👍'} ${isSuperLike ? 'Super like' : 'Like'} kaydedildi:`, proposal.activity_name);
+
       // Optimistic UI update - hemen sonraki karta geç
       const nextIndex = currentIndex + 1;
       
@@ -584,7 +594,13 @@ export default function DiscoverScreen() {
     setIsPassing(true);
 
     try {
-      // Geçilen teklifi hatırla (o oturum için)
+      // Dislike etkileşimini kaydet
+      const { userInteractionsAPI } = await import('@/api/user-interactions');
+      await userInteractionsAPI.recordInteraction(user.id, proposal.id, 'dislike');
+      
+      console.log('👎 Dislike kaydedildi:', proposal.activity_name);
+
+      // Geçilen teklifi hatırla (o oturum için - eski sistem uyumluluğu)
       const currentProposal = proposals[currentIndex];
       if (currentProposal) {
         setSkippedProposalIds(prev => new Set([...Array.from(prev), currentProposal.id]));
@@ -592,9 +608,6 @@ export default function DiscoverScreen() {
 
       // Optimistic update - hemen sonraki karta geç
       setCurrentIndex(currentIndex + 1);
-      
-      // Backend işlemi gerekirse arka planda yap (analytics için)
-      // Şu an sadece frontend'te skip ediyoruz
       
     } catch (error: any) {
       console.error('Pass error:', error);

@@ -143,6 +143,17 @@ export const discoverAPI = {
 
     const appliedProposalIds = (appliedData || []).map((item: any) => item.proposal_id);
 
+    // Kullanıcının etkileşimde bulunduğu teklif ID'lerini al (like, dislike, super_like)
+    const { data: interactedData } = await supabase
+      .from('user_interactions')
+      .select('proposal_id, interaction_type')
+      .eq('user_id', userId);
+
+    const interactedProposalIds = (interactedData || []).map((item: any) => item.proposal_id);
+    const dislikedProposalIds = (interactedData || [])
+      .filter((item: any) => item.interaction_type === 'dislike')
+      .map((item: any) => item.proposal_id);
+
     // Tüm aktif teklifleri getir (koordinatlar dahil - mesafe hesaplaması için)
     let query = supabase
       .from('proposals')
@@ -167,7 +178,12 @@ export const discoverAPI = {
       query = query.not('id', 'in', `(${appliedProposalIds.join(',')})`);
     }
 
-    // Geçilen teklifleri frontend'te filtreleyeceğiz
+    // Etkileşimde bulunulan teklifleri hariç tut (like, dislike, super_like)
+    // Ancak tüm teklifler gösterildikten sonra dislike'ları tekrar gösterebiliriz
+    const allExcludedIds = [...appliedProposalIds, ...interactedProposalIds];
+    if (allExcludedIds.length > 0) {
+      query = query.not('id', 'in', `(${allExcludedIds.join(',')})`);
+    }
 
     // Filtreler - şehir filtresi
     if (filters?.city) {
@@ -276,7 +292,122 @@ export const discoverAPI = {
       return true;
     });
 
+    // Eğer hiç teklif kalmadıysa, dislike yapılan teklifleri tekrar göster
+    if (proposals.length === 0 && dislikedProposalIds.length > 0) {
+      console.log('🔄 Tüm teklifler gösterildi, dislike yapılanları tekrar getiriliyor...');
+      
+      // Sadece dislike yapılan teklifleri getir (başvuru yapılmış olanları hariç tut)
+      const excludeOnlyApplied = appliedProposalIds;
+      
+      let retryQuery = supabase
+        .from('proposals')
+        .select(`
+          id,
+          activity_name,
+          city,
+          is_boosted,
+          interest_id,
+          creator_id,
+          event_datetime,
+          venue_name,
+          creator:profiles!creator_id(name, profile_photo, birth_date, gender, is_active, latitude, longitude),
+          interest:interests(name)
+        `)
+        .eq('status', 'active')
+        .neq('creator_id', userId)
+        .or('event_datetime.is.null,event_datetime.gte.' + new Date().toISOString())
+        .in('id', dislikedProposalIds); // Sadece dislike yapılanları getir
+
+      // Başvuru yapılmış olanları hariç tut
+      if (excludeOnlyApplied.length > 0) {
+        retryQuery = retryQuery.not('id', 'in', `(${excludeOnlyApplied.join(',')})`);
+      }
+
+      // Aynı filtreleri uygula
+      if (filters?.city) {
+        const cityParts = filters.city.split(',').map(part => part.trim());
+        const province = cityParts.length > 1 ? cityParts[cityParts.length - 1] : filters.city;
+        retryQuery = retryQuery.ilike('city', `%${province}%`);
+      }
+      if (filters?.interestId) {
+        retryQuery = retryQuery.eq('interest_id', filters.interestId);
+      }
+      if (filters?.eventDate) {
+        const selectedDate = new Date(filters.eventDate);
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        retryQuery = retryQuery
+          .gte('event_datetime', startOfDay.toISOString())
+          .lte('event_datetime', endOfDay.toISOString());
+      }
+
+      retryQuery = retryQuery.order('is_boosted', { ascending: false }).limit(20);
+
+      const { data: retryData, error: retryError } = await retryQuery;
+      
+      if (retryError) throw retryError;
+      
+      let retryProposals = (retryData || []) as any as DiscoverProposal[];
+      
+      // Aynı filtreleri uygula (aktif kullanıcı, mesafe, yaş, cinsiyet)
+      retryProposals = retryProposals.filter(proposal => {
+        const creator = proposal.creator as any;
+        
+        if (creator.is_active === false) return false;
+
+        // Mesafe filtresi
+        if (userProfile?.latitude && userProfile?.longitude && creator.latitude && creator.longitude) {
+          const distance = calculateDistance(
+            userProfile.latitude, 
+            userProfile.longitude, 
+            creator.latitude, 
+            creator.longitude
+          );
+          const maxDistance = filters?.maxDistance || 50;
+          if (distance > maxDistance) return false;
+        }
+        
+        // Yaş filtresi
+        if (filters?.minAge || filters?.maxAge) {
+          const birthDate = new Date(creator.birth_date);
+          const today = new Date();
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          if (filters.minAge && age < filters.minAge) return false;
+          if (filters.maxAge && age > filters.maxAge) return false;
+        }
+        
+        // Cinsiyet filtresi
+        if (filters?.gender && filters.gender !== 'all') {
+          if (creator.gender !== filters.gender) return false;
+        }
+        
+        return true;
+      });
+
+      console.log(`🔄 Dislike yapılan ${retryProposals.length} teklif tekrar gösteriliyor`);
+      return retryProposals;
+    }
+
     return proposals;
+  },
+
+  // Mesafe hesaplama fonksiyonu (helper)
+  calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Dünya'nın yarıçapı (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Mesafe km cinsinden
   },
 
 
