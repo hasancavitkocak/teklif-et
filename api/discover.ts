@@ -28,6 +28,22 @@ const checkForMatch = async (proposalId: string, userId: string) => {
     .single();
 
   if (proposal) {
+    // Daha önce bu kullanıcılarla eşleşme olmuş mu kontrol et (silinmiş dahil)
+    const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
+    const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
+    
+    const { data: previousMatch } = await supabase
+      .from('matches')
+      .select('id, deleted_by')
+      .eq('user1_id', user1)
+      .eq('user2_id', user2)
+      .maybeSingle();
+
+    // Eğer daha önce eşleşmişlerse (silinmiş bile olsa), otomatik eşleşme yapma
+    if (previousMatch) {
+      console.log('🚫 Daha önce eşleşmiş kullanıcılar - otomatik eşleşme yapılmıyor');
+      return { matched: false, matchId: null };
+    }
     // Sadece pending veya accepted status'lu başvuruları kontrol et
     const { data: reverseRequest } = await supabase
       .from('proposal_requests')
@@ -49,13 +65,14 @@ const checkForMatch = async (proposalId: string, userId: string) => {
         const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
         const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
 
-        // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et
+        // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et (sadece aktif match'ler)
         const { data: existingMatch } = await supabase
           .from('matches')
           .select('id')
           .eq('user1_id', user1)
           .eq('user2_id', user2)
           .eq('proposal_id', proposalId)
+          .is('deleted_by', null) // Sadece aktif match'leri kontrol et
           .maybeSingle();
 
         if (!existingMatch) {

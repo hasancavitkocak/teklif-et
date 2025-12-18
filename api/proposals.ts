@@ -316,13 +316,14 @@ export const proposalsAPI = {
     const user1 = userId < requesterId ? userId : requesterId;
     const user2 = userId < requesterId ? requesterId : userId;
 
-    // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et
+    // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et (sadece aktif match'ler)
     const { data: existingMatch } = await supabase
       .from('matches')
       .select('id')
       .eq('user1_id', user1)
       .eq('user2_id', user2)
       .eq('proposal_id', proposalId)
+      .is('deleted_by', null) // Sadece aktif match'leri kontrol et
       .maybeSingle();
 
     if (existingMatch) {
