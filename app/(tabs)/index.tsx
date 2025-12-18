@@ -1502,6 +1502,8 @@ function CreateProposalModal({
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
   const [interests, setInterests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  // Step system kaldırıldı - tek ekran yaklaşımı
   
   // Toast states for CreateProposalModal
   const [showWarningToast, setShowWarningToast] = useState(false);
@@ -1538,6 +1540,8 @@ function CreateProposalModal({
       setShowDatePicker(true);
     }
   };
+
+  // Step functions removed - using simple form now
 
   const handleCreate = async () => {
     if (!activityName.trim()) {
@@ -1579,6 +1583,7 @@ function CreateProposalModal({
       setVenueName('');
       setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
       setSelectedInterest(null);
+      // Form reset
       
       // Profile sayfasının stats'larını güncelle
       refreshUserStats();
@@ -1598,127 +1603,193 @@ function CreateProposalModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <SafeAreaView style={styles.fullScreenModal} edges={['top', 'bottom']}>
-        <View style={styles.modalContent}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Yeni Teklif</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color="#000" />
+    <Modal visible={visible} animationType="fade" transparent>
+      <TouchableOpacity 
+        style={styles.stepModalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.stepModalContainer}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Simple Header */}
+          <View style={styles.simpleHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.modernCloseButton}>
+              <X size={22} color="#6B7280" />
             </TouchableOpacity>
+            <Text style={styles.simpleTitle}>Yeni Teklif</Text>
+            <View style={{ width: 36 }} />
           </View>
 
           {/* Content */}
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-          >
+          <View style={{ flex: 1 }}>
             <ScrollView 
-              style={styles.modalBody} 
+              style={styles.simpleContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-            {/* Aktivite Adı */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Ne yapmak istersin?</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Örn: Kahve içmek, Sinemaya gitmek..."
-                value={activityName}
-                onChangeText={setActivityName}
-                maxLength={100}
-                placeholderTextColor="#9CA3AF"
-                autoFocus
-              />
-            </View>
-
-            {/* Konum - Otomatik */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Konum</Text>
-              <View style={styles.locationDetectedBadge}>
-                <MapPin size={18} color="#8B5CF6" />
-                <Text style={styles.locationDetectedText}>
-                  {currentCity || 'Konum alınıyor...'}
-                </Text>
+              {/* Aktivite Adı */}
+              <View style={styles.simpleInputGroup}>
+                <Text style={styles.simpleLabel}>Ne yapmak istersin?</Text>
+                <View style={styles.modernInputContainer}>
+                  <TextInput
+                    style={styles.modernTextInput}
+                    placeholder="Kahve içmek, sinemaya gitmek..."
+                    value={activityName}
+                    onChangeText={setActivityName}
+                    maxLength={100}
+                    placeholderTextColor="#9CA3AF"
+                    autoFocus
+                  />
+                </View>
               </View>
-            </View>
 
-            {/* Mekan İsmi */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Mekan İsmi (Opsiyonel)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Örn: Starbucks Kadıköy, Moda Sahil..."
-                value={venueName}
-                onChangeText={setVenueName}
-                maxLength={100}
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
+              {/* Kategori */}
+              <View style={styles.simpleInputGroup}>
+                <Text style={styles.simpleLabel}>Kategori</Text>
+                <TouchableOpacity
+                  style={styles.modernDropdownButton}
+                  onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.modernDropdownContent}>
+                    <Text style={[
+                      styles.modernDropdownText,
+                      !selectedInterest && styles.modernDropdownPlaceholder
+                    ]}>
+                      {selectedInterest 
+                        ? interests.find(i => i.id === selectedInterest)?.name 
+                        : 'Kategori seçin'
+                      }
+                    </Text>
+                    <ChevronDown 
+                      size={20} 
+                      color="#6B7280" 
+                      style={[
+                        styles.modernDropdownIcon,
+                        showCategoryDropdown && styles.modernDropdownIconRotated
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+                
+                {/* Dropdown Menu */}
+                {showCategoryDropdown && (
+                  <View style={styles.modernDropdownMenu}>
+                    <ScrollView 
+                      style={styles.modernDropdownScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
+                    >
+                      {interests.map(interest => (
+                        <TouchableOpacity
+                          key={interest.id}
+                          style={[
+                            styles.modernDropdownItem,
+                            selectedInterest === interest.id && styles.modernDropdownItemSelected
+                          ]}
+                          onPress={() => {
+                            setSelectedInterest(interest.id);
+                            setShowCategoryDropdown(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.modernDropdownItemText,
+                            selectedInterest === interest.id && styles.modernDropdownItemTextSelected
+                          ]}>
+                            {interest.name}
+                          </Text>
+                          {selectedInterest === interest.id && (
+                            <View style={styles.modernDropdownCheckmark}>
+                              <Text style={styles.modernDropdownCheckmarkText}>✓</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
 
-            {/* Tarih */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tarih Seç</Text>
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={showDateTimePicker}
-              >
-                <View style={styles.dateTimeDisplay}>
-                  <Calendar size={18} color="#8B5CF6" />
-                  <Text style={styles.dateTimeDisplayText}>
-                    {eventDate.toLocaleDateString('tr-TR', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
+              {/* Konum */}
+              <View style={styles.simpleInputGroup}>
+                <Text style={styles.simpleLabel}>Konum</Text>
+                <View style={styles.compactLocationBadge}>
+                  <MapPin size={16} color="#8B5CF6" />
+                  <Text style={styles.compactLocationText}>
+                    {currentCity || 'Konum alınıyor...'}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Kategori */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Kategori</Text>
-              <View style={styles.interestsGrid}>
-                {interests.map(interest => (
-                  <TouchableOpacity
-                    key={interest.id}
-                    style={[
-                      styles.interestChipSmall,
-                      selectedInterest === interest.id && styles.interestChipSelected,
-                    ]}
-                    onPress={() => setSelectedInterest(interest.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.interestChipText,
-                        selectedInterest === interest.id && styles.interestChipTextSelected,
-                      ]}
-                    >
-                      {interest.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
               </View>
-            </View>
+
+              {/* Tarih */}
+              <View style={styles.simpleInputGroup}>
+                <Text style={styles.simpleLabel}>Tarih</Text>
+                <TouchableOpacity
+                  style={styles.modernDateButton}
+                  onPress={showDateTimePicker}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.modernDateContent}>
+                    <Calendar size={20} color="#8B5CF6" />
+                    <Text style={styles.modernDateText}>
+                      {eventDate.toLocaleDateString('tr-TR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Mekan (Opsiyonel) */}
+              <View style={styles.simpleInputGroup}>
+                <Text style={styles.simpleLabel}>Mekan (Opsiyonel)</Text>
+                <View style={styles.modernInputContainer}>
+                  <Store size={18} color="#9CA3AF" style={styles.modernInputIcon} />
+                  <TextInput
+                    style={[styles.modernTextInput, styles.modernTextInputWithIcon]}
+                    placeholder="Starbucks Kadıköy, Moda Sahil..."
+                    value={venueName}
+                    onChangeText={setVenueName}
+                    maxLength={100}
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+              </View>
             </ScrollView>
 
-            {/* Button */}
-            <View style={styles.modalFooter}>
+            {/* Submit Button */}
+            <View style={styles.simpleFooter}>
               <TouchableOpacity
-                style={[styles.submitButton, loading && styles.disabledButton]}
+                style={[styles.simpleSubmitButton, loading && styles.modernSubmitButtonDisabled]}
                 onPress={handleCreate}
                 disabled={loading}
+                activeOpacity={0.8}
               >
-                <Text style={styles.submitButtonText}>
-                  {loading ? 'Oluşturuluyor...' : 'Oluştur'}
-                </Text>
+                {loading ? (
+                  <View style={styles.modernButtonLoading}>
+                    <Text style={styles.simpleSubmitButtonText}>Oluşturuluyor</Text>
+                    <View style={styles.modernLoadingDots}>
+                      <View style={[styles.modernLoadingDot, { animationDelay: '0ms' }]} />
+                      <View style={[styles.modernLoadingDot, { animationDelay: '150ms' }]} />
+                      <View style={[styles.modernLoadingDot, { animationDelay: '300ms' }]} />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.modernButtonContent}>
+                    <Sparkles size={20} color="#FFFFFF" />
+                    <Text style={styles.simpleSubmitButtonText}>Teklifi Oluştur</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </View>
-      </SafeAreaView>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
       
       {/* DateTimePicker - Sadece iOS için */}
       {Platform.OS === 'ios' && showDatePicker && (
@@ -1806,8 +1877,6 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 40,
     height: 40,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2144,6 +2213,538 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#8B5CF6',
     flex: 1,
+  },
+
+  // Modern Styles
+  modernInputGroup: {
+    marginBottom: 20,
+  },
+  modernInputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  modernInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modernTextInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1F2937',
+    paddingVertical: 16,
+    paddingHorizontal: 0,
+    minHeight: 50,
+  },
+  modernTextInputWithIcon: {
+    paddingLeft: 8,
+  },
+  modernInputIcon: {
+    marginRight: 4,
+  },
+  modernDropdownButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modernDropdownContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modernDropdownText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  modernDropdownPlaceholder: {
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
+  modernDropdownIcon: {
+    transform: [{ rotate: '0deg' }],
+    transition: 'transform 0.2s ease',
+  },
+  modernDropdownIconRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  modernDropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    zIndex: 999,
+  },
+  modernDropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    marginTop: 8,
+    maxHeight: 150,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modernDropdownScroll: {
+    maxHeight: 150,
+  },
+  modernDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modernDropdownItemSelected: {
+    backgroundColor: '#F3E8FF',
+  },
+  modernDropdownItemText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  modernDropdownItemTextSelected: {
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  modernDropdownCheckmark: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernDropdownCheckmarkText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  modernDateButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modernDateContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modernDateText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  modernLocationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  modernLocationText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  modernLocationSection: {
+    marginBottom: 20,
+  },
+  modernLocationBadgeInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    marginTop: 8,
+  },
+  modernLocationTextInline: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  modernModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modernHeaderContent: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  modernModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  modernModalSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '400',
+    lineHeight: 20,
+  },
+  modernCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernModalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  modernSubmitButton: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modernSubmitButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  modernButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modernButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modernSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modernLoadingDots: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  modernLoadingDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.6,
+  },
+
+  // Step Styles
+  stepHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  stepHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  stepProgress: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  stepProgressText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 2,
+  },
+  stepTitleContainer: {
+    alignItems: 'center',
+  },
+  stepTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  compactStepContent: {
+    flex: 1,
+  },
+  compactStepContentContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 12,
+    minHeight: 120,
+  },
+  compactStepContainer: {
+    width: '100%',
+  },
+  modernLocationBadgeStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E9D5FF',
+    marginBottom: 16,
+  },
+  modernLocationTextStep: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  stepInfoText: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: 16,
+    paddingHorizontal: 20,
+  },
+  stepFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  stepButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  stepBackButton: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  stepNextButton: {
+    flex: 2,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  stepNextButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  stepNextButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Compact Step Styles
+  compactLocationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    marginBottom: 8,
+  },
+  compactLocationText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  compactInfoText: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // Step Modal Popup Styles
+  stepModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  stepModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 420,
+    height: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 25,
+  },
+  // Simple Form Styles
+  simpleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  simpleTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  simpleContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  simpleInputGroup: {
+    marginBottom: 12,
+  },
+  simpleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 6,
+  },
+  simpleFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  simpleSubmitButton: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  simpleSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  stepKeyboardView: {
+    flex: 1,
+    maxHeight: '100%',
+  },
+
+  modernModalBody: {
+    flex: 1,
+  },
+  modernModalBodyContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
 
   participantSelector: {
