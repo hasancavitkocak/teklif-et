@@ -55,10 +55,16 @@ export default function InviteUsersModal({
   const { user, isPremium, refreshUserStats } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
+  const [displayedUsers, setDisplayedUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [sending, setSending] = useState(false);
   const [remainingInvitations, setRemainingInvitations] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreUsers, setHasMoreUsers] = useState(true);
+  
+  const USERS_PER_PAGE = 16; // 4x4 grid için 16 kullanıcı
   
   // Filtreleme state'leri
   const [showFilters, setShowFilters] = useState(false);
@@ -137,6 +143,12 @@ export default function InviteUsersModal({
 
   useEffect(() => {
     if (visible && user) {
+      // Reset pagination state
+      setCurrentPage(1);
+      setDisplayedUsers([]);
+      setHasMoreUsers(true);
+      setSelectedUsers(new Set());
+      
       loadInvitableUsers();
       loadRemainingInvitations();
     }
@@ -288,12 +300,44 @@ export default function InviteUsersModal({
       usersWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       
       setUsers(usersWithDistance);
+      
+      // İlk 16 kullanıcıyı göster (4x4 grid)
+      const initialUsers = usersWithDistance.slice(0, USERS_PER_PAGE);
+      setDisplayedUsers(initialUsers);
+      setCurrentPage(1);
+      setHasMoreUsers(usersWithDistance.length > USERS_PER_PAGE);
+      
+      console.log(`📊 Toplam ${usersWithDistance.length} kullanıcı, ilk ${initialUsers.length} gösteriliyor`);
     } catch (error) {
       console.error('Error loading users:', error);
       Alert.alert('Hata', 'Kullanıcılar yüklenirken bir hata oluştu');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMoreUsers = () => {
+    if (loadingMore || !hasMoreUsers) return;
+    
+    setLoadingMore(true);
+    
+    const nextPage = currentPage + 1;
+    const startIndex = (nextPage - 1) * USERS_PER_PAGE;
+    const endIndex = startIndex + USERS_PER_PAGE;
+    
+    const newUsers = users.slice(startIndex, endIndex);
+    const updatedDisplayedUsers = [...displayedUsers, ...newUsers];
+    
+    setDisplayedUsers(updatedDisplayedUsers);
+    setCurrentPage(nextPage);
+    setHasMoreUsers(endIndex < users.length);
+    
+    console.log(`📊 Sayfa ${nextPage}: ${newUsers.length} yeni kullanıcı eklendi, toplam ${updatedDisplayedUsers.length}`);
+    
+    // Smooth loading effect
+    setTimeout(() => {
+      setLoadingMore(false);
+    }, 200);
   };
 
   const applyFilters = () => {
@@ -312,6 +356,10 @@ export default function InviteUsersModal({
     setShowFilters(false);
     setShowAdvancedFilters(false);
     setEditingCity(false);
+    // Reset pagination
+    setCurrentPage(1);
+    setDisplayedUsers([]);
+    setHasMoreUsers(true);
     loadInvitableUsers();
   };
 
@@ -853,7 +901,7 @@ export default function InviteUsersModal({
               <ActivityIndicator size="large" color="#8B5CF6" />
               <Text style={styles.loadingText}>Kullanıcılar yükleniyor...</Text>
             </View>
-          ) : users.length === 0 ? (
+          ) : displayedUsers.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="people-outline" size={64} color="#d1d5db" />
@@ -864,18 +912,49 @@ export default function InviteUsersModal({
               </Text>
             </View>
           ) : (
-            <ScrollView 
+            <FlatList
+              data={displayedUsers}
+              renderItem={renderUser}
+              keyExtractor={(item) => item.id}
+              numColumns={4}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
-            >
-              <View style={styles.usersGrid}>
-                {users.map((item) => (
-                  <View key={item.id}>
-                    {renderUser({ item })}
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={16}
+              windowSize={8}
+              initialNumToRender={16}
+              ListFooterComponent={() => (
+                <View style={styles.footerContainer}>
+                  {hasMoreUsers && (
+                    <TouchableOpacity
+                      style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]}
+                      onPress={loadMoreUsers}
+                      disabled={loadingMore}
+                      activeOpacity={0.7}
+                    >
+                      {loadingMore ? (
+                        <View style={styles.loadMoreContent}>
+                          <ActivityIndicator size="small" color="#8B5CF6" />
+                          <Text style={styles.loadMoreText}>Yükleniyor...</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.loadMoreContent}>
+                          <Text style={styles.loadMoreText}>
+                            Daha Fazla Göster
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  
+                  {!hasMoreUsers && displayedUsers.length > 0 && (
+                    <Text style={styles.endOfListText}>
+                      100 kişi gösterilmiştir
+                    </Text>
+                  )}
+                </View>
+              )}
+            />
           )}
         </View>
       </View>
@@ -1046,19 +1125,17 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingBottom: 20,
   },
-  usersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+
   row: {
     justifyContent: 'space-between',
     marginBottom: 16,
   },
   storyCard: {
-    width: 80,
+    flex: 1,
     alignItems: 'center',
     marginBottom: 8,
+    marginHorizontal: 6,
+    maxWidth: 80,
   },
   storyCircle: {
     width: 70,
@@ -1457,5 +1534,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  footerContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  loadMoreButton: {
+    backgroundColor: '#F3E8FF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  loadMoreButtonDisabled: {
+    opacity: 0.6,
+  },
+  loadMoreContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  endOfListText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

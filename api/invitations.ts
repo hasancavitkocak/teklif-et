@@ -490,7 +490,7 @@ export const invitationsAPI = {
     ]);
 
     // Client-side filtreleme
-    const finalUsers = filteredUsers.filter(user => !excludedIds.has(user.id)).slice(0, 50);
+    const finalUsers = filteredUsers.filter(user => !excludedIds.has(user.id)).slice(0, 100);
     
     console.log('Final result:', {
       totalAfterFilters: filteredUsers.length,
