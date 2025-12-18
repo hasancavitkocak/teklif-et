@@ -76,6 +76,13 @@ const checkForMatch = async (proposalId: string, userId: string) => {
           .maybeSingle();
 
         if (!existingMatch) {
+          // Teklif adını al
+          const { data: proposalData } = await supabase
+            .from('proposals')
+            .select('activity_name')
+            .eq('id', proposalId)
+            .single();
+
           // Eşleşme oluştur
           await supabase
             .from('matches')
@@ -83,6 +90,7 @@ const checkForMatch = async (proposalId: string, userId: string) => {
               proposal_id: proposalId,
               user1_id: user1,
               user2_id: user2,
+              proposal_name: proposalData?.activity_name || 'Teklif',
             });
 
           // Her iki başvurunun da status'unu accepted yap

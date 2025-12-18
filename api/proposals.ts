@@ -330,6 +330,13 @@ export const proposalsAPI = {
       return existingMatch;
     }
 
+    // Teklif adını al
+    const { data: proposalData } = await supabase
+      .from('proposals')
+      .select('activity_name')
+      .eq('id', proposalId)
+      .single();
+
     // Yeni match oluştur
     const { data: match, error: matchError } = await supabase
       .from('matches')
@@ -337,6 +344,7 @@ export const proposalsAPI = {
         proposal_id: proposalId,
         user1_id: user1,
         user2_id: user2,
+        proposal_name: proposalData?.activity_name || 'Teklif',
       })
       .select()
       .single();

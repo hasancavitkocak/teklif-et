@@ -30,6 +30,7 @@ export const messagesAPI = {
           id,
           user1_id,
           user2_id,
+          proposal_name,
           proposal:proposals(activity_name),
           user1:profiles!user1_id(id, name, profile_photo),
           user2:profiles!user2_id(id, name, profile_photo)
@@ -65,7 +66,7 @@ export const messagesAPI = {
       matchInfo: {
         id: match.id,
         otherUser: otherUser || { id: '', name: '', profile_photo: '' },
-        activity: (match.proposal as any)?.activity_name || 'Teklif',
+        activity: (match as any).proposal_name || (match.proposal as any)?.activity_name || 'Teklif',
       } as MatchInfo,
       messages: messagesResult.data as Message[],
     };
@@ -79,6 +80,7 @@ export const messagesAPI = {
         id,
         user1_id,
         user2_id,
+        proposal_name,
         proposal:proposals(activity_name),
         user1:profiles!user1_id(name, profile_photo),
         user2:profiles!user2_id(name, profile_photo)
@@ -94,7 +96,7 @@ export const messagesAPI = {
     return {
       id: match.id,
       otherUser: otherUser || { name: '', profile_photo: '' },
-      activity: (match.proposal as any)?.activity_name || 'Teklif',
+      activity: (match as any).proposal_name || (match.proposal as any)?.activity_name || 'Teklif',
     } as MatchInfo;
   },
 

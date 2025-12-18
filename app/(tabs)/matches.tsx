@@ -209,7 +209,7 @@ export default function MatchesScreen() {
                   </View>
                   {/* Teklif adını göster */}
                   <Text style={styles.proposalName} numberOfLines={1}>
-                    {match.proposal?.activity_name || 'Teklif'}
+                    {match.proposal_name || match.proposal?.activity_name || 'Teklif'}
                   </Text>
                   {match.lastMessage ? (
                     <Text style={styles.lastMessage} numberOfLines={1}>
