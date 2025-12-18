@@ -6,7 +6,8 @@ export interface Match {
   user2_id: string;
   matched_at: string;
   deleted_by?: string;
-  proposal: {
+  proposal_id?: string;
+  proposal?: {
     activity_name: string;
   };
   otherUser: {
@@ -33,6 +34,7 @@ export const matchesAPI = {
         user2_id,
         matched_at,
         deleted_by,
+        proposal_id,
         proposal:proposals(activity_name)
       `)
       .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)

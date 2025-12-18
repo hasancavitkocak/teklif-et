@@ -316,19 +316,20 @@ export const proposalsAPI = {
     const user1 = userId < requesterId ? userId : requesterId;
     const user2 = userId < requesterId ? requesterId : userId;
 
-    // Önce var mı kontrol et
+    // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et
     const { data: existingMatch } = await supabase
       .from('matches')
       .select('id')
       .eq('user1_id', user1)
       .eq('user2_id', user2)
+      .eq('proposal_id', proposalId)
       .maybeSingle();
 
     if (existingMatch) {
       return existingMatch;
     }
 
-    // Yoksa oluştur
+    // Yeni match oluştur
     const { data: match, error: matchError } = await supabase
       .from('matches')
       .insert({

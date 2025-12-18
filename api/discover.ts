@@ -49,12 +49,13 @@ const checkForMatch = async (proposalId: string, userId: string) => {
         const user1 = userId < proposal.creator_id ? userId : proposal.creator_id;
         const user2 = userId < proposal.creator_id ? proposal.creator_id : userId;
 
-        // Önce var mı kontrol et
+        // Aynı kullanıcılar aynı teklif için zaten eşleşmiş mi kontrol et
         const { data: existingMatch } = await supabase
           .from('matches')
           .select('id')
           .eq('user1_id', user1)
           .eq('user2_id', user2)
+          .eq('proposal_id', proposalId)
           .maybeSingle();
 
         if (!existingMatch) {

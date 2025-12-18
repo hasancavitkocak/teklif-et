@@ -207,6 +207,10 @@ export default function MatchesScreen() {
                       <View style={styles.unreadDot} />
                     )}
                   </View>
+                  {/* Teklif adını göster */}
+                  <Text style={styles.proposalName} numberOfLines={1}>
+                    {match.proposal?.activity_name || 'Teklif'}
+                  </Text>
                   {match.lastMessage ? (
                     <Text style={styles.lastMessage} numberOfLines={1}>
                       {match.lastMessage.content}
@@ -395,6 +399,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
     marginRight: 8,
+  },
+  proposalName: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   lastMessage: {
     fontSize: 14,

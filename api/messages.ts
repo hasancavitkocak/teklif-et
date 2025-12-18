@@ -65,7 +65,7 @@ export const messagesAPI = {
       matchInfo: {
         id: match.id,
         otherUser: otherUser || { id: '', name: '', profile_photo: '' },
-        activity: (match.proposal as any)?.activity_name || '',
+        activity: (match.proposal as any)?.activity_name || 'Teklif',
       } as MatchInfo,
       messages: messagesResult.data as Message[],
     };
@@ -94,7 +94,7 @@ export const messagesAPI = {
     return {
       id: match.id,
       otherUser: otherUser || { name: '', profile_photo: '' },
-      activity: (match.proposal as any)?.activity_name || '',
+      activity: (match.proposal as any)?.activity_name || 'Teklif',
     } as MatchInfo;
   },
 
