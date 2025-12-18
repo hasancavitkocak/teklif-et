@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { matchesAPI, type Match as MatchType } from '@/api/matches';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
+import { FullScreenLoader } from '@/components/FullScreenLoader';
 
 export default function MatchesScreen() {
   const { user } = useAuth();

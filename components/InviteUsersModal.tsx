@@ -18,6 +18,7 @@ import { invitationsAPI } from '@/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PROVINCES } from '@/constants/cities';
 import { supabase } from '@/lib/supabase';
+import { AppIconLoader } from './AppIconLoader';
 import { useRouter } from 'expo-router';
 import SimplePremiumAlert from './SimplePremiumAlert';
 import InvitationCreditModal from './InvitationCreditModal';
@@ -898,7 +899,7 @@ export default function InviteUsersModal({
         <View style={styles.content}>
           {loading ? (
             <View style={styles.centerContent}>
-              <ActivityIndicator size="large" color="#8B5CF6" />
+              <AppIconLoader size={60} />
               <Text style={styles.loadingText}>Kullanıcılar yükleniyor...</Text>
             </View>
           ) : displayedUsers.length === 0 ? (
@@ -934,7 +935,7 @@ export default function InviteUsersModal({
                     >
                       {loadingMore ? (
                         <View style={styles.loadMoreContent}>
-                          <ActivityIndicator size="small" color="#8B5CF6" />
+                          <AppIconLoader size={20} />
                           <Text style={styles.loadMoreText}>Yükleniyor...</Text>
                         </View>
                       ) : (

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { X, Camera as CameraIcon, Image as ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { AppIconLoader } from './AppIconLoader';
 // Platform-specific haptics import
 let Haptics: any = null;
 if (Platform.OS !== 'web') {
@@ -356,29 +357,41 @@ export default function PhotoManagementModal({
 
             <View style={styles.uploadButtons}>
               <TouchableOpacity
-                style={styles.addPhotoCard}
+                style={[styles.addPhotoCard, loading && styles.disabledCard]}
                 onPress={addFromCamera}
                 disabled={loading || photos.length >= 6}
                 activeOpacity={0.7}
               >
                 <View style={styles.addPhotoContent}>
                   <View style={styles.addPhotoIconContainer}>
-                    <CameraIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                    {loading ? (
+                      <AppIconLoader size={28} />
+                    ) : (
+                      <CameraIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                    )}
                   </View>
-                  <Text style={styles.addPhotoText}>Kamera</Text>
+                  <Text style={styles.addPhotoText}>
+                    {loading ? 'Yükleniyor...' : 'Kamera'}
+                  </Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.addPhotoCard}
+                style={[styles.addPhotoCard, loading && styles.disabledCard]}
                 onPress={addFromGallery}
                 disabled={loading || photos.length >= 6}
                 activeOpacity={0.7}
               >
                 <View style={styles.addPhotoContent}>
                   <View style={styles.addPhotoIconContainer}>
-                    <ImageIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                    {loading ? (
+                      <AppIconLoader size={28} />
+                    ) : (
+                      <ImageIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                    )}
                   </View>
-                  <Text style={styles.addPhotoText}>Galeri</Text>
+                  <Text style={styles.addPhotoText}>
+                    {loading ? 'Yükleniyor...' : 'Galeri'}
+                  </Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -534,6 +547,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  disabledCard: {
+    opacity: 0.6,
   },
   photosScrollContainer: {
     maxHeight: 160,

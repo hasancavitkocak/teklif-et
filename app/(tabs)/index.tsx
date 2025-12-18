@@ -28,6 +28,8 @@ import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '
 import PremiumPopup from '@/components/PremiumPopup';
 import SimplePremiumAlert from '@/components/SimplePremiumAlert';
 import SuperLikeSuccessModal from '@/components/SuperLikeSuccessModal';
+import { FullScreenLoader } from '@/components/FullScreenLoader';
+import { AppIconLoader } from '@/components/AppIconLoader';
 import ProposalSentToast from '@/components/ProposalSentToast';
 import ProposalCreatedToast from '@/components/ProposalCreatedToast';
 import LocationPermissionModal from '@/components/LocationPermissionModal';
@@ -621,11 +623,7 @@ export default function DiscoverScreen() {
   const currentProposal = proposals[currentIndex];
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
-      </View>
-    );
+    return <FullScreenLoader text="Öneriler yükleniyor..." />;
   }
 
   return (
@@ -1772,12 +1770,8 @@ function CreateProposalModal({
               >
                 {loading ? (
                   <View style={styles.modernButtonLoading}>
+                    <AppIconLoader size={20} />
                     <Text style={styles.simpleSubmitButtonText}>Oluşturuluyor</Text>
-                    <View style={styles.modernLoadingDots}>
-                      <View style={[styles.modernLoadingDot, { animationDelay: '0ms' }]} />
-                      <View style={[styles.modernLoadingDot, { animationDelay: '150ms' }]} />
-                      <View style={[styles.modernLoadingDot, { animationDelay: '300ms' }]} />
-                    </View>
                   </View>
                 ) : (
                   <View style={styles.modernButtonContent}>
