@@ -154,6 +154,19 @@ export const discoverAPI = {
       .filter((item: any) => item.interaction_type === 'dislike')
       .map((item: any) => item.proposal_id);
 
+    // Eşleşmiş kullanıcıların ID'lerini al
+    const { data: matchedData } = await supabase
+      .from('matches')
+      .select('user1_id, user2_id')
+      .is('deleted_by', null)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+
+    const matchedUserIds = (matchedData || []).flatMap(match => {
+      if (match.user1_id === userId) return [match.user2_id];
+      if (match.user2_id === userId) return [match.user1_id];
+      return [];
+    });
+
     // Tüm aktif teklifleri getir (koordinatlar dahil - mesafe hesaplaması için)
     let query = supabase
       .from('proposals')
@@ -172,6 +185,11 @@ export const discoverAPI = {
       .eq('status', 'active')
       .neq('creator_id', userId) // Kendi tekliflerini gösterme
       .or('event_datetime.is.null,event_datetime.gte.' + new Date().toISOString()); // Expired olmayan teklifler
+
+    // Eşleşmiş kullanıcıların tekliflerini hariç tut
+    if (matchedUserIds.length > 0) {
+      query = query.not('creator_id', 'in', `(${matchedUserIds.join(',')})`);
+    }
 
     // Daha önce başvuru yapılmış teklifleri hariç tut
     if (appliedProposalIds.length > 0) {
@@ -317,6 +335,11 @@ export const discoverAPI = {
         .neq('creator_id', userId)
         .or('event_datetime.is.null,event_datetime.gte.' + new Date().toISOString())
         .in('id', dislikedProposalIds); // Sadece dislike yapılanları getir
+
+      // Eşleşmiş kullanıcıların tekliflerini hariç tut
+      if (matchedUserIds.length > 0) {
+        retryQuery = retryQuery.not('creator_id', 'in', `(${matchedUserIds.join(',')})`);
+      }
 
       // Başvuru yapılmış olanları hariç tut
       if (excludeOnlyApplied.length > 0) {
