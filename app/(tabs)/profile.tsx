@@ -308,20 +308,28 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
+    console.log('🔘 Çıkış yap butonuna basıldı');
     setShowSignOutModal(true);
   };
 
   const confirmSignOut = async () => {
+    console.log('🔘 Çıkış onaylandı, işlem başlıyor...');
     setSignOutLoading(true);
     try {
+      console.log('🔘 signOut fonksiyonu çağrılıyor...');
       await signOut();
+      console.log('✅ signOut başarılı');
       setShowSignOutModal(false);
-      router.replace('/auth/welcome');
+      console.log('✅ Modal kapatıldı');
+      // router.replace yerine sadece modal'ı kapat
+      // Ana index sayfası otomatik olarak welcome'a yönlendirecek
+      console.log('✅ Çıkış yapıldı, ana sayfa yönlendirecek');
     } catch (error: any) {
-      console.error('Sign out error:', error);
+      console.error('❌ Sign out error:', error);
       setErrorMessage(error.message || 'Çıkış yapılırken bir hata oluştu');
       setShowErrorToast(true);
     } finally {
+      console.log('🔘 Loading durumu temizleniyor...');
       setSignOutLoading(false);
     }
   };

@@ -57,8 +57,14 @@ export default function SignOutModal({
       transparent
       animationType="none"
       statusBarTranslucent
+      onRequestClose={onClose}
     >
-      <BlurView intensity={20} style={styles.overlay}>
+      <TouchableOpacity 
+        style={styles.overlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <BlurView intensity={20} style={StyleSheet.absoluteFill} />
         <Animated.View 
           style={[
             styles.container,
@@ -69,7 +75,11 @@ export default function SignOutModal({
           ]}
         >
           {/* Main Modal */}
-          <View style={styles.modal}>
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={() => {}} // Modal içeriğine tıklamayı engelle
+            style={styles.modal}
+          >
             {/* Logout Icon */}
             <View style={styles.iconContainer}>
               <View style={styles.logoutIconContainer}>
@@ -87,17 +97,25 @@ export default function SignOutModal({
               {/* Buttons */}
               <View style={styles.buttons}>
                 <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={onClose}
+                  style={[styles.cancelButton, loading && styles.cancelButtonDisabled]}
+                  onPress={() => {
+                    console.log('🔘 İptal butonuna basıldı');
+                    onClose();
+                  }}
                   disabled={loading}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.cancelButtonText}>İptal</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
                   style={[styles.signOutButton, loading && styles.signOutButtonDisabled]}
-                  onPress={onConfirm}
+                  onPress={() => {
+                    console.log('🔘 SignOutModal onConfirm çağrılıyor...');
+                    onConfirm();
+                  }}
                   disabled={loading}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.signOutButtonText}>
                     {loading ? 'Çıkış Yapılıyor...' : 'Çıkış Yap'}
@@ -105,9 +123,9 @@ export default function SignOutModal({
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         </Animated.View>
-      </BlurView>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -175,6 +193,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cancelButtonDisabled: {
+    opacity: 0.5,
   },
   cancelButtonText: {
     fontSize: 14,

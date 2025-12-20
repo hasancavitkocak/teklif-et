@@ -11,8 +11,11 @@ class OtpCache {
 
   setOtp(phone: string, code: string): void {
     const expiresAt = Date.now() + this.EXPIRY_TIME;
+    // Code'u string olarak kaydet
+    const codeStr = String(code);
+    console.log('📝 OTP cache\'e kaydediliyor:', { phone, code: codeStr, expiresAt });
     this.cache.set(phone, {
-      code,
+      code: codeStr,
       expiresAt,
       attempts: 0
     });
@@ -24,7 +27,10 @@ class OtpCache {
   }
 
   verifyOtp(phone: string, inputCode: string): { success: boolean; error?: string } {
+    const inputCodeStr = String(inputCode);
+    console.log('🔍 OTP doğrulama:', { phone, inputCode: inputCodeStr });
     const otpData = this.cache.get(phone);
+    console.log('📋 Cache\'deki OTP data:', otpData);
 
     if (!otpData) {
       return { success: false, error: 'OTP bulunamadı veya süresi doldu' };
@@ -40,13 +46,15 @@ class OtpCache {
       return { success: false, error: 'Çok fazla hatalı deneme' };
     }
 
-    if (otpData.code !== inputCode) {
+    if (otpData.code !== inputCodeStr) {
       otpData.attempts++;
+      console.log('❌ OTP kodu eşleşmiyor:', { expected: otpData.code, received: inputCodeStr, expectedType: typeof otpData.code, receivedType: typeof inputCodeStr });
       return { success: false, error: 'Geçersiz OTP kodu' };
     }
 
     // Başarılı doğrulama
     this.cache.delete(phone);
+    console.log('✅ OTP doğrulama başarılı');
     return { success: true };
   }
 

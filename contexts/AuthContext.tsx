@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 import { NetgsmSmsService } from '@/utils/smsService';
 import { otpCache } from '@/utils/otpCache';
+import { settingsAPI } from '@/api/settings';
 
 interface AuthContextType {
   session: Session | null;
@@ -306,16 +307,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    console.log('🔄 AuthContext session değişti:', session?.user?.id || 'null');
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      console.log('🔄 Initial session set:', session?.user?.id || 'null');
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('🔄 Auth state changed:', _event, session?.user?.id || 'null');
       (async () => {
+        const newUser = session?.user ?? null;
+        console.log('🔄 Setting new user:', newUser?.id || 'null');
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(newUser);
+        console.log('✅ User state updated');
       })();
     });
 
@@ -604,6 +611,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithPhone = async (phone: string) => {
     try {
+      // Supabase'den SMS modunu kontrol et
+      const smsEnabled = await settingsAPI.isSmsEnabled();
+      const demoCode = await settingsAPI.getDemoOtpCode();
+      
+      console.log('📱 SMS Mode:', smsEnabled ? 'Production' : 'Development');
+      
+      // Development modunda demo kod kullan
+      if (!smsEnabled) {
+        console.log('📱 Demo mode: Supabase ayarlarından demo kodu kullanılıyor:', demoCode);
+        console.log('📱 Telefon numarası:', phone);
+        otpCache.setOtp(phone, demoCode);
+        console.log('📱 Demo kod cache\'e kaydedildi');
+        return;
+      }
+
+      // Production modunda gerçek SMS gönder
+      console.log('📱 Production mode: Gerçek SMS gönderiliyor');
+
       // OTP kodu oluştur
       const otpCode = NetgsmSmsService.generateOtp();
       
@@ -614,10 +639,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         msgheader: process.env.EXPO_PUBLIC_NETGSM_HEADER || 'TEKLIF'
       };
 
-      // Eğer Netgsm bilgileri yoksa demo modunda çalış
+      // Netgsm bilgileri kontrolü
       if (!netgsmConfig.username || !netgsmConfig.password) {
-        console.log('📱 Demo mode: Netgsm bilgileri bulunamadı, demo kodu kullanılıyor');
-        otpCache.setOtp(phone, '123456');
+        console.warn('⚠️ Netgsm bilgileri bulunamadı, demo moda geçiliyor');
+        otpCache.setOtp(phone, demoCode);
         return;
       }
 
@@ -774,18 +799,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    console.log('🔘 AuthContext signOut başlıyor...');
     try {
+      console.log('🔘 Supabase auth signOut çağrılıyor...');
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Supabase signOut error:', error);
+        console.error('❌ Supabase signOut error:', error);
         // Hata olsa bile local state'i temizle
+      } else {
+        console.log('✅ Supabase signOut başarılı');
       }
     } catch (error) {
-      console.error('SignOut catch error:', error);
+      console.error('❌ SignOut catch error:', error);
     } finally {
       // Her durumda local state'i temizle
+      console.log('🔘 Local state temizleniyor...');
       setSession(null);
       setUser(null);
+      console.log('✅ Local state temizlendi');
     }
   };
 

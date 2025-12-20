@@ -7,3 +7,4 @@ export * from './interests';
 export * from './notifications';
 export * from './invitations';
 export * from './user-interactions';
+export * from './settings';

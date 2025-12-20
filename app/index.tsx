@@ -10,15 +10,26 @@ export default function Index() {
   const segments = useSegments();
 
   useEffect(() => {
-    if (loading) return;
+    console.log('🔍 Index useEffect çalıştı - loading:', loading, 'user:', user?.id || 'null');
+    
+    if (loading) {
+      console.log('⏳ Loading devam ediyor, bekleniyor...');
+      return;
+    }
 
     const checkProfile = async () => {
-      console.log('🔍 Checking profile, user:', user?.id);
+      console.log('🔍 Checking profile, user:', user?.id || 'null');
       
       if (!user) {
         console.log('❌ No user, redirecting to welcome');
         setTimeout(() => {
-          router.replace('/auth/welcome');
+          console.log('🔄 Router replace to welcome çağrılıyor...');
+          try {
+            router.replace('/auth/welcome');
+            console.log('✅ Router replace başarılı');
+          } catch (error) {
+            console.error('❌ Router replace hatası:', error);
+          }
         }, 100);
         return;
       }
@@ -26,6 +37,7 @@ export default function Index() {
       // Eğer zaten onboarding içindeyse, kontrol etme
       const inOnboarding = segments.some(segment => segment === 'onboarding');
       if (inOnboarding) {
+        console.log('📚 Onboarding içinde, kontrol atlanıyor');
         return;
       }
 

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import InfoToast from '@/components/InfoToast';
 import ErrorToast from '@/components/ErrorToast';
 import { SmsRetrieverService } from '@/utils/smsRetriever';
+import { settingsAPI } from '@/api/settings';
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -17,6 +18,8 @@ export default function VerifyScreen() {
   const [countdown, setCountdown] = useState(60); // 60 saniye geri sayım
   const [canResend, setCanResend] = useState(false);
   const [smsRetrieverActive, setSmsRetrieverActive] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoCode, setDemoCode] = useState('123456');
   const inputRefs = useRef<(TextInput | null)[]>([]);
   
   // Toast states
@@ -24,6 +27,26 @@ export default function VerifyScreen() {
   const [infoMessage, setInfoMessage] = useState('');
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // SMS mode kontrolü
+  useEffect(() => {
+    checkSmsMode();
+  }, []);
+
+  const checkSmsMode = async () => {
+    try {
+      const smsEnabled = await settingsAPI.isSmsEnabled();
+      const code = await settingsAPI.getDemoOtpCode();
+      setIsDemoMode(!smsEnabled);
+      setDemoCode(code);
+      console.log('📱 Verify sayfası - SMS Mode:', smsEnabled ? 'Production' : 'Development');
+      console.log('📱 Verify sayfası - Demo kod:', code);
+    } catch (error) {
+      console.error('❌ SMS mode kontrol hatası:', error);
+      setIsDemoMode(true); // Hata durumunda demo mode
+      setDemoCode('123456'); // Fallback kod
+    }
+  };
 
   // SMS Retriever başlat (sadece Android)
   useEffect(() => {
@@ -181,8 +204,8 @@ export default function VerifyScreen() {
           {Platform.OS === 'android' && smsRetrieverActive && (
             <Text style={styles.autoReadHint}>📱 SMS otomatik okunacak</Text>
           )}
-          {(!process.env.EXPO_PUBLIC_NETGSM_USERNAME || !process.env.EXPO_PUBLIC_NETGSM_PASSWORD) && (
-            <Text style={styles.hint}>Test için: 123456</Text>
+          {isDemoMode && (
+            <Text style={styles.hint}>Test için: {demoCode}</Text>
           )}
         </View>
 
