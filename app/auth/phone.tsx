@@ -31,7 +31,7 @@ export default function PhoneScreen() {
       await signInWithPhone('+90' + phone);
       router.push({ pathname: '/auth/verify', params: { phone: '+90' + phone } });
     } catch (error: any) {
-      setErrorMessage(error.message || 'Bir hata oluştu');
+      setErrorMessage(error.message || 'SMS gönderilemedi');
       setShowErrorToast(true);
     } finally {
       setLoading(false);

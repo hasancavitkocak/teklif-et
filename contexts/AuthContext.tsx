@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
+import { NetgsmSmsService } from '@/utils/smsService';
+import { otpCache } from '@/utils/otpCache';
 
 interface AuthContextType {
   session: Session | null;
@@ -601,23 +603,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithPhone = async (phone: string) => {
-    // Phone number is handled in verifyOtp
+    try {
+      // OTP kodu oluştur
+      const otpCode = NetgsmSmsService.generateOtp();
+      
+      // Netgsm konfigürasyonu
+      const netgsmConfig = {
+        username: process.env.EXPO_PUBLIC_NETGSM_USERNAME || '',
+        password: process.env.EXPO_PUBLIC_NETGSM_PASSWORD || '',
+        msgheader: process.env.EXPO_PUBLIC_NETGSM_HEADER || 'TEKLIF'
+      };
+
+      // Eğer Netgsm bilgileri yoksa demo modunda çalış
+      if (!netgsmConfig.username || !netgsmConfig.password) {
+        console.log('📱 Demo mode: Netgsm bilgileri bulunamadı, demo kodu kullanılıyor');
+        otpCache.setOtp(phone, '123456');
+        return;
+      }
+
+      // Android için SMS Retriever hash'ini al
+      let appHash = '';
+      if (Platform.OS === 'android') {
+        try {
+          const { SmsRetrieverService } = await import('@/utils/smsRetriever');
+          const hash = await SmsRetrieverService.getAppHash();
+          if (hash) {
+            appHash = ` ${hash}`;
+          }
+        } catch (error) {
+          console.warn('⚠️ App hash alınamadı:', error);
+        }
+      }
+
+      // SMS mesajını oluştur
+      const message = `Teklif Et doğrulama kodunuz: ${otpCode}${appHash}`;
+
+      // SMS gönder
+      const smsResult = await NetgsmSmsService.sendSms({
+        phone,
+        message,
+        config: netgsmConfig
+      });
+
+      if (smsResult.success) {
+        // OTP'yi cache'e kaydet
+        otpCache.setOtp(phone, otpCode);
+        console.log('✅ SMS başarıyla gönderildi, Job ID:', smsResult.jobId);
+      } else {
+        throw new Error(smsResult.error || 'SMS gönderilemedi');
+      }
+    } catch (error) {
+      console.error('❌ SMS gönderim hatası:', error);
+      throw error;
+    }
   };
 
   const resendOtp = async (phone: string) => {
-    // Gerçek uygulamada burada SMS API'si çağrılacak
-    // Şimdilik demo için başarılı dönüyoruz
-    console.log('📱 Resending OTP to:', phone);
-    
-    // Simüle edilmiş gecikme
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return true;
+    try {
+      // Çok sık gönderim kontrolü
+      if (otpCache.hasValidOtp(phone)) {
+        const remainingTime = otpCache.getRemainingTime(phone);
+        if (remainingTime > 240) { // 4 dakikadan fazla kaldıysa
+          throw new Error(`${Math.ceil(remainingTime / 60)} dakika sonra tekrar deneyebilirsiniz`);
+        }
+      }
+
+      // Yeni OTP gönder
+      await signInWithPhone(phone);
+      return true;
+    } catch (error) {
+      console.error('❌ OTP yeniden gönderim hatası:', error);
+      throw error;
+    }
   };
 
   const verifyOtp = async (phone: string, otp: string) => {
-    if (otp !== '123456') {
-      throw new Error('Geçersiz doğrulama kodu');
+    // OTP doğrulaması
+    const verification = otpCache.verifyOtp(phone, otp);
+    if (!verification.success) {
+      throw new Error(verification.error || 'Geçersiz doğrulama kodu');
     }
 
     const email = `${phone.replace(/\+/g, '')}@teklif.et`;

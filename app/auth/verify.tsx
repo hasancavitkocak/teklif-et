@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import InfoToast from '@/components/InfoToast';
 import ErrorToast from '@/components/ErrorToast';
+import { SmsRetrieverService } from '@/utils/smsRetriever';
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function VerifyScreen() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60); // 60 saniye geri sayım
   const [canResend, setCanResend] = useState(false);
+  const [smsRetrieverActive, setSmsRetrieverActive] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   
   // Toast states
@@ -23,6 +25,48 @@ export default function VerifyScreen() {
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // SMS Retriever başlat (sadece Android)
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      startSmsRetriever();
+    }
+
+    // Cleanup
+    return () => {
+      SmsRetrieverService.stopSmsListener();
+    };
+  }, []);
+
+  const startSmsRetriever = async () => {
+    try {
+      const success = await SmsRetrieverService.startSmsListener(
+        (code) => {
+          console.log('📱 Otomatik SMS kodu alındı:', code);
+          // Kodu otomatik doldur
+          const newOtp = code.split('');
+          setOtp(newOtp);
+          setSmsRetrieverActive(false);
+          
+          // Otomatik doğrulama yap
+          setTimeout(() => {
+            verifyCode(code);
+          }, 500);
+        },
+        (error) => {
+          console.error('❌ SMS Retriever hatası:', error);
+          setSmsRetrieverActive(false);
+        }
+      );
+
+      if (success) {
+        setSmsRetrieverActive(true);
+        setInfoMessage('SMS otomatik okunacak');
+        setShowInfoToast(true);
+      }
+    } catch (error) {
+      console.error('❌ SMS Retriever başlatma hatası:', error);
+    }
+  };
   // Geri sayım timer
   useEffect(() => {
     if (countdown > 0) {
@@ -39,17 +83,20 @@ export default function VerifyScreen() {
     if (!canResend) return;
     
     try {
-      const success = await resendOtp(phone);
-      if (success) {
-        setCountdown(60);
-        setCanResend(false);
-        setOtp(['', '', '', '', '', '']); // Kodu temizle
-        inputRefs.current[0]?.focus(); // İlk input'a odaklan
-        setInfoMessage('Doğrulama kodu tekrar gönderildi');
-        setShowInfoToast(true);
+      await resendOtp(phone);
+      setCountdown(60);
+      setCanResend(false);
+      setOtp(['', '', '', '', '', '']); // Kodu temizle
+      inputRefs.current[0]?.focus(); // İlk input'a odaklan
+      setInfoMessage('Doğrulama kodu tekrar gönderildi');
+      setShowInfoToast(true);
+
+      // SMS Retriever'ı yeniden başlat
+      if (Platform.OS === 'android') {
+        startSmsRetriever();
       }
-    } catch (error) {
-      setErrorMessage('Kod gönderilemedi, lütfen tekrar deneyin');
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Kod gönderilemedi, lütfen tekrar deneyin');
       setShowErrorToast(true);
     }
   };
@@ -131,7 +178,12 @@ export default function VerifyScreen() {
           <Text style={styles.subtitle}>
             {phone} numarasına gönderilen{'\n'}6 haneli kodu girin
           </Text>
-          <Text style={styles.hint}>Test için: 123456</Text>
+          {Platform.OS === 'android' && smsRetrieverActive && (
+            <Text style={styles.autoReadHint}>📱 SMS otomatik okunacak</Text>
+          )}
+          {(!process.env.EXPO_PUBLIC_NETGSM_USERNAME || !process.env.EXPO_PUBLIC_NETGSM_PASSWORD) && (
+            <Text style={styles.hint}>Test için: 123456</Text>
+          )}
         </View>
 
         <View style={styles.otpContainer}>
@@ -226,6 +278,12 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     marginTop: 12,
     fontWeight: '600',
+  },
+  autoReadHint: {
+    fontSize: 14,
+    color: '#10B981',
+    marginTop: 8,
+    fontWeight: '500',
   },
   otpContainer: {
     flexDirection: 'row',
