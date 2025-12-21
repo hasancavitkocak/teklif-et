@@ -161,6 +161,13 @@ export const discoverAPI = {
       .eq('id', userId)
       .single();
 
+    console.log('📍 Kullanıcı konumu:', {
+      city: userProfile?.city,
+      hasCoordinates: !!(userProfile?.latitude && userProfile?.longitude),
+      lat: userProfile?.latitude,
+      lng: userProfile?.longitude
+    });
+
     // Daha önce başvuru yapılmış teklif ID'lerini al (tüm başvurular - rejected dahil)
     const { data: appliedData } = await supabase
       .from('proposal_requests')
@@ -283,8 +290,8 @@ export const discoverAPI = {
       console.log('⚠️ Yeterli teklif yok, dislike yapılanlar dahil ediliyor. Bulunan:', tempData?.length || 0);
     }
     
-    // Final sorgu
-    query = query.order('is_boosted', { ascending: false }).limit(20);
+    // Final sorgu - mesafe filtresi için daha fazla teklif al
+    query = query.order('is_boosted', { ascending: false }).limit(50); // 50 teklif al, mesafe filtresinden sonra 20'ye düşür
 
     const { data, error } = await query;
 
@@ -327,29 +334,58 @@ export const discoverAPI = {
       return R * c; // Mesafe km cinsinden
     };
 
-    // Aktif olmayan kullanıcıları filtrele ve mesafe filtrelemesi
-    proposals = proposals.filter(proposal => {
+    // Aktif olmayan kullanıcıları filtrele ve mesafe hesapla
+    const proposalsWithDistance = proposals.map(proposal => {
       const creator = proposal.creator as any;
+      let distance = 0;
       
-      // Sadece aktif kullanıcıları göster
-      if (creator.is_active === false) {
-        return false;
-      }
-
-      // Mesafe filtresi (koordinatlar varsa)
+      // Mesafe hesapla (koordinatlar varsa)
       if (userProfile?.latitude && userProfile?.longitude && creator.latitude && creator.longitude) {
-        const distance = calculateDistance(
+        distance = calculateDistance(
           userProfile.latitude, 
           userProfile.longitude, 
           creator.latitude, 
           creator.longitude
         );
+      } else {
+        // Koordinat yoksa şehir bazlı tahmini mesafe
+        const userCity = userProfile?.city?.toLowerCase() || '';
+        const proposalCity = proposal.city?.toLowerCase() || '';
         
+        if (userCity.includes('maltepe') && proposalCity.includes('maltepe')) {
+          distance = 5; // Aynı ilçe
+        } else if (userCity.includes('istanbul') && proposalCity.includes('istanbul')) {
+          distance = 25; // Aynı il
+        } else if (proposalCity.includes('gebze') || proposalCity.includes('darıca')) {
+          distance = 45; // Gebze/Darıca tahmini
+        } else {
+          distance = 100; // Diğer şehirler
+        }
+        
+        console.log(`📍 Koordinat yok, tahmini mesafe: ${creator.name} - ${distance} km - ${proposal.city}`);
+      }
+      
+      return { ...proposal, distance };
+    });
+
+    // Filtreleme ve sıralama
+    proposals = proposalsWithDistance.filter(proposal => {
+      const creator = proposal.creator as any;
+      
+      // Sadece aktif kullanıcıları göster
+      if (creator.is_active === false) {
+        console.log(`🚫 Aktif olmayan kullanıcı elendi: ${creator.name}`);
+        return false;
+      }
+
+      // Mesafe filtresi (koordinatlar varsa)
+      if (userProfile?.latitude && userProfile?.longitude && creator.latitude && creator.longitude) {
         const maxDistance = filters?.maxDistance || 50; // Varsayılan 50 km
         
-        console.log(`📍 Mesafe: ${creator.name} - ${distance.toFixed(1)} km (max: ${maxDistance} km)`);
+        console.log(`📍 Mesafe: ${creator.name} - ${proposal.distance.toFixed(1)} km (max: ${maxDistance} km) - Şehir: ${proposal.city}`);
         
-        if (distance > maxDistance) {
+        if (proposal.distance > maxDistance) {
+          console.log(`🚫 Mesafe filtresi: ${creator.name} elendi (${proposal.distance.toFixed(1)} km > ${maxDistance} km)`);
           return false;
         }
       }
@@ -375,6 +411,21 @@ export const discoverAPI = {
       
       return true;
     });
+
+    // Mesafe filtresinden sonra 20 teklif limiti uygula ve mesafeye göre sırala
+    proposals = proposals
+      .sort((a, b) => {
+        // Önce boost edilenler
+        if (a.is_boosted && !b.is_boosted) return -1;
+        if (!a.is_boosted && b.is_boosted) return 1;
+        
+        // Sonra mesafeye göre (yakından uzağa)
+        return a.distance - b.distance;
+      })
+      .slice(0, 20);
+    
+    console.log('📋 Final teklif sayısı (mesafe sıralı + 20 limit):', proposals.length);
+    console.log('📋 İlk 3 teklif mesafeleri:', proposals.slice(0, 3).map(p => `${p.city} - ${p.distance.toFixed(1)}km`));
 
     // Eğer hiç teklif kalmadıysa (5'ten az), dislike yapılan teklifleri tekrar göster
     if (proposals.length < 5 && dislikedProposalIds.length > 0) {
@@ -412,12 +463,7 @@ export const discoverAPI = {
         retryQuery = retryQuery.not('id', 'in', `(${excludeAppliedAndLiked.join(',')})`);
       }
 
-      // Aynı filtreleri uygula
-      if (filters?.city) {
-        const cityParts = filters.city.split(',').map(part => part.trim());
-        const province = cityParts.length > 1 ? cityParts[cityParts.length - 1] : filters.city;
-        retryQuery = retryQuery.ilike('city', `%${province}%`);
-      }
+      // Aynı filtreleri uygula (şehir filtresi hariç - mesafe filtresi kullanıyoruz)
       if (filters?.interestId) {
         retryQuery = retryQuery.eq('interest_id', filters.interestId);
       }

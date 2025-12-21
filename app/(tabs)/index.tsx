@@ -214,8 +214,14 @@ export default function DiscoverScreen() {
     useCallback(() => {
       console.log('Discover screen focused');
       if (user?.id) {
-        updateUserLocationOnFocus(); // Konum güncelle
-        loadProposals();
+        // Konum güncellemesi tamamlandıktan sonra teklifleri yükle
+        updateUserLocationOnFocus().then(() => {
+          loadProposals();
+        }).catch(() => {
+          // Konum güncellemesi başarısız olsa bile teklifleri yükle
+          loadProposals();
+        });
+        
         loadRemainingProposals(); // Kalan teklif kredisini yükle
         refreshPremiumStatus(); // Premium durumunu yenile
         
@@ -476,7 +482,7 @@ export default function DiscoverScreen() {
     try {
       setLoading(true);
       const data = await discoverAPI.getProposals(user.id, {
-        city: selectedCity,
+        city: undefined, // Şehir filtresini kaldır, sadece mesafe filtresi kullan
         interestId: selectedInterest,
         minAge: isPremium ? minAge : undefined,
         maxAge: isPremium ? maxAge : undefined,
