@@ -57,7 +57,7 @@ export default function GenderScreen() {
       if (error) throw error;
       
       console.log('Gender saved successfully, navigating to interests');
-      router.push('/onboarding/interests');
+      router.push('/onboarding/lifestyle');
     } catch (error: any) {
       console.error('Gender save error:', error);
       setErrorMessage(error.message);

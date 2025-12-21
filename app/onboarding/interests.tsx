@@ -1,8 +1,53 @@
 import { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { 
+  ChevronLeft, 
+  X,
+  Music, 
+  Gamepad2, 
+  Book, 
+  Dumbbell, 
+  Camera, 
+  Utensils,
+  Plane,
+  Palette,
+  Users,
+  Heart,
+  Circle,
+  Zap,
+  Waves,
+  Trophy,
+  Target,
+  Flower2,
+  Activity,
+  MapPin,
+  Bike,
+  Mountain,
+  Film,
+  Headphones,
+  Theater,
+  Guitar,
+  Piano,
+  Brush,
+  Tent,
+  Trees,
+  Coffee,
+  PenTool,
+  ShoppingBag,
+  Shirt,
+  Laptop,
+  Gamepad,
+  Lightbulb,
+  TrendingUp,
+  Mic,
+  HandHeart,
+  Dog,
+  Brain,
+  Leaf
+} from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
@@ -34,12 +79,112 @@ export default function InterestsScreen() {
     }
   };
 
+  // İlgi alanı iconları
+  const getInterestIcon = (interestName: string) => {
+    const iconProps = { size: 18, color: '#8B5CF6', strokeWidth: 2 };
+    
+    switch (interestName.toLowerCase()) {
+      // Spor & Aktivite
+      case 'futbol':
+        return <Circle {...iconProps} />;
+      case 'basketbol':
+        return <Trophy {...iconProps} />;
+      case 'yüzme':
+        return <Waves {...iconProps} />;
+      case 'voleybol':
+        return <Target {...iconProps} />;
+      case 'tenis':
+        return <Target {...iconProps} />;
+      case 'yoga':
+        return <Flower2 {...iconProps} />;
+      case 'fitness':
+        return <Dumbbell {...iconProps} />;
+      case 'koşu':
+        return <Zap {...iconProps} />;
+      case 'yürüyüş':
+        return <Activity {...iconProps} />;
+      case 'bisiklet':
+        return <Bike {...iconProps} />;
+      case 'dağcılık':
+        return <Mountain {...iconProps} />;
+      
+      // Sanat & Müzik
+      case 'sinema':
+        return <Film {...iconProps} />;
+      case 'müzik':
+        return <Music {...iconProps} />;
+      case 'dans':
+        return <Users {...iconProps} />;
+      case 'tiyatro':
+        return <Theater {...iconProps} />;
+      case 'konser':
+        return <Headphones {...iconProps} />;
+      case 'gitar':
+        return <Guitar {...iconProps} />;
+      case 'piyano':
+        return <Piano {...iconProps} />;
+      case 'resim':
+        return <Brush {...iconProps} />;
+      case 'fotoğrafçılık':
+        return <Camera {...iconProps} />;
+      
+      // Yaşam Tarzı
+      case 'seyahat':
+        return <Plane {...iconProps} />;
+      case 'kamp':
+        return <Tent {...iconProps} />;
+      case 'doğa':
+        return <Trees {...iconProps} />;
+      case 'yemek yapmak':
+      case 'yemek':
+        return <Utensils {...iconProps} />;
+      case 'kahve':
+        return <Coffee {...iconProps} />;
+      case 'kitap okuma':
+      case 'kitap':
+        return <Book {...iconProps} />;
+      case 'yazma':
+        return <PenTool {...iconProps} />;
+      case 'alışveriş':
+        return <ShoppingBag {...iconProps} />;
+      case 'moda':
+        return <Shirt {...iconProps} />;
+      
+      // Teknoloji & Oyun
+      case 'teknoloji':
+        return <Laptop {...iconProps} />;
+      case 'oyun':
+        return <Gamepad2 {...iconProps} />;
+      case 'tasarım':
+        return <Palette {...iconProps} />;
+      case 'girişimcilik':
+        return <Lightbulb {...iconProps} />;
+      case 'yatırım':
+        return <TrendingUp {...iconProps} />;
+      case 'podcast':
+        return <Mic {...iconProps} />;
+      
+      // Sosyal & Diğer
+      case 'gönüllülük':
+        return <HandHeart {...iconProps} />;
+      case 'hayvanlar':
+        return <Dog {...iconProps} />;
+      case 'meditasyon':
+        return <Brain {...iconProps} />;
+      case 'bahçecilik':
+        return <Leaf {...iconProps} />;
+      
+      default:
+        return <Heart {...iconProps} />;
+    }
+  };
+
   useEffect(() => {
     loadInterests();
   }, []);
 
   const loadInterests = async () => {
-    const { data, error } = await supabase.from('interests').select('*').order('category');
+    const { data, error } = await supabase.from('interests').select('*').order('name');
     if (data) setInterests(data);
   };
 
@@ -56,6 +201,11 @@ export default function InterestsScreen() {
       triggerHaptic();
       setSelectedInterests([...selectedInterests, id]);
     }
+  };
+
+  const removeInterest = (id: string) => {
+    triggerHaptic();
+    setSelectedInterests(selectedInterests.filter(i => i !== id));
   };
 
   const handleContinue = async () => {
@@ -78,7 +228,7 @@ export default function InterestsScreen() {
       const { error } = await supabase.from('user_interests').insert(insertData);
 
       if (error) throw error;
-      router.push('/onboarding/lifestyle');
+      router.push('/onboarding/location');
     } catch (error: any) {
       setErrorMessage(error.message);
       setShowErrorToast(true);
@@ -98,7 +248,7 @@ export default function InterestsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.progressBar}>
-        <View style={[styles.progress, { width: '56%' }]} />
+        <View style={[styles.progress, { width: '70%' }]} />
       </View>
 
       <View style={styles.header}>
@@ -115,41 +265,76 @@ export default function InterestsScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
-          <Text style={styles.stepIndicator}>Adım 4/7</Text>
+          <Text style={styles.stepIndicator}>Adım 5/7</Text>
           <Text style={styles.title}>İlgi alanlarınız</Text>
           <Text style={styles.subtitle}>
             En az 3, en fazla 5 seçin ({selectedInterests.length}/5)
           </Text>
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {Object.entries(groupedInterests).map(([category, categoryInterests]) => (
-            <View key={category} style={styles.categoryContainer}>
-              <Text style={styles.categoryTitle}>{category}</Text>
-              <View style={styles.interestsGrid}>
-                {categoryInterests.map(interest => (
-                  <TouchableOpacity
-                    key={interest.id}
-                    style={[
-                      styles.interestChip,
-                      selectedInterests.includes(interest.id) && styles.interestChipSelected,
-                    ]}
-                    onPress={() => toggleInterest(interest.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.interestText,
-                        selectedInterests.includes(interest.id) && styles.interestTextSelected,
-                      ]}
+        {/* Seçilen İlgi Alanları */}
+        {selectedInterests.length > 0 && (
+          <View style={styles.selectedSection}>
+            <Text style={styles.selectedTitle}>Seçilen İlgi Alanları</Text>
+            <View style={styles.selectedGrid}>
+              {selectedInterests.map(interestId => {
+                const interest = interests.find(i => i.id === interestId);
+                if (!interest) return null;
+                
+                return (
+                  <View key={interest.id} style={styles.selectedChip}>
+                    <View style={styles.selectedContent}>
+                      <View style={styles.selectedIconContainer}>
+                        {React.cloneElement(getInterestIcon(interest.name), { 
+                          color: '#8B5CF6', 
+                          size: 14 
+                        })}
+                      </View>
+                      <Text style={styles.selectedText}>{interest.name}</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeInterest(interest.id)}
+                      style={styles.removeButton}
+                      activeOpacity={0.7}
                     >
-                      {interest.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <X size={12} color="#8B5CF6" strokeWidth={2.5} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
-          ))}
+          </View>
+        )}
+
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.interestsGrid}>
+            {interests.map(interest => (
+              <TouchableOpacity
+                key={interest.id}
+                style={[
+                  styles.interestChip,
+                  selectedInterests.includes(interest.id) && styles.interestChipSelected,
+                ]}
+                onPress={() => toggleInterest(interest.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.interestContent}>
+                  {React.cloneElement(getInterestIcon(interest.name), { 
+                    color: selectedInterests.includes(interest.id) ? '#FFF' : '#8B5CF6',
+                    size: 16 
+                  })}
+                  <Text
+                    style={[
+                      styles.interestText,
+                      selectedInterests.includes(interest.id) && styles.interestTextSelected,
+                    ]}
+                  >
+                    {interest.name}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
 
         <TouchableOpacity
@@ -212,7 +397,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   titleContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   stepIndicator: {
     fontSize: 14,
@@ -223,55 +408,117 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: '#111827',
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 17,
+    fontSize: 15,
     color: '#8E8E93',
     fontWeight: '400',
+  },
+  selectedSection: {
+    backgroundColor: '#F9F5FF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  selectedTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  selectedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  selectedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  selectedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectedIconContainer: {
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  removeButton: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#F3E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
     marginBottom: 16,
   },
-  categoryContainer: {
-    marginBottom: 28,
-  },
-  categoryTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 14,
-  },
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 2,
+    justifyContent: 'space-between',
   },
   interestChip: {
     backgroundColor: '#FFF',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 2,
+    width: '48%',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   interestChipSelected: {
     backgroundColor: '#8B5CF6',
     shadowColor: '#8B5CF6',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  interestContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
   },
   interestText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#111827',
+    textAlign: 'center',
   },
   interestTextSelected: {
     color: '#FFF',

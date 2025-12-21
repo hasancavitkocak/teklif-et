@@ -29,6 +29,13 @@ export default function PhotosScreen() {
   };
 
   const openCamera = async () => {
+    // 6 fotoğraf limiti kontrolü
+    if (photos.length >= 6) {
+      setWarningMessage('En fazla 6 fotoğraf ekleyebilirsiniz');
+      setShowWarningToast(true);
+      return;
+    }
+
     if (Platform.OS === 'web') {
       // Web'de file input kullan
       if (fileInputRef.current) {
@@ -72,6 +79,13 @@ export default function PhotosScreen() {
   };
 
   const openGallery = async () => {
+    // 6 fotoğraf limiti kontrolü
+    if (photos.length >= 6) {
+      setWarningMessage('En fazla 6 fotoğraf ekleyebilirsiniz');
+      setShowWarningToast(true);
+      return;
+    }
+
     if (Platform.OS === 'web') {
       // Web'de file input kullan
       if (fileInputRef.current) {
@@ -116,6 +130,13 @@ export default function PhotosScreen() {
   };
 
   const handleFileChange = (event: any) => {
+    // 6 fotoğraf limiti kontrolü
+    if (photos.length >= 6) {
+      setWarningMessage('En fazla 6 fotoğraf ekleyebilirsiniz');
+      setShowWarningToast(true);
+      return;
+    }
+
     const file = event.target?.files?.[0];
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -254,7 +275,7 @@ export default function PhotosScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
-          <Text style={styles.stepIndicator}>Son Adım</Text>
+          <Text style={styles.stepIndicator}>Adım 7/7</Text>
           <Text style={styles.title}>Fotoğraflarınızı ekleyin</Text>
           <Text style={styles.subtitle}>
             En az 2 fotoğraf gerekli ({photos.length}/6)
@@ -264,27 +285,59 @@ export default function PhotosScreen() {
         <View style={styles.uploadSection}>
           <View style={styles.uploadButtons}>
             <TouchableOpacity
-              style={styles.addPhotoCard}
+              style={[
+                styles.addPhotoCard,
+                photos.length >= 6 && styles.addPhotoCardDisabled
+              ]}
               onPress={openCamera}
-              activeOpacity={0.7}
+              activeOpacity={photos.length >= 6 ? 1 : 0.7}
+              disabled={photos.length >= 6}
             >
               <View style={styles.addPhotoContent}>
-                <View style={styles.addPhotoIconContainer}>
-                  <CameraIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                <View style={[
+                  styles.addPhotoIconContainer,
+                  photos.length >= 6 && styles.addPhotoIconDisabled
+                ]}>
+                  <CameraIcon 
+                    size={28} 
+                    color={photos.length >= 6 ? '#9CA3AF' : '#8B5CF6'} 
+                    strokeWidth={2} 
+                  />
                 </View>
-                <Text style={styles.addPhotoText}>Kamera</Text>
+                <Text style={[
+                  styles.addPhotoText,
+                  photos.length >= 6 && styles.addPhotoTextDisabled
+                ]}>
+                  Kamera
+                </Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.addPhotoCard}
+              style={[
+                styles.addPhotoCard,
+                photos.length >= 6 && styles.addPhotoCardDisabled
+              ]}
               onPress={openGallery}
-              activeOpacity={0.7}
+              activeOpacity={photos.length >= 6 ? 1 : 0.7}
+              disabled={photos.length >= 6}
             >
               <View style={styles.addPhotoContent}>
-                <View style={styles.addPhotoIconContainer}>
-                  <ImageIcon size={28} color="#8B5CF6" strokeWidth={2} />
+                <View style={[
+                  styles.addPhotoIconContainer,
+                  photos.length >= 6 && styles.addPhotoIconDisabled
+                ]}>
+                  <ImageIcon 
+                    size={28} 
+                    color={photos.length >= 6 ? '#9CA3AF' : '#8B5CF6'} 
+                    strokeWidth={2} 
+                  />
                 </View>
-                <Text style={styles.addPhotoText}>Galeri</Text>
+                <Text style={[
+                  styles.addPhotoText,
+                  photos.length >= 6 && styles.addPhotoTextDisabled
+                ]}>
+                  Galeri
+                </Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -471,6 +524,11 @@ const styles = StyleSheet.create({
     borderColor: '#E9D5FF',
     borderStyle: 'solid',
   },
+  addPhotoCardDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    opacity: 0.6,
+  },
   addPhotoContent: {
     flex: 1,
     justifyContent: 'center',
@@ -485,10 +543,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  addPhotoIconDisabled: {
+    backgroundColor: '#F9FAFB',
+  },
   addPhotoText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  addPhotoTextDisabled: {
+    color: '#9CA3AF',
   },
   footer: {
     paddingTop: 16,

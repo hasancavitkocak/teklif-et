@@ -47,7 +47,7 @@ export default function LifestyleScreen() {
         .eq('id', user?.id);
 
       if (error) throw error;
-      router.push('/onboarding/location');
+      router.push('/onboarding/interests');
     } catch (error: any) {
       setErrorMessage(error.message);
       setShowErrorToast(true);
@@ -59,7 +59,7 @@ export default function LifestyleScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.progressBar}>
-        <View style={[styles.progress, { width: '70%' }]} />
+        <View style={[styles.progress, { width: '56%' }]} />
       </View>
 
       <View style={styles.header}>
@@ -76,7 +76,7 @@ export default function LifestyleScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleContainer}>
-          <Text style={styles.stepIndicator}>Adım 5/7</Text>
+          <Text style={styles.stepIndicator}>Adım 4/7</Text>
           <Text style={styles.title}>Yaşam tarzınız</Text>
         </View>
 
