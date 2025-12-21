@@ -43,6 +43,7 @@ import RequestLimitModal from '@/components/RequestLimitModal';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import WarningToast from '@/components/WarningToast';
+import SwipeCard from '@/components/SwipeCard';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -714,119 +715,14 @@ export default function DiscoverScreen() {
       </View>
 
       {currentProposal ? (
-        <View style={styles.cardContainer}>
-          <TouchableOpacity 
-            style={styles.card}
-            onPress={() => router.push(`/profile/${currentProposal.creator_id}` as any)}
-            activeOpacity={0.95}
-          >
-            <Image
-              source={{ uri: currentProposal.creator.profile_photo }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={styles.cardGradient}
-            >
-
-              
-              {/* Ana Container - Yan Yana */}
-              <View style={styles.cardBottomContainer}>
-                {/* Sol Taraf - Aktivite ve Kullanıcı */}
-                <View style={styles.cardLeftInfo}>
-                  <Text style={styles.activityName}>{currentProposal.activity_name}</Text>
-                  <Text style={styles.userName}>
-                    {currentProposal.creator.name}, {calculateAge(currentProposal.creator.birth_date)}
-                  </Text>
-                </View>
-                
-                {/* Sağ Taraf - Tarih/Saat/Mekan/Konum */}
-                {(currentProposal.event_datetime || currentProposal.venue_name || currentProposal.city) && (
-                  <View style={styles.cardRightInfo}>
-                    {/* Tarih */}
-                    {currentProposal.event_datetime && (
-                      <View style={styles.infoItem}>
-                        <Calendar size={12} color="#FFF" />
-                        <Text style={styles.infoText}>
-                          {new Date(currentProposal.event_datetime).toLocaleDateString('tr-TR', {
-                            day: 'numeric',
-                            month: 'long',
-                          })}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {/* Mekan ve Konum - Alt Alta */}
-                    {currentProposal.venue_name && (
-                      <View style={styles.infoItem}>
-                        <Store size={12} color="#FFF" />
-                        <Text style={styles.infoText} numberOfLines={1}>
-                          {currentProposal.venue_name}
-                        </Text>
-                      </View>
-                    )}
-                    {currentProposal.city && (
-                      <View style={styles.infoItem}>
-                        <MapPin size={12} color="#FFF" />
-                        <Text style={styles.infoText}>{currentProposal.city}</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
-              
-              {/* Kategori - En Alt */}
-              {currentProposal.interest && (
-                <View style={styles.interestChip}>
-                  <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
-                </View>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={styles.passButton} 
-              onPress={handlePass}
-              disabled={isLiking || isSuperLiking || isPassing}
-            >
-              <X 
-                size={32} 
-                color={(isLiking || isSuperLiking || isPassing) ? "#EF444450" : "#EF4444"} 
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.superLikeButton}
-              onPress={() => handleLike(true)}
-              disabled={isLiking || isSuperLiking || isPassing}
-            >
-              <Zap 
-                size={28} 
-                color={(isLiking || isSuperLiking || isPassing) ? "#FFFFFF50" : "#FFF"} 
-                fill={(isLiking || isSuperLiking || isPassing) ? "#FFFFFF50" : "#FFF"} 
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.likeButton} 
-              onPress={() => handleLike()}
-              disabled={isLiking || isSuperLiking || isPassing}
-            >
-              <Image 
-                source={require('@/assets/images/puzzle-iconnew.png')} 
-                style={{ 
-                  width: 48, 
-                  height: 48, 
-                  tintColor: (isLiking || isSuperLiking || isPassing) ? '#8B5CF650' : '#8B5CF6',
-                  opacity: (isLiking || isSuperLiking || isPassing) ? 0.5 : 1
-                }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <SwipeCard
+          proposal={currentProposal}
+          onSwipeLeft={handlePass}
+          onSwipeRight={() => handleLike(false)}
+          onSwipeUp={() => handleLike(true)}
+          calculateAge={calculateAge}
+          isLoading={isLiking || isSuperLiking || isPassing}
+        />
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Şu an gösterilecek teklif yok</Text>
