@@ -544,9 +544,16 @@ export default function ProposalsScreen() {
                     )}
                     <TouchableOpacity
                       onPress={() => handleInviteUsers(proposal)}
-                      style={styles.inviteButton}
+                      style={[
+                        styles.inviteButton,
+                        proposal.event_datetime && new Date(proposal.event_datetime) < new Date() && styles.inviteButtonDisabled
+                      ]}
+                      disabled={!!(proposal.event_datetime && new Date(proposal.event_datetime) < new Date())}
                     >
-                      <UserPlus size={18} color="#8B5CF6" />
+                      <UserPlus 
+                        size={18} 
+                        color={proposal.event_datetime && new Date(proposal.event_datetime) < new Date() ? "#9CA3AF" : "#8B5CF6"} 
+                      />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteProposal(proposal.id)}
@@ -592,17 +599,29 @@ export default function ProposalsScreen() {
 
                 {/* Etkinlik Tarihi */}
                 {proposal.event_datetime && (
-                  <View style={styles.dateContainer}>
-                    <Text style={styles.dateLabel}>Etkinlik tarihi:</Text>
-                    <Text style={styles.dateValue}>
-                      {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })} - {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
-                        weekday: 'long'
-                      })}
-                    </Text>
+                  <View>
+                    <View style={styles.dateContainer}>
+                      <Text style={styles.dateLabel}>Etkinlik tarihi:</Text>
+                      <Text style={[
+                        styles.dateValue,
+                        new Date(proposal.event_datetime) < new Date() && styles.expiredDate
+                      ]}>
+                        {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })} - {new Date(proposal.event_datetime).toLocaleDateString('tr-TR', {
+                          weekday: 'long'
+                        })}
+                      </Text>
+                    </View>
+                    {/* Geçmiş tarih uyarısı - Tarihin altında */}
+                    {new Date(proposal.event_datetime) < new Date() && (
+                      <View style={styles.expiredWarning}>
+                        <XIcon size={16} color="#EF4444" />
+                        <Text style={styles.expiredText}>Bu etkinlik tarihi geçmiş</Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -1005,6 +1024,9 @@ const styles = StyleSheet.create({
   inviteButton: {
     padding: 8,
   },
+  inviteButtonDisabled: {
+    opacity: 0.5,
+  },
   badge: {
     backgroundColor: '#8B5CF6',
     minWidth: 28,
@@ -1166,6 +1188,30 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  // Geçmiş tarih stilleri
+  expiredDate: {
+    color: '#EF4444',
+    textDecorationLine: 'line-through',
+  },
+  expiredWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginLeft: 16, // Tarih label'ı ile hizalamak için
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignSelf: 'flex-start', // Sol tarafa hizala
+  },
+  expiredText: {
+    fontSize: 12,
+    color: '#EF4444',
+    fontWeight: '600',
   },
 });
 

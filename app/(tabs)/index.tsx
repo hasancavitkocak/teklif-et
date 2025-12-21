@@ -1667,8 +1667,15 @@ function CreateProposalModal({
         value: eventDate,
         mode: 'date',
         is24Hour: true,
+        minimumDate: new Date(), // Bugünden önceki tarihleri engelle
         onChange: (event, date) => {
           if (event.type === 'set' && date) {
+            // Seçilen tarih bugünden önceyse uyarı göster
+            if (date < new Date().setHours(0, 0, 0, 0)) {
+              setWarningMessage('Etkinlik tarihi geçmiş bir tarih olamaz');
+              setShowWarningToast(true);
+              return;
+            }
             setEventDate(date);
           }
         },
@@ -1933,8 +1940,16 @@ function CreateProposalModal({
           value={eventDate}
           mode="date"
           display="spinner"
+          minimumDate={new Date()} // Bugünden önceki tarihleri engelle
           onChange={(event, date) => {
             if (event.type === 'set' && date) {
+              // Seçilen tarih bugünden önceyse uyarı göster
+              if (date < new Date().setHours(0, 0, 0, 0)) {
+                setWarningMessage('Etkinlik tarihi geçmiş bir tarih olamaz');
+                setShowWarningToast(true);
+                setShowDatePicker(false);
+                return;
+              }
               setEventDate(date);
               setShowDatePicker(false);
             } else if (event.type === 'dismissed') {
