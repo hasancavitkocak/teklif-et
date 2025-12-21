@@ -142,8 +142,8 @@ export const proposalsAPI = {
 
   // Gönderilen başvuruları getir
   // Tüm durumları göster ama auto_rejected olanları filtrele
-  getSentRequests: async (userId: string) => {
-    const { data, error } = await supabase
+  getSentRequests: async (userId: string, limit?: number, offset?: number) => {
+    let query = supabase
       .from('proposal_requests')
       .select(`
         id,
@@ -167,6 +167,16 @@ export const proposalsAPI = {
       .neq('status', 'auto_rejected')
       .in('proposals.status', ['active', 'matched', 'completed']) // Expired tekliflerin taleplerini gösterme
       .order('created_at', { ascending: false });
+
+    // Pagination parametreleri varsa ekle
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+    if (offset !== undefined) {
+      query = query.range(offset, offset + (limit || 10) - 1);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

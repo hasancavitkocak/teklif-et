@@ -110,9 +110,9 @@ export const invitationsAPI = {
     return data;
   },
 
-  // Gönderilen davetleri getir (teklif sahibi için)
-  getSentInvitations: async (inviterId: string) => {
-    const { data, error } = await supabase
+  // Gönderilen davetleri getir (teklif sahibi için) - Pagination destekli
+  getSentInvitations: async (inviterId: string, limit?: number, offset?: number) => {
+    let query = supabase
       .from('proposal_invitations')
       .select(`
         id,
@@ -136,6 +136,16 @@ export const invitationsAPI = {
       `)
       .eq('inviter_id', inviterId)
       .order('created_at', { ascending: false });
+
+    // Pagination parametreleri varsa ekle
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+    if (offset !== undefined) {
+      query = query.range(offset, offset + (limit || 10) - 1);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     

@@ -33,6 +33,14 @@ export default function ProposalsScreen() {
   const [received, setReceived] = useState<ProposalRequest[]>([]);
   const [sent, setSent] = useState<ProposalRequest[]>([]);
   const [sentInvitations, setSentInvitations] = useState<any[]>([]);
+  const [displayedInvitations, setDisplayedInvitations] = useState<any[]>([]);
+  const [invitationsPage, setInvitationsPage] = useState(1);
+  const [hasMoreInvitations, setHasMoreInvitations] = useState(true);
+  const [displayedRequests, setDisplayedRequests] = useState<ProposalRequest[]>([]);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [hasMoreRequests, setHasMoreRequests] = useState(true);
+  const INVITATIONS_PER_PAGE = 20; // 20 ile sınırla
+  const REQUESTS_PER_PAGE = 20; // 20 ile sınırla
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sentSubTab, setSentSubTab] = useState<'invitations' | 'requests'>('invitations');
@@ -114,6 +122,11 @@ export default function ProposalsScreen() {
   useEffect(() => {
     if (user?.id) {
       console.log('Tab changed to:', activeTab);
+      // Tab değiştiğinde pagination'ı sıfırla
+      if (activeTab === 'sent') {
+        resetInvitationsPagination();
+        resetRequestsPagination();
+      }
       loadTabData();
     }
   }, [activeTab]);
@@ -125,20 +138,22 @@ export default function ProposalsScreen() {
     }
 
     try {
-      // API katmanından veri al
-      const [myProposalsData, receivedData, sentData, sentInvitationsData, pendingCount] = await Promise.all([
+      // API katmanından veri al - Pagination için sadece ilk sayfa
+      const [myProposalsData, receivedData, pendingCount] = await Promise.all([
         proposalsAPI.getMyProposals(user.id),
         proposalsAPI.getReceivedRequests(user.id),
-        proposalsAPI.getSentRequests(user.id),
-        invitationsAPI.getSentInvitations(user.id),
         proposalsAPI.getPendingCount(user.id),
       ]);
 
       setMyProposals(myProposalsData);
       setReceived(receivedData);
-      setSent(sentData);
-      setSentInvitations(sentInvitationsData);
       setProposalsCount(pendingCount);
+      
+      // Sent tab için pagination başlat
+      if (activeTab === 'sent') {
+        await updateDisplayedInvitations(1);
+        await updateDisplayedRequests(1);
+      }
     } catch (error: any) {
       setErrorMessage(error.message);
       setShowErrorToast(true);
@@ -146,6 +161,64 @@ export default function ProposalsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // Davetler pagination fonksiyonları - Sadece son 20 davet
+  const updateDisplayedInvitations = async (page: number) => {
+    if (!user?.id) return;
+    
+    try {
+      // Sadece ilk 20 daveti çek
+      const newInvitations = await invitationsAPI.getSentInvitations(user.id, INVITATIONS_PER_PAGE, 0);
+      
+      setDisplayedInvitations(newInvitations);
+      setInvitationsPage(1);
+      setHasMoreInvitations(false); // Daha fazla yükleme yok
+      
+      console.log(`📄 Davetler yüklendi: ${newInvitations.length} adet (son 20)`);
+    } catch (error) {
+      console.error('Davetler yükleme hatası:', error);
+    }
+  };
+
+  const loadMoreInvitations = () => {
+    // Artık kullanılmıyor - 20 ile sınırlı
+    return;
+  };
+
+  const resetInvitationsPagination = () => {
+    setInvitationsPage(1);
+    setDisplayedInvitations([]);
+    setHasMoreInvitations(false);
+  };
+
+  // İstekler pagination fonksiyonları - Sadece son 20 istek
+  const updateDisplayedRequests = async (page: number) => {
+    if (!user?.id) return;
+    
+    try {
+      // Sadece ilk 20 isteği çek
+      const newRequests = await proposalsAPI.getSentRequests(user.id, REQUESTS_PER_PAGE, 0);
+      
+      setDisplayedRequests(newRequests);
+      setRequestsPage(1);
+      setHasMoreRequests(false); // Daha fazla yükleme yok
+      
+      console.log(`📄 İstekler yüklendi: ${newRequests.length} adet (son 20)`);
+    } catch (error) {
+      console.error('İstekler yükleme hatası:', error);
+    }
+  };
+
+  const loadMoreRequests = () => {
+    // Artık kullanılmıyor - 20 ile sınırlı
+    return;
+  };
+
+  const resetRequestsPagination = () => {
+    setRequestsPage(1);
+    setDisplayedRequests([]);
+    setHasMoreRequests(false);
   };
 
   // Tab değiştiğinde sadece o tab'ın verisini yükle
@@ -164,12 +237,9 @@ export default function ProposalsScreen() {
         setReceived(receivedData);
         setProposalsCount(pendingCount);
       } else if (activeTab === 'sent') {
-        const [sentData, sentInvitationsData] = await Promise.all([
-          proposalsAPI.getSentRequests(user.id),
-          invitationsAPI.getSentInvitations(user.id),
-        ]);
-        setSent(sentData);
-        setSentInvitations(sentInvitationsData);
+        // Pagination ile veri yükle
+        await updateDisplayedInvitations(1);
+        await updateDisplayedRequests(1);
       }
     } catch (error: any) {
       console.error('Tab data load error:', error);
@@ -559,6 +629,7 @@ export default function ProposalsScreen() {
       {activeTab === 'sent' && (
         <ScrollView
           style={styles.content}
+          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={loadProposals} />
           }
@@ -573,7 +644,7 @@ export default function ProposalsScreen() {
                 <Text style={[styles.subTabText, sentSubTab === 'invitations' && styles.subTabTextActive]}>
                   Davetler
                 </Text>
-                {sentInvitations.length > 0 && (
+                {displayedInvitations.length > 0 && (
                   <View style={[
                     styles.subTabBadge,
                     sentSubTab === 'invitations' && styles.subTabBadgeActive
@@ -582,7 +653,7 @@ export default function ProposalsScreen() {
                       styles.subTabBadgeText,
                       sentSubTab === 'invitations' && styles.subTabBadgeTextActive
                     ]}>
-                      {sentInvitations.length}
+                      {displayedInvitations.length}
                     </Text>
                   </View>
                 )}
@@ -594,7 +665,7 @@ export default function ProposalsScreen() {
                 <Text style={[styles.subTabText, sentSubTab === 'requests' && styles.subTabTextActive]}>
                   İstekler
                 </Text>
-                {sent.length > 0 && (
+                {displayedRequests.length > 0 && (
                   <View style={[
                     styles.subTabBadge,
                     sentSubTab === 'requests' && styles.subTabBadgeActive
@@ -603,7 +674,7 @@ export default function ProposalsScreen() {
                       styles.subTabBadgeText,
                       sentSubTab === 'requests' && styles.subTabBadgeTextActive
                     ]}>
-                      {sent.length}
+                      {displayedRequests.length}
                     </Text>
                   </View>
                 )}
@@ -612,23 +683,45 @@ export default function ProposalsScreen() {
 
             {/* İçerik */}
             {sentSubTab === 'invitations' ? (
-              sentInvitations.length > 0 ? (
-                sentInvitations.map(invitation => renderInvitation(invitation))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Clock size={48} color="#9CA3AF" />
-                  <Text style={styles.emptyText}>Henüz gönderilen davet yok</Text>
-                </View>
-              )
+              <>
+                {displayedInvitations.length > 0 ? (
+                  <>
+                    {displayedInvitations.map(invitation => renderInvitation(invitation))}
+                    
+                    {/* Son 20 Davet Mesajı */}
+                    <View style={styles.endMessageContainer}>
+                      <Text style={styles.endMessageText}>
+                        Son 20 davet gösteriliyor ({displayedInvitations.length})
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Clock size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyText}>Henüz gönderilen davet yok</Text>
+                  </View>
+                )}
+              </>
             ) : (
-              sent.length > 0 ? (
-                sent.map(request => renderRequest(request, 'sent'))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Clock size={48} color="#9CA3AF" />
-                  <Text style={styles.emptyText}>Henüz gönderilen istek yok</Text>
-                </View>
-              )
+              <>
+                {displayedRequests.length > 0 ? (
+                  <>
+                    {displayedRequests.map(request => renderRequest(request, 'sent'))}
+                    
+                    {/* Son 20 İstek Mesajı */}
+                    <View style={styles.endMessageContainer}>
+                      <Text style={styles.endMessageText}>
+                        Son 20 istek gösteriliyor ({displayedRequests.length})
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Clock size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyText}>Henüz gönderilen istek yok</Text>
+                  </View>
+                )}
+              </>
             )}
           </>
         </ScrollView>
@@ -1038,6 +1131,41 @@ const styles = StyleSheet.create({
   },
   subTabBadgeTextActive: {
     color: '#FFF',
+  },
+  loadMoreContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    textAlign: 'center',
+  },
+  endMessageContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  endMessageText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
