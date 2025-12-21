@@ -1,10 +1,10 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, Filter, Eye, Check, Sparkles, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { packagesAPI, type Package, type PackagePurchase, type UserCredit } from '@/api/packages';
 import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
@@ -12,6 +12,15 @@ import PremiumSuccessModal from '@/components/PremiumSuccessModal';
 import PremiumCancelledModal from '@/components/PremiumCancelledModal';
 import PackagePurchaseSuccessModal from '@/components/PackagePurchaseSuccessModal';
 import ErrorToast from '@/components/ErrorToast';
+
+const { width } = Dimensions.get('window');
+
+const PREMIUM_FEATURES = [
+  { icon: Eye, title: 'Günde 5 Teklif', description: 'Günde 1 teklif yerine 5 teklif oluştur' },
+  { icon: Sparkles, title: 'Günde 3 Super Like', description: 'Günde 1 super like yerine 3 super like gönder' },
+  { icon: Crown, title: 'Sınırsız Eşleşme İsteği', description: 'Günde 10 eşleşme isteği yerine sınırsız eşleşme isteği' },
+  { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Yaş, konum ve diğer detaylı filtreler' },
+];
 
 export default function PremiumScreen() {
   const { user, refreshPremiumStatus, isPremium } = useAuth();
@@ -34,19 +43,7 @@ export default function PremiumScreen() {
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const features = [
-    { icon: Eye, title: 'Günde 5 Teklif', description: 'Günde 1 teklif yerine 5 teklif oluştur' },
-    { icon: Sparkles, title: 'Günde 3 Super Like', description: 'Günde 1 super like yerine 3 super like gönder' },
-    { icon: Crown, title: 'Sınırsız Eşleşme İsteği', description: 'Günde 10 eşleşme isteği yerine sınırsız eşleşme isteği' },
-    { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Yaş, konum ve diğer detaylı filtreler' },
-  ];
-
-  // Load packages and subscription data
-  useEffect(() => {
-    loadData();
-  }, [user?.id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user?.id) return;
     
     try {
@@ -72,7 +69,12 @@ export default function PremiumScreen() {
     } catch (error) {
       console.error('❌ Paket verilerini yükleme hatası:', error);
     }
-  };
+  }, [user?.id]);
+
+  // Load packages and subscription data
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
@@ -237,7 +239,7 @@ export default function PremiumScreen() {
 
         <View style={styles.featuresSection}>
           <Text style={styles.sectionTitle}>Premium Özellikler</Text>
-          {features.map((feature, index) => (
+          {PREMIUM_FEATURES.map((feature, index) => (
             <View key={index} style={styles.featureCard}>
               <View style={styles.featureIcon}>
                 <feature.icon size={24} color="#8B5CF6" />

@@ -215,6 +215,9 @@ export default function DiscoverScreen() {
     useCallback(() => {
       console.log('Discover screen focused');
       if (user?.id) {
+        // Loading'i hemen başlat
+        setLoading(true);
+        
         // Konum güncellemesi tamamlandıktan sonra teklifleri yükle
         updateUserLocationOnFocus().then(() => {
           loadProposals();
