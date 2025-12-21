@@ -15,40 +15,57 @@ export const userInteractionsAPI = {
     proposalId: string,
     interactionType: 'like' | 'dislike' | 'super_like'
   ) => {
-    // Daha önce bu teklifle etkileşim var mı kontrol et
-    const { data: existingInteraction } = await supabase
-      .from('user_interactions')
-      .select('id, interaction_type')
-      .eq('user_id', userId)
-      .eq('proposal_id', proposalId)
-      .maybeSingle();
-
-    if (existingInteraction) {
-      // Mevcut etkileşimi güncelle
-      const { error } = await supabase
+    try {
+      // Daha önce bu teklifle etkileşim var mı kontrol et
+      const { data: existingInteraction } = await supabase
         .from('user_interactions')
-        .update({
-          interaction_type: interactionType,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingInteraction.id);
+        .select('id, interaction_type')
+        .eq('user_id', userId)
+        .eq('proposal_id', proposalId)
+        .maybeSingle();
 
-      if (error) throw error;
-      
-      console.log(`🔄 Etkileşim güncellendi: ${existingInteraction.interaction_type} -> ${interactionType}`);
-    } else {
-      // Yeni etkileşim kaydet
-      const { error } = await supabase
-        .from('user_interactions')
-        .insert({
-          user_id: userId,
-          proposal_id: proposalId,
-          interaction_type: interactionType
-        });
+      if (existingInteraction) {
+        // Aynı etkileşim tipiyse hiçbir şey yapma
+        if (existingInteraction.interaction_type === interactionType) {
+          console.log(`⚠️ Aynı etkileşim zaten mevcut: ${interactionType}`);
+          return;
+        }
+        
+        // Mevcut etkileşimi güncelle
+        const { error } = await supabase
+          .from('user_interactions')
+          .update({
+            interaction_type: interactionType,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingInteraction.id);
 
-      if (error) throw error;
-      
-      console.log(`✅ Yeni etkileşim kaydedildi: ${interactionType}`);
+        if (error) throw error;
+        
+        console.log(`🔄 Etkileşim güncellendi: ${existingInteraction.interaction_type} -> ${interactionType}`);
+      } else {
+        // Yeni etkileşim kaydet - upsert kullan (duplicate safe)
+        const { error } = await supabase
+          .from('user_interactions')
+          .upsert({
+            user_id: userId,
+            proposal_id: proposalId,
+            interaction_type: interactionType
+          }, {
+            onConflict: 'user_id,proposal_id'
+          });
+
+        if (error) throw error;
+        
+        console.log(`✅ Yeni etkileşim kaydedildi: ${interactionType}`);
+      }
+    } catch (error: any) {
+      // Duplicate key hatası durumunda sessizce geç
+      if (error.code === '23505') {
+        console.log(`⚠️ Duplicate etkileşim engellendi: ${interactionType}`);
+        return;
+      }
+      throw error;
     }
   },
 

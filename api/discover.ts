@@ -168,6 +168,7 @@ export const discoverAPI = {
       .eq('requester_id', userId); // Tüm başvuruları hariç tut (pending, accepted, rejected)
 
     const appliedProposalIds = (appliedData || []).map((item: any) => item.proposal_id);
+    console.log('🚫 Başvuru yapılan teklif sayısı:', appliedProposalIds.length);
 
     // Kullanıcının etkileşimde bulunduğu teklif ID'lerini al (like, dislike, super_like)
     const { data: interactedData } = await supabase
@@ -175,10 +176,16 @@ export const discoverAPI = {
       .select('proposal_id, interaction_type')
       .eq('user_id', userId);
 
-    const interactedProposalIds = (interactedData || []).map((item: any) => item.proposal_id);
+    const likedProposalIds = (interactedData || [])
+      .filter((item: any) => item.interaction_type === 'like' || item.interaction_type === 'super_like')
+      .map((item: any) => item.proposal_id);
+    
     const dislikedProposalIds = (interactedData || [])
       .filter((item: any) => item.interaction_type === 'dislike')
       .map((item: any) => item.proposal_id);
+
+    console.log('👍 Like yapılan teklif sayısı:', likedProposalIds.length);
+    console.log('👎 Dislike yapılan teklif sayısı:', dislikedProposalIds.length);
 
     // Eşleşmiş kullanıcıların ID'lerini al
     const { data: matchedData } = await supabase
@@ -217,17 +224,13 @@ export const discoverAPI = {
       query = query.not('creator_id', 'in', `(${matchedUserIds.join(',')})`);
     }
 
-    // Daha önce başvuru yapılmış teklifleri hariç tut
-    if (appliedProposalIds.length > 0) {
-      query = query.not('id', 'in', `(${appliedProposalIds.join(',')})`);
+    // Başvuru yapılan ve like yapılan teklifleri hariç tut (dislike yapılanları henüz hariç tutma)
+    const excludedIds = [...appliedProposalIds, ...likedProposalIds];
+    if (excludedIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
     }
-
-    // Etkileşimde bulunulan teklifleri hariç tut (like, dislike, super_like)
-    // Ancak tüm teklifler gösterildikten sonra dislike'ları tekrar gösterebiliriz
-    const allExcludedIds = [...appliedProposalIds, ...interactedProposalIds];
-    if (allExcludedIds.length > 0) {
-      query = query.not('id', 'in', `(${allExcludedIds.join(',')})`);
-    }
+    
+    console.log('🚫 Toplam hariç tutulan teklif sayısı:', excludedIds.length);
 
     // Filtreler - şehir filtresi
     if (filters?.city) {
@@ -262,7 +265,25 @@ export const discoverAPI = {
         .lte('event_datetime', endOfDay.toISOString());
     }
 
-    // Boost edilenler önce, sonra rastgele
+    // Boost edilenler önce, sonra rastgele - önce dislike yapılanları da hariç tutarak dene
+    let tempQuery = query;
+    if (dislikedProposalIds.length > 0) {
+      tempQuery = tempQuery.not('id', 'in', `(${dislikedProposalIds.join(',')})`);
+    }
+    
+    // Önce dislike yapılanları hariç tutarak dene
+    const tempQueryWithLimit = tempQuery.order('is_boosted', { ascending: false }).limit(20);
+    const { data: tempData, error: tempError } = await tempQueryWithLimit;
+    
+    // Eğer yeterli teklif varsa (en az 10 teklif), dislike yapılanları hariç tut
+    if (!tempError && tempData && tempData.length >= 10) {
+      query = tempQuery;
+      console.log('✅ Yeterli teklif var, dislike yapılanlar hariç tutuluyor:', tempData.length);
+    } else {
+      console.log('⚠️ Yeterli teklif yok, dislike yapılanlar dahil ediliyor. Bulunan:', tempData?.length || 0);
+    }
+    
+    // Final sorgu
     query = query.order('is_boosted', { ascending: false }).limit(20);
 
     const { data, error } = await query;
@@ -273,6 +294,25 @@ export const discoverAPI = {
     
     console.log('📋 Ham teklif sayısı:', proposals.length);
     console.log('📋 İlk 3 teklif şehirleri:', proposals.slice(0, 3).map(p => p.city));
+
+    // Frontend'te de bir kez daha filtrele (güvenlik için)
+    proposals = proposals.filter(proposal => {
+      // Başvuru yapılan teklifleri hariç tut
+      if (appliedProposalIds.includes(proposal.id)) {
+        console.log('🚫 Frontend filtreleme: Başvuru yapılan teklif hariç tutuldu:', proposal.activity_name);
+        return false;
+      }
+      
+      // Like yapılan teklifleri hariç tut
+      if (likedProposalIds.includes(proposal.id)) {
+        console.log('🚫 Frontend filtreleme: Like yapılan teklif hariç tutuldu:', proposal.activity_name);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log('📋 Frontend filtreleme sonrası teklif sayısı:', proposals.length);
 
     // Mesafe hesaplama fonksiyonu (Haversine formula)
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -336,12 +376,12 @@ export const discoverAPI = {
       return true;
     });
 
-    // Eğer hiç teklif kalmadıysa, dislike yapılan teklifleri tekrar göster
-    if (proposals.length === 0 && dislikedProposalIds.length > 0) {
-      console.log('🔄 Tüm teklifler gösterildi, dislike yapılanları tekrar getiriliyor...');
+    // Eğer hiç teklif kalmadıysa (5'ten az), dislike yapılan teklifleri tekrar göster
+    if (proposals.length < 5 && dislikedProposalIds.length > 0) {
+      console.log('🔄 Yeterli teklif yok, dislike yapılanları tekrar getiriliyor...', proposals.length);
       
-      // Sadece dislike yapılan teklifleri getir (başvuru yapılmış olanları hariç tut)
-      const excludeOnlyApplied = appliedProposalIds;
+      // Sadece dislike yapılan teklifleri getir (başvuru yapılmış ve like yapılmış olanları hariç tut)
+      const excludeAppliedAndLiked = [...appliedProposalIds, ...likedProposalIds];
       
       let retryQuery = supabase
         .from('proposals')
@@ -367,9 +407,9 @@ export const discoverAPI = {
         retryQuery = retryQuery.not('creator_id', 'in', `(${matchedUserIds.join(',')})`);
       }
 
-      // Başvuru yapılmış olanları hariç tut
-      if (excludeOnlyApplied.length > 0) {
-        retryQuery = retryQuery.not('id', 'in', `(${excludeOnlyApplied.join(',')})`);
+      // Başvuru yapılmış ve like yapılmış olanları hariç tut
+      if (excludeAppliedAndLiked.length > 0) {
+        retryQuery = retryQuery.not('id', 'in', `(${excludeAppliedAndLiked.join(',')})`);
       }
 
       // Aynı filtreleri uygula
@@ -440,7 +480,12 @@ export const discoverAPI = {
       });
 
       console.log(`🔄 Dislike yapılan ${retryProposals.length} teklif tekrar gösteriliyor`);
-      return retryProposals;
+      
+      // Mevcut tekliflerle birleştir (duplicate kontrolü ile)
+      const existingIds = new Set(proposals.map(p => p.id));
+      const newProposals = retryProposals.filter(p => !existingIds.has(p.id));
+      
+      return [...proposals, ...newProposals];
     }
 
     return proposals;
@@ -467,42 +512,43 @@ export const discoverAPI = {
     userId: string,
     isSuperLike: boolean = false
   ) => {
-    // Teklif kredisi kontrolü kaldırıldı - eşleşme isteği için gereksiz
+    try {
+      // Teklif kredisi kontrolü kaldırıldı - eşleşme isteği için gereksiz
 
-    // Günlük eşleşme isteği limiti kontrolü
-    const { data: canSendRequest, error: requestCheckError } = await supabase.rpc('can_send_request_today', {
-      p_user_id: userId
-    });
+      // Günlük eşleşme isteği limiti kontrolü
+      const { data: canSendRequest, error: requestCheckError } = await supabase.rpc('can_send_request_today', {
+        p_user_id: userId
+      });
 
-    if (requestCheckError) throw requestCheckError;
+      if (requestCheckError) throw requestCheckError;
 
-    if (!canSendRequest) {
-      throw new Error('Günlük eşleşme isteği hakkınız bitti');
-    }
-
-    // Super like kontrolü - database fonksiyonu ile kontrol et
-    if (isSuperLike) {
-      const { data: canUse } = await supabase.rpc('can_use_super_like', { p_user_id: userId });
-      if (!canUse) {
-        throw new Error('Günlük super like hakkınız doldu');
+      if (!canSendRequest) {
+        throw new Error('Günlük eşleşme isteği hakkınız bitti');
       }
-    }
 
-    // Daha önce başvuru yapılmış mı kontrol et (tüm durumlar)
-    const { data: existingRequest } = await supabase
-      .from('proposal_requests')
-      .select('id, status')
-      .eq('proposal_id', proposalId)
-      .eq('requester_id', userId)
-      .maybeSingle();
+      // Super like kontrolü - database fonksiyonu ile kontrol et
+      if (isSuperLike) {
+        const { data: canUse } = await supabase.rpc('can_use_super_like', { p_user_id: userId });
+        if (!canUse) {
+          throw new Error('Günlük super like hakkınız doldu');
+        }
+      }
 
-    if (existingRequest) {
-      if (existingRequest.status === 'pending') {
-        throw new Error('Bu teklife daha önce başvurdunuz');
-      } else if (existingRequest.status === 'accepted') {
-        throw new Error('Bu teklifle zaten eşleştiniz');
-      } else if (existingRequest.status === 'rejected') {
-        // Reddedilmiş başvuruyu güncelle (yeni şans ver)
+      // Daha önce başvuru yapılmış mı kontrol et (tüm durumlar)
+      const { data: existingRequest } = await supabase
+        .from('proposal_requests')
+        .select('id, status')
+        .eq('proposal_id', proposalId)
+        .eq('requester_id', userId)
+        .maybeSingle();
+
+      if (existingRequest) {
+        if (existingRequest.status === 'pending') {
+          throw new Error('Bu teklife daha önce başvurdunuz');
+        } else if (existingRequest.status === 'accepted') {
+          throw new Error('Bu teklifle zaten eşleştiniz');
+        } else if (existingRequest.status === 'rejected') {
+          // Reddedilmiş başvuruyu güncelle (yeni şans ver)
         const { error: updateError } = await supabase
           .from('proposal_requests')
           .update({
@@ -631,6 +677,15 @@ export const discoverAPI = {
     });
 
     return await checkForMatch(proposalId, userId);
+    
+    } catch (error: any) {
+      // Duplicate key hatalarını sessizce geç
+      if (error.code === '23505') {
+        console.log('⚠️ Duplicate like engellendi');
+        return { matched: false };
+      }
+      throw error;
+    }
   },
 
   // Bugün için kalan eşleşme isteği sayısını al

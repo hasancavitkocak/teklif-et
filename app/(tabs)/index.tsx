@@ -43,7 +43,6 @@ import RequestLimitModal from '@/components/RequestLimitModal';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import WarningToast from '@/components/WarningToast';
-import SwipeCard from '@/components/SwipeCard';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -539,7 +538,10 @@ export default function DiscoverScreen() {
     if (currentIndex >= proposals.length || !user?.id) return;
     
     // Eğer herhangi bir işlem devam ediyorsa, yeni işlem başlatma
-    if (isLiking || isSuperLiking || isPassing) return;
+    if (isLiking || isSuperLiking || isPassing) {
+      console.log('⚠️ İşlem devam ediyor, duplicate engellendi');
+      return;
+    }
 
     const proposal = proposals[currentIndex];
 
@@ -561,22 +563,21 @@ export default function DiscoverScreen() {
       
       console.log(`${isSuperLike ? '⚡' : '👍'} ${isSuperLike ? 'Super like' : 'Like'} kaydedildi:`, proposal.activity_name);
 
-      // Optimistic UI update - hemen sonraki karta geç
-      const nextIndex = currentIndex + 1;
-      
+      // Backend işlemini tamamla
       const result = await discoverAPI.likeProposal(proposal.id, user.id, isSuperLike);
       
-      // Backend işlemi tamamlandı, şimdi UI güncellemelerini yap
+      // İşlem tamamlandı, şimdi UI güncellemelerini yap
+      const nextIndex = currentIndex + 1;
       
       // Süper beğeni başarı pop-up'ı göster
       if (isSuperLike && !result.matched) {
         setSuperLikeUserName(proposal.creator.name);
         setShowSuperLikeSuccess(true);
         
-        // Optimistic update - hemen karta geç
+        // İşlem tamamlandıktan sonra karta geç
         setCurrentIndex(nextIndex);
         
-        // Pop-up göster ama kart geçişi zaten yapıldı
+        // Pop-up göster ve loading'i temizle
         setTimeout(() => {
           setIsSuperLiking(false);
         }, 2500);
@@ -586,14 +587,14 @@ export default function DiscoverScreen() {
       if (result.matched) {
         setMatchedUserName(proposal.creator.name);
         setShowMatchSuccessModal(true);
-        // Match durumunda da hemen geç, modal kapanınca ek işlem yok
+        // Match durumunda da işlem tamamlandıktan sonra geç
         setCurrentIndex(nextIndex);
       } else {
         // Eşleşme yoksa toast göster ve karta geç
         setIsToastSuperLike(isSuperLike);
         setShowProposalSentToast(true);
         
-        // Optimistic update - hemen karta geç
+        // İşlem tamamlandıktan sonra karta geç
         setCurrentIndex(nextIndex);
       }
 
@@ -642,7 +643,10 @@ export default function DiscoverScreen() {
     if (currentIndex >= proposals.length || !user?.id) return;
     
     // Eğer herhangi bir işlem devam ediyorsa, yeni işlem başlatma
-    if (isLiking || isSuperLiking || isPassing) return;
+    if (isLiking || isSuperLiking || isPassing) {
+      console.log('⚠️ İşlem devam ediyor, duplicate engellendi');
+      return;
+    }
 
     const proposal = proposals[currentIndex];
 
@@ -662,13 +666,16 @@ export default function DiscoverScreen() {
         setSkippedProposalIds(prev => new Set([...Array.from(prev), currentProposal.id]));
       }
 
-      // Optimistic update - hemen sonraki karta geç
+      // İşlem tamamlandıktan sonra sonraki karta geç
       setCurrentIndex(currentIndex + 1);
       
     } catch (error: any) {
       console.error('Pass error:', error);
-      setErrorMessage('Bir hata oluştu, tekrar deneyin');
-      setShowErrorToast(true);
+      // Duplicate hatası değilse kullanıcıya göster
+      if (error.code !== '23505') {
+        setErrorMessage('Bir hata oluştu, tekrar deneyin');
+        setShowErrorToast(true);
+      }
     } finally {
       setIsPassing(false);
     }
@@ -715,14 +722,137 @@ export default function DiscoverScreen() {
       </View>
 
       {currentProposal ? (
-        <SwipeCard
-          proposal={currentProposal}
-          onSwipeLeft={handlePass}
-          onSwipeRight={() => handleLike(false)}
-          onSwipeUp={() => handleLike(true)}
-          calculateAge={calculateAge}
-          isLoading={isLiking || isSuperLiking || isPassing}
-        />
+        <View style={styles.cardContainer}>
+          {/* Kart */}
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => router.push(`/profile/${currentProposal.creator_id}` as any)}
+            activeOpacity={0.95}
+          >
+            <Image
+              source={{ uri: currentProposal.creator.profile_photo }}
+              style={styles.cardImage}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={styles.cardGradient}
+            >
+              {/* Ana Container - Yan Yana */}
+              <View style={styles.cardBottomContainer}>
+                {/* Sol Taraf - Aktivite ve Kullanıcı */}
+                <View style={styles.cardLeftInfo}>
+                  <Text style={styles.activityName}>{currentProposal.activity_name}</Text>
+                  <Text style={styles.userName}>
+                    {currentProposal.creator.name}, {calculateAge(currentProposal.creator.birth_date)}
+                  </Text>
+                </View>
+                
+                {/* Sağ Taraf - Tarih/Saat/Mekan/Konum */}
+                {(currentProposal.event_datetime || currentProposal.venue_name || currentProposal.city) && (
+                  <View style={styles.cardRightInfo}>
+                    {/* Tarih */}
+                    {currentProposal.event_datetime && (
+                      <View style={styles.infoItem}>
+                        <Calendar size={12} color="#FFF" />
+                        <Text style={styles.infoText}>
+                          {new Date(currentProposal.event_datetime).toLocaleDateString('tr-TR', {
+                            day: 'numeric',
+                            month: 'long',
+                          })}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {/* Mekan ve Konum - Alt Alta */}
+                    {currentProposal.venue_name && (
+                      <View style={styles.infoItem}>
+                        <Store size={12} color="#FFF" />
+                        <Text style={styles.infoText} numberOfLines={1}>
+                          {currentProposal.venue_name}
+                        </Text>
+                      </View>
+                    )}
+                    {currentProposal.city && (
+                      <View style={styles.infoItem}>
+                        <MapPin size={12} color="#FFF" />
+                        <Text style={styles.infoText}>{currentProposal.city}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+              
+              {/* Kategori - En Alt */}
+              {currentProposal.interest && (
+                <View style={styles.interestChip}>
+                  <Text style={styles.interestText}>{currentProposal.interest.name}</Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Action Buttons */}
+          <View style={styles.actionsContainer}>
+            {/* REDDET Butonu */}
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.passButton]} 
+              onPress={handlePass}
+              disabled={isLiking || isSuperLiking || isPassing}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={isLiking || isSuperLiking || isPassing ? ['#EF444450', '#DC262650'] : ['#EF4444', '#DC2626']}
+                style={styles.buttonGradient}
+              >
+                <X size={28} color="#FFF" strokeWidth={3} />
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            {/* SÜPER BEĞENİ Butonu */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.superLikeButton]}
+              onPress={() => handleLike(true)}
+              disabled={isLiking || isSuperLiking || isPassing}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={isLiking || isSuperLiking || isPassing ? ['#F59E0B50', '#D9770050'] : ['#F59E0B', '#D97700']}
+                style={styles.buttonGradient}
+              >
+                <Zap 
+                  size={24} 
+                  color="#FFF" 
+                  fill="#FFF" 
+                  strokeWidth={2}
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            {/* TEKLİF ET Butonu */}
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.likeButton]} 
+              onPress={() => handleLike(false)}
+              disabled={isLiking || isSuperLiking || isPassing}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={isLiking || isSuperLiking || isPassing ? ['#8B5CF650', '#7C3AED50'] : ['#8B5CF6', '#7C3AED']}
+                style={styles.buttonGradient}
+              >
+                <Image 
+                  source={require('@/assets/images/puzzle-iconnew.png')} 
+                  style={{ 
+                    width: 32, 
+                    height: 32, 
+                    tintColor: '#FFF'
+                  }}
+                  resizeMode="contain"
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Şu an gösterilecek teklif yok</Text>
@@ -3464,5 +3594,120 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFF',
     borderTopColor: 'transparent',
+  },
+  // Kart Stilleri
+  cardContainer: {
+    flex: 1,
+    padding: 16,
+    paddingBottom: 120,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    paddingTop: 100,
+  },
+  cardBottomContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  cardLeftInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  activityName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  userName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  cardRightInfo: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  interestChip: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  interestText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  // Action Buttons
+  actionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    marginTop: 20,
+  },
+  actionButton: {
+    alignItems: 'center',
+  },
+  buttonGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  passButton: {
+    // Özel stil gerekirse buraya eklenebilir
+  },
+  superLikeButton: {
+    // Özel stil gerekirse buraya eklenebilir
+  },
+  likeButton: {
+    // Özel stil gerekirse buraya eklenebilir
   },
 });
