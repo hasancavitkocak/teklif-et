@@ -5,31 +5,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
+import { packagesAPI, type Package, type PackagePurchase, type UserCredit } from '@/api/packages';
 import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
 import PremiumSuccessModal from '@/components/PremiumSuccessModal';
 import PremiumCancelledModal from '@/components/PremiumCancelledModal';
 import ErrorToast from '@/components/ErrorToast';
 
-interface Subscription {
-  id: string;
-  plan_type: string;
-  end_date: string;
-  status: string;
-  auto_renew: boolean;
-  cancelled_at?: string;
-}
-
 export default function PremiumScreen() {
   const { user, refreshPremiumStatus, isPremium } = useAuth();
   const router = useRouter();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscription, setSubscription] = useState<PackagePurchase | null>(null);
+  const [subscriptionPackages, setSubscriptionPackages] = useState<Package[]>([]);
+  const [addonPackages, setAddonPackages] = useState<Package[]>([]);
+  const [userCredits, setUserCredits] = useState<UserCredit[]>([]);
   const [loading, setLoading] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [cancelledModalVisible, setCancelledModalVisible] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Package | null>(null);
   const [activeTab, setActiveTab] = useState<'plans' | 'addons'>('plans');
   
   // Toast states
@@ -43,62 +38,40 @@ export default function PremiumScreen() {
     { icon: Filter, title: 'Gelişmiş Filtreleme', description: 'Yaş, konum ve diğer detaylı filtreler' },
   ];
 
-  const plans = [
-    { 
-      duration: 'Haftalık', 
-      price: '₺149', 
-      value: 14900, 
-      type: 'weekly',
-      popular: false,
-      perMonth: '₺596/ay'
-    },
-    { 
-      duration: 'Aylık', 
-      price: '₺399', 
-      value: 39900, 
-      type: 'monthly',
-      popular: true,
-      save: '33% Tasarruf'
-    },
-    { 
-      duration: 'Yıllık', 
-      price: '₺3.999', 
-      value: 399900, 
-      type: 'yearly',
-      popular: false, 
-      save: '44% Tasarruf',
-      perMonth: '₺333/ay'
-    },
-  ];
-
-  // Load current subscription
+  // Load packages and subscription data
   useEffect(() => {
-    loadSubscription();
+    loadData();
   }, [user?.id]);
 
-  const loadSubscription = async () => {
+  const loadData = async () => {
     if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase
-        .from('premium_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+      // Load packages
+      const [subscriptions, addons, activeSubscription, credits] = await Promise.all([
+        packagesAPI.getSubscriptionPackages(),
+        packagesAPI.getAddonPackages(),
+        packagesAPI.getActiveSubscription(),
+        packagesAPI.getUserCredits()
+      ]);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Subscription load error:', error);
-        return;
-      }
+      setSubscriptionPackages(subscriptions);
+      setAddonPackages(addons);
+      setSubscription(activeSubscription);
+      setUserCredits(credits);
 
-      setSubscription(data);
+      console.log('📦 Paketler yüklendi:', {
+        subscriptions: subscriptions.length,
+        addons: addons.length,
+        activeSubscription: !!activeSubscription,
+        credits: credits.length
+      });
     } catch (error) {
-      console.error('Load subscription error:', error);
+      console.error('❌ Paket verilerini yükleme hatası:', error);
     }
   };
 
-  const handleSubscribe = (plan: any) => {
+  const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
     setSubscriptionModalVisible(true);
   };
@@ -108,25 +81,27 @@ export default function PremiumScreen() {
     
     setLoading(true);
     try {
-      // Mock payment process - always success
+      // Mock payment process - always success for now
       const paymentSuccess = true;
       
       if (!paymentSuccess) {
         throw new Error('Ödeme işlemi başarısız oldu');
       }
 
-      // Create subscription
-      const { data, error } = await supabase.rpc('create_premium_subscription', {
-        p_user_id: user?.id,
-        p_plan_type: selectedPlan.type,
-        p_price_amount: selectedPlan.value
-      });
+      // Purchase package via API
+      const result = await packagesAPI.purchasePackage(
+        selectedPlan.id,
+        'test_payment',
+        `test_${Date.now()}`
+      );
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error || 'Satın alma işlemi başarısız');
+      }
       
-      // Refresh premium status and subscription
+      // Refresh data
       await refreshPremiumStatus();
-      await loadSubscription();
+      await loadData();
       
       // Close subscription modal and show success
       setSubscriptionModalVisible(false);
@@ -144,28 +119,35 @@ export default function PremiumScreen() {
     setCancelModalVisible(true);
   };
 
-  const handlePurchaseSuperLikes = async () => {
+  const handlePurchaseAddon = async (addon: Package) => {
     if (!user?.id) return;
     
     setLoading(true);
     try {
-      // Simulate purchase (gerçek ödeme entegrasyonu sonra eklenecek)
-      const { error } = await supabase.rpc('purchase_super_like_credits', {
-        p_user_id: user.id,
-        p_package_type: 'super_like_10',
-        p_credits_amount: 10,
-        p_price_paid: 9900, // ₺99 in kuruş
-        p_payment_method: 'test',
-        p_transaction_id: `test_${Date.now()}`
-      });
-
-      if (error) throw error;
-
-      // Başarı mesajı göster
-      alert('🎉 Super Like paketi başarıyla satın alındı!\n+10 Super Like kredisi hesabınıza eklendi.');
+      // Mock payment process
+      const paymentSuccess = true;
       
-      // Premium durumunu yenile (profil stats'ları için)
-      refreshPremiumStatus();
+      if (!paymentSuccess) {
+        throw new Error('Ödeme işlemi başarısız oldu');
+      }
+
+      // Purchase addon via API
+      const result = await packagesAPI.purchasePackage(
+        addon.id,
+        'test_payment',
+        `test_${Date.now()}`
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Satın alma işlemi başarısız');
+      }
+
+      // Refresh data
+      await loadData();
+      await refreshPremiumStatus();
+      
+      // Show success message
+      alert(`🎉 ${addon.name} başarıyla satın alındı!\n${addon.credits_amount ? `+${addon.credits_amount} kredi hesabınıza eklendi.` : ''}`);
       
     } catch (error: any) {
       setErrorMessage(error.message || 'Satın alma işlemi başarısız oldu');
@@ -176,22 +158,19 @@ export default function PremiumScreen() {
   };
 
   const confirmCancelSubscription = async () => {
+    if (!subscription) return;
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('cancel_premium_subscription', {
-        p_user_id: user?.id
-      });
+      const result = await packagesAPI.cancelSubscription(subscription.id);
 
-      if (error) throw error;
-      
-      if (data) {
-        await loadSubscription();
-        setCancelModalVisible(false);
-        setCancelledModalVisible(true);
-      } else {
-        setErrorMessage('Aktif abonelik bulunamadı');
-        setShowErrorToast(true);
+      if (!result.success) {
+        throw new Error(result.error || 'Abonelik iptal edilemedi');
       }
+      
+      await loadData();
+      setCancelModalVisible(false);
+      setCancelledModalVisible(true);
     } catch (error: any) {
       setErrorMessage(error.message || 'Abonelik iptal edilemedi');
       setShowErrorToast(true);
@@ -220,11 +199,15 @@ export default function PremiumScreen() {
                 <Crown size={24} color="#8B5CF6" fill="#8B5CF6" />
                 <View style={styles.subscriptionInfo}>
                   <Text style={styles.subscriptionType}>
-                    {subscription.plan_type === 'weekly' ? 'Haftalık' : 
-                     subscription.plan_type === 'monthly' ? 'Aylık' : 'Yıllık'} Premium
+                    {subscription.purchase_type === 'subscription' ? 
+                      (subscription.package as any)?.name || 'Premium' : 'Premium'
+                    }
                   </Text>
                   <Text style={styles.subscriptionExpiry}>
-                    {new Date(subscription.end_date).toLocaleDateString('tr-TR')} tarihine kadar aktif
+                    {subscription.expires_at ? 
+                      new Date(subscription.expires_at).toLocaleDateString('tr-TR') + ' tarihine kadar aktif' :
+                      'Süresiz aktif'
+                    }
                   </Text>
                   {subscription.cancelled_at && (
                     <Text style={styles.subscriptionCancelled}>
@@ -288,30 +271,36 @@ export default function PremiumScreen() {
         {/* Tab Content */}
         {activeTab === 'plans' && !isPremium && (
           <View style={styles.plansSection}>
-            {plans.map((plan, index) => (
+            {subscriptionPackages.map((plan, index) => (
               <TouchableOpacity
-                key={index}
-                style={[styles.planCard, plan.popular && styles.planCardPopular]}
+                key={plan.id}
+                style={[styles.planCard, plan.is_popular && styles.planCardPopular]}
                 onPress={() => handleSubscribe(plan)}
                 activeOpacity={0.9}
                 disabled={loading}
               >
-                {plan.popular && (
+                {plan.is_popular && (
                   <View style={styles.popularBadge}>
                     <Text style={styles.popularText}>EN POPÜLER</Text>
                   </View>
                 )}
                 <View style={styles.planHeader}>
                   <View>
-                    <Text style={styles.planDuration}>{plan.duration}</Text>
-                    {plan.save && (
-                      <Text style={styles.planSave}>{plan.save}</Text>
+                    <Text style={styles.planDuration}>{plan.name}</Text>
+                    {plan.features.includes('33% Tasarruf') && (
+                      <Text style={styles.planSave}>33% Tasarruf</Text>
                     )}
-                    {plan.perMonth && (
-                      <Text style={styles.planPerMonth}>{plan.perMonth}</Text>
+                    {plan.features.includes('44% Tasarruf') && (
+                      <Text style={styles.planSave}>44% Tasarruf</Text>
+                    )}
+                    {plan.duration_type === 'weekly' && (
+                      <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
+                    )}
+                    {plan.duration_type === 'yearly' && (
+                      <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
                     )}
                   </View>
-                  <Text style={styles.planPrice}>{plan.price}</Text>
+                  <Text style={styles.planPrice}>₺{Math.round(plan.price_amount / 100)}</Text>
                 </View>
                 <View style={styles.planFeatures}>
                   <View style={styles.planFeatureRow}>
@@ -334,58 +323,56 @@ export default function PremiumScreen() {
               İhtiyacınız olan özellikleri tek seferlik satın alın
             </Text>
           
-          {/* Super Like Paketi */}
-          <TouchableOpacity 
-            style={styles.addOnCard} 
-            activeOpacity={0.9}
-            onPress={() => handlePurchaseSuperLikes()}
-          >
-            <View style={styles.addOnIcon}>
-              <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />
-            </View>
-            <View style={styles.addOnContent}>
-              <Text style={styles.addOnTitle}>Super Like Paketi</Text>
-              <Text style={styles.addOnDescription}>10 adet Super Like kredisi</Text>
-              <Text style={styles.addOnSubtext}>Günlük limitten bağımsız kullanın</Text>
-            </View>
-            <View style={styles.addOnPricing}>
-              <Text style={styles.addOnPrice}>₺99</Text>
-              <Text style={styles.addOnPriceUnit}>tek seferlik</Text>
-            </View>
-          </TouchableOpacity>
+            {/* User Credits Display */}
+            {userCredits.length > 0 && (
+              <View style={styles.creditsSection}>
+                <Text style={styles.creditsTitle}>Mevcut Kredileriniz</Text>
+                {userCredits.map((credit, index) => (
+                  <View key={index} style={styles.creditItem}>
+                    <Text style={styles.creditType}>
+                      {credit.credit_type === 'super_like' ? 'Super Like' :
+                       credit.credit_type === 'boost' ? 'Boost' : 'Profil Görüntüleme'}
+                    </Text>
+                    <Text style={styles.creditAmount}>{credit.amount} adet</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
-          {/* Boost Paketi */}
-          <TouchableOpacity style={[styles.addOnCard, { opacity: 0.6 }]} activeOpacity={0.9} disabled>
-            <View style={[styles.addOnIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Crown size={24} color="#F59E0B" />
-            </View>
-            <View style={styles.addOnContent}>
-              <Text style={styles.addOnTitle}>Boost</Text>
-              <Text style={styles.addOnDescription}>30 dakika öne çıkarma</Text>
-              <Text style={styles.addOnSubtext}>Yakında geliyor...</Text>
-            </View>
-            <View style={styles.addOnPricing}>
-              <Text style={styles.addOnPrice}>₺49</Text>
-              <Text style={styles.addOnPriceUnit}>tek seferlik</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Profile Views Paketi */}
-          <TouchableOpacity style={[styles.addOnCard, { opacity: 0.6 }]} activeOpacity={0.9} disabled>
-            <View style={[styles.addOnIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Eye size={24} color="#3B82F6" />
-            </View>
-            <View style={styles.addOnContent}>
-              <Text style={styles.addOnTitle}>Profilimi Kim İnceledi</Text>
-              <Text style={styles.addOnDescription}>7 gün boyunca aktif</Text>
-              <Text style={styles.addOnSubtext}>Yakında geliyor...</Text>
-            </View>
-            <View style={styles.addOnPricing}>
-              <Text style={styles.addOnPrice}>₺79</Text>
-              <Text style={styles.addOnPriceUnit}>7 günlük</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+            {/* Addon Packages */}
+            {addonPackages.map((addon, index) => (
+              <TouchableOpacity 
+                key={addon.id}
+                style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
+                activeOpacity={0.9}
+                onPress={() => handlePurchaseAddon(addon)}
+                disabled={loading}
+              >
+                <View style={[styles.addOnIcon, {
+                  backgroundColor: addon.category === 'super_like' ? '#FEF3C7' :
+                                  addon.category === 'boost' ? '#FEF3C7' : '#DBEAFE'
+                }]}>
+                  {addon.category === 'super_like' && <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />}
+                  {addon.category === 'boost' && <Crown size={24} color="#F59E0B" />}
+                  {addon.category === 'profile_views' && <Eye size={24} color="#3B82F6" />}
+                </View>
+                <View style={styles.addOnContent}>
+                  <Text style={styles.addOnTitle}>{addon.name}</Text>
+                  <Text style={styles.addOnDescription}>{addon.description}</Text>
+                  {addon.credits_amount && (
+                    <Text style={styles.addOnSubtext}>{addon.credits_amount} adet kredi</Text>
+                  )}
+                </View>
+                <View style={styles.addOnPricing}>
+                  <Text style={styles.addOnPrice}>₺{Math.round(addon.price_amount / 100)}</Text>
+                  <Text style={styles.addOnPriceUnit}>
+                    {addon.duration_type === 'one_time' ? 'tek seferlik' : 
+                     addon.duration_type === 'weekly' ? '7 günlük' : 'aylık'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         <View style={styles.termsSection}>
@@ -401,7 +388,7 @@ export default function PremiumScreen() {
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
         onConfirm={confirmSubscription}
-        plan={selectedPlan || plans[0]}
+        plan={selectedPlan || (subscriptionPackages.length > 0 ? subscriptionPackages[0] : null)}
         loading={loading}
       />
 
@@ -409,7 +396,7 @@ export default function PremiumScreen() {
         visible={cancelModalVisible}
         onClose={() => setCancelModalVisible(false)}
         onConfirm={confirmCancelSubscription}
-        expiryDate={subscription?.end_date}
+        expiryDate={subscription?.expires_at}
         loading={loading}
       />
 
@@ -419,14 +406,14 @@ export default function PremiumScreen() {
           setSuccessModalVisible(false);
           router.push('/(tabs)');
         }}
-        planType={selectedPlan?.type || 'monthly'}
-        expiryDate={subscription?.end_date}
+        planType={selectedPlan?.duration_type || 'monthly'}
+        expiryDate={subscription?.expires_at}
       />
 
       <PremiumCancelledModal
         visible={cancelledModalVisible}
         onClose={() => setCancelledModalVisible(false)}
-        expiryDate={subscription?.end_date}
+        expiryDate={subscription?.expires_at}
       />
 
       {/* Error Toast */}
@@ -753,5 +740,35 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#8B5CF6',
+  },
+  // Credits Styles
+  creditsSection: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  creditsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  creditItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  creditType: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  creditAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
   },
 });

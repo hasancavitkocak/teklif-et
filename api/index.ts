@@ -8,3 +8,4 @@ export * from './notifications';
 export * from './invitations';
 export * from './user-interactions';
 export * from './settings';
+export * from './packages';

@@ -19,12 +19,19 @@ interface PremiumSubscriptionModalProps {
   onClose: () => void;
   onConfirm: () => void;
   plan: {
-    duration: string;
-    price: string;
-    type: string;
+    id?: string;
+    name?: string;
+    duration_type?: string;
+    price_amount?: number;
+    features?: string[];
+    is_popular?: boolean;
+    // Legacy support
+    duration?: string;
+    price?: string;
+    type?: string;
     save?: string;
     perMonth?: string;
-  };
+  } | null;
   loading?: boolean;
 }
 
@@ -39,6 +46,11 @@ export default function PremiumSubscriptionModal({
   const fadeAnim = new Animated.Value(0);
   const sparkleAnim = new Animated.Value(0);
   const crownAnim = new Animated.Value(0);
+
+  // Early return if no plan
+  if (!plan) {
+    return null;
+  }
 
   useEffect(() => {
     if (visible) {
@@ -181,15 +193,27 @@ export default function PremiumSubscriptionModal({
               {/* Plan Info */}
               <View style={styles.planCard}>
                 <View style={styles.planHeader}>
-                  <Text style={styles.planDuration}>{plan.duration}</Text>
-                  <Text style={styles.planPrice}>{plan.price}</Text>
+                  <Text style={styles.planDuration}>
+                    {plan?.name || plan?.duration || 'Premium Plan'}
+                  </Text>
+                  <Text style={styles.planPrice}>
+                    {plan?.price_amount ? `₺${Math.round(plan.price_amount / 100)}` : plan?.price || '₺0'}
+                  </Text>
                 </View>
-                {plan.save && (
+                {(plan?.features?.includes('33% Tasarruf') || plan?.features?.includes('44% Tasarruf') || plan?.save) && (
                   <View style={styles.saveBadge}>
-                    <Text style={styles.saveText}>{plan.save}</Text>
+                    <Text style={styles.saveText}>
+                      {plan?.features?.find(f => f.includes('Tasarruf')) || plan?.save || 'Tasarruf'}
+                    </Text>
                   </View>
                 )}
-                {plan.perMonth && (
+                {(plan?.duration_type === 'weekly' && plan?.price_amount) && (
+                  <Text style={styles.perMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
+                )}
+                {(plan?.duration_type === 'yearly' && plan?.price_amount) && (
+                  <Text style={styles.perMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
+                )}
+                {plan?.perMonth && (
                   <Text style={styles.perMonth}>{plan.perMonth}</Text>
                 )}
               </View>
