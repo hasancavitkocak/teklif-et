@@ -7,7 +7,6 @@ import {
   FlatList,
   Image,
   ActivityIndicator,
-  Alert,
   StyleSheet,
   ScrollView,
   PanResponder,
@@ -22,6 +21,9 @@ import { AppIconLoader } from './AppIconLoader';
 import { useRouter } from 'expo-router';
 import SimplePremiumAlert from './SimplePremiumAlert';
 import InvitationCreditModal from './InvitationCreditModal';
+import SuccessToast from './SuccessToast';
+import ErrorToast from './ErrorToast';
+import WarningToast from './WarningToast';
 
 interface User {
   id: string;
@@ -80,6 +82,14 @@ export default function InviteUsersModal({
   const [minAge, setMinAge] = useState<number>(18);
   const [maxAge, setMaxAge] = useState<number>(50);
   const [selectedGender, setSelectedGender] = useState<'all' | 'male' | 'female'>('all');
+
+  // Toast states
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showWarningToast, setShowWarningToast] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
 
   // Yaş slider refs
   const ageSliderTrackRef = useRef<View>(null);
@@ -311,7 +321,8 @@ export default function InviteUsersModal({
       console.log(`📊 Toplam ${usersWithDistance.length} kullanıcı, ilk ${initialUsers.length} gösteriliyor`);
     } catch (error) {
       console.error('Error loading users:', error);
-      Alert.alert('Hata', 'Kullanıcılar yüklenirken bir hata oluştu');
+      setErrorMessage('Kullanıcılar yüklenirken bir hata oluştu');
+      setShowErrorToast(true);
     } finally {
       setLoading(false);
     }
@@ -390,6 +401,8 @@ export default function InviteUsersModal({
 
     setSending(true);
     try {
+      const selectedCount = selectedUsers.size; // Sayıyı önceden kaydet
+      
       await invitationsAPI.inviteUsers(
         proposalId,
         user.id,
@@ -411,19 +424,25 @@ export default function InviteUsersModal({
       // Kullanıcı listesini yenile (davet edilenleri çıkar)
       loadInvitableUsers();
       
-      Alert.alert(
-        'Başarılı! 🎉',
-        `${selectedUsers.size} kullanıcıya davet gönderildi`
-      );
+      // Başarı mesajını göster (temizlemeden önce kaydedilen sayıyı kullan)
+      // setTimeout ile state güncellemelerinin tamamlanmasını bekle
+      setTimeout(() => {
+        console.log('🎉 Davet başarılı, toast gösteriliyor:', selectedCount);
+        setSuccessMessage(`${selectedCount} kullanıcıya davet gönderildi! 🎉`);
+        setShowSuccessToast(true);
+      }, 100);
     } catch (error: any) {
       console.error('Error sending invitations:', error);
       
       if (error.message?.includes('duplicate')) {
-        Alert.alert('Uyarı', 'Bazı kullanıcılar zaten davet edilmiş');
+        setWarningMessage('Bazı kullanıcılar zaten davet edilmiş');
+        setShowWarningToast(true);
       } else if (error.message?.includes('limit') || error.message?.includes('kredi')) {
-        Alert.alert('Davet Kredisi Yetersiz', 'Davet krediniz yetersiz. Premium üyelik ile sınırsız davet gönderebilirsiniz.');
+        setErrorMessage('Davet krediniz yetersiz. Premium üyelik ile sınırsız davet gönderebilirsiniz.');
+        setShowErrorToast(true);
       } else {
-        Alert.alert('Hata', 'Davetler gönderilirken bir hata oluştu');
+        setErrorMessage('Davetler gönderilirken bir hata oluştu');
+        setShowErrorToast(true);
       }
     } finally {
       setSending(false);
@@ -712,7 +731,8 @@ export default function InviteUsersModal({
                                 setShowProvinceDropdown(false);
                                 setShowDistrictDropdown(false);
                               } else {
-                                Alert.alert('Uyarı', 'Lütfen il ve ilçe seçin');
+                                setWarningMessage('Lütfen il ve ilçe seçin');
+                                setShowWarningToast(true);
                               }
                             }}
                           >
@@ -959,6 +979,27 @@ export default function InviteUsersModal({
           )}
         </View>
       </View>
+
+      {/* Success Toast - Modal içinde */}
+      <SuccessToast
+        visible={showSuccessToast}
+        message={successMessage}
+        onHide={() => setShowSuccessToast(false)}
+      />
+
+      {/* Error Toast - Modal içinde */}
+      <ErrorToast
+        visible={showErrorToast}
+        message={errorMessage}
+        onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Warning Toast - Modal içinde */}
+      <WarningToast
+        visible={showWarningToast}
+        message={warningMessage}
+        onHide={() => setShowWarningToast(false)}
+      />
     </Modal>
 
       {/* Premium Alert */}
