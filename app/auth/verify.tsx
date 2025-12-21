@@ -119,7 +119,12 @@ export default function VerifyScreen() {
         startSmsRetriever();
       }
     } catch (error: any) {
-      setErrorMessage(error.message || 'Kod gönderilemedi, lütfen tekrar deneyin');
+      // SMS gönderim sınırlaması hatası için özel mesaj
+      if (error.message.includes('saniye bekleyin')) {
+        setErrorMessage(`SMS gönderim sınırı: ${error.message}`);
+      } else {
+        setErrorMessage(error.message || 'Kod gönderilemedi, lütfen tekrar deneyin');
+      }
       setShowErrorToast(true);
     }
   };
@@ -178,7 +183,18 @@ export default function VerifyScreen() {
       }
     } catch (error: any) {
       console.log('❌ Verify error:', error.message);
-      setErrorMessage('Doğrulama kodu hatalı');
+      // Daha spesifik hata mesajları
+      if (error.message.includes('Geçersiz OTP kodu')) {
+        setErrorMessage('Doğrulama kodu hatalı. Lütfen tekrar deneyin.');
+      } else if (error.message.includes('OTP bulunamadı')) {
+        setErrorMessage('Doğrulama kodu bulunamadı. Yeni kod isteyin.');
+      } else if (error.message.includes('OTP süresi doldu')) {
+        setErrorMessage('Doğrulama kodunun süresi doldu. Yeni kod isteyin.');
+      } else if (error.message.includes('Çok fazla hatalı deneme')) {
+        setErrorMessage('Çok fazla hatalı deneme. Yeni kod isteyin.');
+      } else {
+        setErrorMessage('Doğrulama kodu hatalı');
+      }
       setShowErrorToast(true);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();

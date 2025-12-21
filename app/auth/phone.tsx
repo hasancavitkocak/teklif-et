@@ -31,7 +31,12 @@ export default function PhoneScreen() {
       await signInWithPhone('+90' + phone);
       router.push({ pathname: '/auth/verify', params: { phone: '+90' + phone } });
     } catch (error: any) {
-      setErrorMessage(error.message || 'SMS gönderilemedi');
+      // SMS gönderim sınırlaması hatası için özel mesaj
+      if (error.message.includes('saniye bekleyin')) {
+        setErrorMessage(`SMS gönderim sınırı: ${error.message}`);
+      } else {
+        setErrorMessage(error.message || 'SMS gönderilemedi');
+      }
       setShowErrorToast(true);
     } finally {
       setLoading(false);

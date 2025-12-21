@@ -15,6 +15,9 @@ export interface AppSettings {
   app_maintenance: boolean;
   max_daily_proposals: number;
   max_daily_requests: number;
+  netgsm_username: string;
+  netgsm_password: string;
+  netgsm_header: string;
 }
 
 class SettingsAPI {
@@ -154,6 +157,37 @@ class SettingsAPI {
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Netgsm yapılandırmasını getir
+   */
+  async getNetgsmConfig(): Promise<{
+    username: string;
+    password: string;
+    msgheader: string;
+  } | null> {
+    try {
+      const [username, password, header] = await Promise.all([
+        this.getSetting('netgsm_username'),
+        this.getSetting('netgsm_password'),
+        this.getSetting('netgsm_header')
+      ]);
+
+      if (!username || !password) {
+        console.warn('⚠️ Netgsm bilgileri eksik:', { username: !!username, password: !!password, header: !!header });
+        return null;
+      }
+
+      return {
+        username: username as string,
+        password: password as string,
+        msgheader: (header as string) || 'TEKLIF'
+      };
+    } catch (error) {
+      console.error('❌ Netgsm config getirme hatası:', error);
+      return null;
+    }
   }
 }
 

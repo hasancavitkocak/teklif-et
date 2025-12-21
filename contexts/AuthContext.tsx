@@ -632,15 +632,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // OTP kodu oluştur
       const otpCode = NetgsmSmsService.generateOtp();
       
-      // Netgsm konfigürasyonu
-      const netgsmConfig = {
-        username: process.env.EXPO_PUBLIC_NETGSM_USERNAME || '',
-        password: process.env.EXPO_PUBLIC_NETGSM_PASSWORD || '',
-        msgheader: process.env.EXPO_PUBLIC_NETGSM_HEADER || 'TEKLIF'
-      };
+      // Netgsm konfigürasyonu - Supabase'den al
+      const netgsmConfig = await settingsAPI.getNetgsmConfig();
+
+      // Debug: Netgsm config kontrolü
+      console.log('🔍 Netgsm config debug:', {
+        configFound: !!netgsmConfig,
+        username: netgsmConfig?.username ? '✅ Var' : '❌ Yok',
+        password: netgsmConfig?.password ? '✅ Var' : '❌ Yok',
+        header: netgsmConfig?.msgheader ? '✅ Var' : '❌ Yok'
+      });
 
       // Netgsm bilgileri kontrolü
-      if (!netgsmConfig.username || !netgsmConfig.password) {
+      if (!netgsmConfig) {
         console.warn('⚠️ Netgsm bilgileri bulunamadı, demo moda geçiliyor');
         otpCache.setOtp(phone, demoCode);
         return;
@@ -685,12 +689,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resendOtp = async (phone: string) => {
     try {
-      // Çok sık gönderim kontrolü
-      if (otpCache.hasValidOtp(phone)) {
-        const remainingTime = otpCache.getRemainingTime(phone);
-        if (remainingTime > 240) { // 4 dakikadan fazla kaldıysa
-          throw new Error(`${Math.ceil(remainingTime / 60)} dakika sonra tekrar deneyebilirsiniz`);
-        }
+      // SMS gönderim sınırlaması kontrolü (1 dakika)
+      const resendCheck = otpCache.canResendOtp(phone);
+      if (!resendCheck.canResend) {
+        throw new Error(`Lütfen ${resendCheck.remainingSeconds} saniye bekleyin`);
       }
 
       // Yeni OTP gönder

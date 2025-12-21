@@ -2,22 +2,26 @@ interface OtpData {
   code: string;
   expiresAt: number;
   attempts: number;
+  lastSentAt: number; // Son gönderim zamanı
 }
 
 class OtpCache {
   private cache = new Map<string, OtpData>();
   private readonly EXPIRY_TIME = 5 * 60 * 1000; // 5 dakika
   private readonly MAX_ATTEMPTS = 3;
+  private readonly MIN_RESEND_INTERVAL = 60 * 1000; // 1 dakika
 
   setOtp(phone: string, code: string): void {
-    const expiresAt = Date.now() + this.EXPIRY_TIME;
+    const now = Date.now();
+    const expiresAt = now + this.EXPIRY_TIME;
     // Code'u string olarak kaydet
     const codeStr = String(code);
     console.log('📝 OTP cache\'e kaydediliyor:', { phone, code: codeStr, expiresAt });
     this.cache.set(phone, {
       code: codeStr,
       expiresAt,
-      attempts: 0
+      attempts: 0,
+      lastSentAt: now
     });
 
     // Otomatik temizlik
@@ -69,6 +73,23 @@ class OtpCache {
     
     const remaining = otpData.expiresAt - Date.now();
     return Math.max(0, Math.ceil(remaining / 1000));
+  }
+
+  // Yeniden gönderim için kalan süreyi kontrol et
+  canResendOtp(phone: string): { canResend: boolean; remainingSeconds?: number } {
+    const otpData = this.cache.get(phone);
+    if (!otpData) return { canResend: true };
+    
+    const timeSinceLastSent = Date.now() - otpData.lastSentAt;
+    if (timeSinceLastSent < this.MIN_RESEND_INTERVAL) {
+      const remainingMs = this.MIN_RESEND_INTERVAL - timeSinceLastSent;
+      return { 
+        canResend: false, 
+        remainingSeconds: Math.ceil(remainingMs / 1000) 
+      };
+    }
+    
+    return { canResend: true };
   }
 }
 
