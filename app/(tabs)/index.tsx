@@ -17,7 +17,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Store, ChevronDown, Crown } from 'lucide-react-native';
+import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Store, ChevronDown, Crown, 
+  Music, Gamepad2, Book, Dumbbell, Camera, Utensils, Plane, Palette, Users, Heart, Circle, 
+  Activity, Waves, Trophy, Target, Flower2, Bike, Mountain, Film, Headphones, Theater, 
+  Guitar, Piano, Brush, Tent, Trees, Coffee, PenTool, ShoppingBag, Shirt, Laptop, 
+  Lightbulb, TrendingUp, Mic, HandHeart, Dog, Brain, Leaf } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 import { useAuth } from '@/contexts/AuthContext';
@@ -398,9 +402,58 @@ export default function DiscoverScreen() {
   const loadInterests = async () => {
     try {
       const data = await interestsAPI.getAll();
-      setInterests(data);
+      // Alfabetik sıraya koy
+      const sortedInterests = data.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+      setInterests(sortedInterests);
     } catch (error: any) {
       console.error('Error loading interests:', error.message);
+    }
+  };
+
+  // İlgi alanı iconları
+  const getInterestIcon = (interestName: string, size = 18, color = '#8B5CF6') => {
+    const iconProps = { size, color, strokeWidth: 2 };
+    
+    switch (interestName.toLowerCase()) {
+      case 'futbol': return <Circle {...iconProps} />;
+      case 'basketbol': return <Trophy {...iconProps} />;
+      case 'yüzme': return <Waves {...iconProps} />;
+      case 'voleybol': case 'tenis': return <Target {...iconProps} />;
+      case 'yoga': return <Flower2 {...iconProps} />;
+      case 'fitness': return <Dumbbell {...iconProps} />;
+      case 'koşu': return <Activity {...iconProps} />;
+      case 'yürüyüş': return <Activity {...iconProps} />;
+      case 'bisiklet': return <Bike {...iconProps} />;
+      case 'dağcılık': return <Mountain {...iconProps} />;
+      case 'sinema': return <Film {...iconProps} />;
+      case 'müzik': return <Music {...iconProps} />;
+      case 'dans': return <Users {...iconProps} />;
+      case 'tiyatro': return <Theater {...iconProps} />;
+      case 'konser': return <Headphones {...iconProps} />;
+      case 'gitar': return <Guitar {...iconProps} />;
+      case 'piyano': return <Piano {...iconProps} />;
+      case 'resim': return <Brush {...iconProps} />;
+      case 'fotoğrafçılık': return <Camera {...iconProps} />;
+      case 'seyahat': return <Plane {...iconProps} />;
+      case 'kamp': return <Tent {...iconProps} />;
+      case 'doğa': return <Trees {...iconProps} />;
+      case 'yemek yapmak': case 'yemek': return <Utensils {...iconProps} />;
+      case 'kahve': return <Coffee {...iconProps} />;
+      case 'kitap okuma': case 'kitap': return <Book {...iconProps} />;
+      case 'yazma': return <PenTool {...iconProps} />;
+      case 'alışveriş': return <ShoppingBag {...iconProps} />;
+      case 'moda': return <Shirt {...iconProps} />;
+      case 'teknoloji': return <Laptop {...iconProps} />;
+      case 'oyun': return <Gamepad2 {...iconProps} />;
+      case 'tasarım': return <Palette {...iconProps} />;
+      case 'girişimcilik': return <Lightbulb {...iconProps} />;
+      case 'yatırım': return <TrendingUp {...iconProps} />;
+      case 'podcast': return <Mic {...iconProps} />;
+      case 'gönüllülük': return <HandHeart {...iconProps} />;
+      case 'hayvanlar': return <Dog {...iconProps} />;
+      case 'meditasyon': return <Brain {...iconProps} />;
+      case 'bahçecilik': return <Leaf {...iconProps} />;
+      default: return <Heart {...iconProps} />;
     }
   };
 
@@ -1285,14 +1338,17 @@ export default function DiscoverScreen() {
                         setShowInterestDropdown(false);
                       }}
                     >
-                      <Text
-                        style={[
-                          styles.dropdownItemText,
-                          selectedInterest === interest.id && styles.dropdownItemTextActive,
-                        ]}
-                      >
-                        {interest.name}
-                      </Text>
+                      <View style={styles.dropdownItemContent}>
+                        {getInterestIcon(interest.name, 16, selectedInterest === interest.id ? '#8B5CF6' : '#6B7280')}
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            selectedInterest === interest.id && styles.dropdownItemTextActive,
+                          ]}
+                        >
+                          {interest.name}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1517,7 +1573,58 @@ function CreateProposalModal({
 
   const loadInterests = async () => {
     const { data } = await supabase.from('interests').select('*');
-    if (data) setInterests(data);
+    if (data) {
+      // Alfabetik sıraya koy
+      const sortedInterests = data.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+      setInterests(sortedInterests);
+    }
+  };
+
+  // İlgi alanı iconları - CreateProposalModal içinde
+  const getInterestIcon = (interestName: string, size = 18, color = '#8B5CF6') => {
+    const iconProps = { size, color, strokeWidth: 2 };
+    
+    switch (interestName.toLowerCase()) {
+      case 'futbol': return <Circle {...iconProps} />;
+      case 'basketbol': return <Trophy {...iconProps} />;
+      case 'yüzme': return <Waves {...iconProps} />;
+      case 'voleybol': case 'tenis': return <Target {...iconProps} />;
+      case 'yoga': return <Flower2 {...iconProps} />;
+      case 'fitness': return <Dumbbell {...iconProps} />;
+      case 'koşu': return <Activity {...iconProps} />;
+      case 'yürüyüş': return <Activity {...iconProps} />;
+      case 'bisiklet': return <Bike {...iconProps} />;
+      case 'dağcılık': return <Mountain {...iconProps} />;
+      case 'sinema': return <Film {...iconProps} />;
+      case 'müzik': return <Music {...iconProps} />;
+      case 'dans': return <Users {...iconProps} />;
+      case 'tiyatro': return <Theater {...iconProps} />;
+      case 'konser': return <Headphones {...iconProps} />;
+      case 'gitar': return <Guitar {...iconProps} />;
+      case 'piyano': return <Piano {...iconProps} />;
+      case 'resim': return <Brush {...iconProps} />;
+      case 'fotoğrafçılık': return <Camera {...iconProps} />;
+      case 'seyahat': return <Plane {...iconProps} />;
+      case 'kamp': return <Tent {...iconProps} />;
+      case 'doğa': return <Trees {...iconProps} />;
+      case 'yemek yapmak': case 'yemek': return <Utensils {...iconProps} />;
+      case 'kahve': return <Coffee {...iconProps} />;
+      case 'kitap okuma': case 'kitap': return <Book {...iconProps} />;
+      case 'yazma': return <PenTool {...iconProps} />;
+      case 'alışveriş': return <ShoppingBag {...iconProps} />;
+      case 'moda': return <Shirt {...iconProps} />;
+      case 'teknoloji': return <Laptop {...iconProps} />;
+      case 'oyun': return <Gamepad2 {...iconProps} />;
+      case 'tasarım': return <Palette {...iconProps} />;
+      case 'girişimcilik': return <Lightbulb {...iconProps} />;
+      case 'yatırım': return <TrendingUp {...iconProps} />;
+      case 'podcast': return <Mic {...iconProps} />;
+      case 'gönüllülük': return <HandHeart {...iconProps} />;
+      case 'hayvanlar': return <Dog {...iconProps} />;
+      case 'meditasyon': return <Brain {...iconProps} />;
+      case 'bahçecilik': return <Leaf {...iconProps} />;
+      default: return <Heart {...iconProps} />;
+    }
   };
 
 
@@ -1693,12 +1800,15 @@ function CreateProposalModal({
                             setShowCategoryDropdown(false);
                           }}
                         >
-                          <Text style={[
-                            styles.modernDropdownItemText,
-                            selectedInterest === interest.id && styles.modernDropdownItemTextSelected
-                          ]}>
-                            {interest.name}
-                          </Text>
+                          <View style={styles.modernDropdownItemContent}>
+                            {getInterestIcon(interest.name, 18, selectedInterest === interest.id ? '#8B5CF6' : '#6B7280')}
+                            <Text style={[
+                              styles.modernDropdownItemText,
+                              selectedInterest === interest.id && styles.modernDropdownItemTextSelected
+                            ]}>
+                              {interest.name}
+                            </Text>
+                          </View>
                           {selectedInterest === interest.id && (
                             <View style={styles.modernDropdownCheckmark}>
                               <Text style={styles.modernDropdownCheckmarkText}>✓</Text>
@@ -2277,7 +2387,6 @@ const styles = StyleSheet.create({
   },
   modernDropdownIcon: {
     transform: [{ rotate: '0deg' }],
-    transition: 'transform 0.2s ease',
   },
   modernDropdownIconRotated: {
     transform: [{ rotate: '180deg' }],
@@ -2296,7 +2405,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 16,
     marginTop: 8,
-    maxHeight: 150,
+    maxHeight: 250,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -2304,7 +2413,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modernDropdownScroll: {
-    maxHeight: 150,
+    maxHeight: 250,
   },
   modernDropdownItem: {
     flexDirection: 'row',
@@ -3428,6 +3537,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#8B5CF6',
+  },
+  
+  // Dropdown item content styles
+  dropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  modernDropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
   },
   
   // Loading ve Disabled Button Stilleri (artık kullanılmıyor)
