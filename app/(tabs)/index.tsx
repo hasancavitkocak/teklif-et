@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   PanResponder,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -1795,7 +1796,10 @@ function CreateProposalModal({
                 <Text style={styles.simpleLabel}>Kategori</Text>
                 <TouchableOpacity
                   style={styles.modernDropdownButton}
-                  onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  onPress={() => {
+                    setShowCategoryDropdown(!showCategoryDropdown);
+                    Keyboard.dismiss();
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={styles.modernDropdownContent}>
@@ -1837,6 +1841,7 @@ function CreateProposalModal({
                           onPress={() => {
                             setSelectedInterest(interest.id);
                             setShowCategoryDropdown(false);
+                            Keyboard.dismiss();
                           }}
                         >
                           <View style={styles.modernDropdownItemContent}>
