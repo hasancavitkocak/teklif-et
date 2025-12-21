@@ -34,8 +34,26 @@ export default function DeleteAccountModal({
     setShowSecondStep(true);
   };
 
+  // Türkçe karakterleri normalize eden fonksiyon
+  const normalizeText = (text: string): string => {
+    return text
+      .trim()
+      .replace(/İ/g, 'i')  // Büyük İ'yi küçük i'ye çevir
+      .replace(/I/g, 'i')  // Büyük I'yı küçük i'ye çevir
+      .toLowerCase()
+      .replace(/ı/g, 'i')  // Türkçe ı'yı i'ye çevir
+      .replace(/i̇/g, 'i')  // Noktalı i'yi noktasız i'ye çevir
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c');
+  };
+
   const handleFinalConfirm = () => {
-    if (confirmText.toLowerCase() === 'sil') {
+    const normalizedText = normalizeText(confirmText);
+    
+    if (normalizedText === 'sil') {
       onConfirm();
     }
   };
@@ -46,7 +64,7 @@ export default function DeleteAccountModal({
     onClose();
   };
 
-  const isConfirmValid = confirmText.toLowerCase() === 'sil';
+  const isConfirmValid = normalizeText(confirmText) === 'sil';
 
   return (
     <Modal

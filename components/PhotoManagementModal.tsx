@@ -177,32 +177,17 @@ export default function PhotoManagementModal({
         // Dosya adı oluştur
         const timestamp = Date.now();
         const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
+        const filePath = `profile-photos/${fileName}`;
         
-        let base64Data: string;
-        
-        if (uri.startsWith('file://')) {
-          // Mobile için - expo-file-system kullan
-          const FileSystem = require('expo-file-system');
-          base64Data = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } else {
-          // Web için - data URL'den base64 kısmını al
-          base64Data = uri.split(',')[1];
-        }
-        
-        // Base64'ü ArrayBuffer'a çevir
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
+        // Fetch ile ArrayBuffer al (hem web hem mobile çalışır)
+        const response = await fetch(uri);
+        const arrayBuffer = await response.arrayBuffer();
+        const fileData = new Uint8Array(arrayBuffer);
         
         // Supabase storage'a yükle
         const { error: uploadError } = await supabase.storage
           .from('profile-photos')
-          .upload(`profile-photos/${fileName}`, byteArray, {
+          .upload(filePath, fileData, {
             contentType: 'image/jpeg',
             upsert: false,
           });
@@ -212,7 +197,7 @@ export default function PhotoManagementModal({
         // Public URL'i al
         const { data: urlData } = supabase.storage
           .from('profile-photos')
-          .getPublicUrl(`profile-photos/${fileName}`);
+          .getPublicUrl(filePath);
         
         uploadedUrl = urlData.publicUrl;
       }

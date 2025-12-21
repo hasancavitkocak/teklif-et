@@ -10,6 +10,7 @@ import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
 import PremiumSuccessModal from '@/components/PremiumSuccessModal';
 import PremiumCancelledModal from '@/components/PremiumCancelledModal';
+import PackagePurchaseSuccessModal from '@/components/PackagePurchaseSuccessModal';
 import ErrorToast from '@/components/ErrorToast';
 
 export default function PremiumScreen() {
@@ -26,6 +27,8 @@ export default function PremiumScreen() {
   const [cancelledModalVisible, setCancelledModalVisible] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Package | null>(null);
   const [activeTab, setActiveTab] = useState<'plans' | 'addons'>('plans');
+  const [packageSuccessModalVisible, setPackageSuccessModalVisible] = useState(false);
+  const [purchasedPackage, setPurchasedPackage] = useState<Package | null>(null);
   
   // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
@@ -146,8 +149,9 @@ export default function PremiumScreen() {
       await loadData();
       await refreshPremiumStatus();
       
-      // Show success message
-      alert(`🎉 ${addon.name} başarıyla satın alındı!\n${addon.credits_amount ? `+${addon.credits_amount} kredi hesabınıza eklendi.` : ''}`);
+      // Show success modal
+      setPurchasedPackage(addon);
+      setPackageSuccessModalVisible(true);
       
     } catch (error: any) {
       setErrorMessage(error.message || 'Satın alma işlemi başarısız oldu');
@@ -200,7 +204,7 @@ export default function PremiumScreen() {
                 <View style={styles.subscriptionInfo}>
                   <Text style={styles.subscriptionType}>
                     {subscription.purchase_type === 'subscription' ? 
-                      (subscription.package as any)?.name || 'Premium' : 'Premium'
+                      'Premium Abonelik' : 'Premium'
                     }
                   </Text>
                   <Text style={styles.subscriptionExpiry}>
@@ -340,7 +344,9 @@ export default function PremiumScreen() {
             )}
 
             {/* Addon Packages */}
-            {addonPackages.map((addon, index) => (
+            {addonPackages
+              .filter(addon => addon.category !== 'profile_views') // Profil görüntüleme paketini kaldır
+              .map((addon, index) => (
               <TouchableOpacity 
                 key={addon.id}
                 style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
@@ -414,6 +420,18 @@ export default function PremiumScreen() {
         visible={cancelledModalVisible}
         onClose={() => setCancelledModalVisible(false)}
         expiryDate={subscription?.expires_at}
+      />
+
+      {/* Package Purchase Success Modal */}
+      <PackagePurchaseSuccessModal
+        visible={packageSuccessModalVisible}
+        onClose={() => {
+          setPackageSuccessModalVisible(false);
+          setPurchasedPackage(null);
+        }}
+        packageName={purchasedPackage?.name || ''}
+        packageCategory={purchasedPackage?.category || ''}
+        creditsAmount={purchasedPackage?.credits_amount}
       />
 
       {/* Error Toast */}
