@@ -321,8 +321,13 @@ export default function ProfileScreen() {
       console.log('✅ signOut başarılı');
       setShowSignOutModal(false);
       console.log('✅ Modal kapatıldı');
-      // router.replace yerine sadece modal'ı kapat
-      // Ana index sayfası otomatik olarak welcome'a yönlendirecek
+      
+      // Manuel olarak welcome sayfasına yönlendir
+      setTimeout(() => {
+        console.log('🔄 Manuel welcome yönlendirmesi...');
+        router.replace('/auth/welcome');
+      }, 500);
+      
       console.log('✅ Çıkış yapıldı, ana sayfa yönlendirecek');
     } catch (error: any) {
       console.error('❌ Sign out error:', error);

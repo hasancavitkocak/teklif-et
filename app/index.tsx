@@ -25,10 +25,14 @@ export default function Index() {
         setTimeout(() => {
           console.log('🔄 Router replace to welcome çağrılıyor...');
           try {
+            // Navigation stack'ini temizle ve welcome'a git
+            router.dismissAll();
             router.replace('/auth/welcome');
             console.log('✅ Router replace başarılı');
           } catch (error) {
             console.error('❌ Router replace hatası:', error);
+            // Fallback: push kullan
+            router.push('/auth/welcome');
           }
         }, 100);
         return;

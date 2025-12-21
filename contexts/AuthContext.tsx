@@ -816,6 +816,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔘 Local state temizleniyor...');
       setSession(null);
       setUser(null);
+      setLoading(false); // Loading'i de sıfırla
       console.log('✅ Local state temizlendi');
     }
   };
