@@ -1583,9 +1583,15 @@ function CreateProposalModal({
     const hour = now.getHours();
     // Saat 18:00'den önce bugün, sonra yarın
     if (hour < 18) {
-      return now; // Bugün
+      // Bugün saat 23:59'a ayarla
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      return today;
     } else {
-      return new Date(Date.now() + 24 * 60 * 60 * 1000); // Yarın
+      // Yarın saat 23:59'a ayarla
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      tomorrow.setHours(23, 59, 59, 999);
+      return tomorrow;
     }
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -1675,12 +1681,17 @@ function CreateProposalModal({
         onChange: (event, date) => {
           if (event.type === 'set' && date) {
             // Seçilen tarih bugünden önceyse uyarı göster
-            if (date < new Date().setHours(0, 0, 0, 0)) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (date < today) {
               setWarningMessage('Etkinlik tarihi geçmiş bir tarih olamaz');
               setShowWarningToast(true);
               return;
             }
-            setEventDate(date);
+            // Seçilen tarihi saat 23:59'a ayarla
+            const newDate = new Date(date);
+            newDate.setHours(23, 59, 59, 999);
+            setEventDate(newDate);
           }
         },
       });
@@ -1729,7 +1740,18 @@ function CreateProposalModal({
       // Form'u temizle
       setActivityName('');
       setVenueName('');
-      setEventDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+      // Event date'i yeniden hesapla
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour < 18) {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        setEventDate(today);
+      } else {
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        tomorrow.setHours(23, 59, 59, 999);
+        setEventDate(tomorrow);
+      }
       setSelectedInterest(null);
       // Form reset
       
@@ -1952,19 +1974,23 @@ function CreateProposalModal({
           onChange={(event, date) => {
             if (event.type === 'set' && date) {
               // Seçilen tarih bugünden önceyse uyarı göster
-              if (date < new Date().setHours(0, 0, 0, 0)) {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              if (date < today) {
                 setWarningMessage('Etkinlik tarihi geçmiş bir tarih olamaz');
                 setShowWarningToast(true);
                 setShowDatePicker(false);
                 return;
               }
-              setEventDate(date);
+              // Seçilen tarihi saat 23:59'a ayarla
+              const newDate = new Date(date);
+              newDate.setHours(23, 59, 59, 999);
+              setEventDate(newDate);
               setShowDatePicker(false);
             } else if (event.type === 'dismissed') {
               setShowDatePicker(false);
             }
           }}
-          minimumDate={new Date()}
         />
       )}
       
