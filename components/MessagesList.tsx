@@ -87,9 +87,11 @@ const MessagesList = forwardRef<MessagesListRef, MessagesListProps>(({
       contentContainerStyle={[styles.messagesList, { paddingBottom: insets.bottom }]}
       showsVerticalScrollIndicator={false}
       style={styles.messagesWrapper}
-      contentInsetAdjustmentBehavior="automatic"
       onContentSizeChange={() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
+        // Yeni mesaj geldiğinde scroll
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       }}
     />
   );

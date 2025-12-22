@@ -159,7 +159,7 @@ export default function MessageDetailScreen() {
         
         <MessageInput 
           onSendMessage={sendMessage}
-          onFocus={() => {
+          onKeyboardShow={() => {
             // Klavye açıldığında son mesaja scroll - daha uzun timeout
             setTimeout(() => {
               messagesListRef.current?.scrollToEnd();

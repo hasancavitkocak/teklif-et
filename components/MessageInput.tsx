@@ -1,24 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
+  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send } from 'lucide-react-native';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
-  onFocus?: () => void;
+  onKeyboardShow?: () => void;
   disabled?: boolean;
 }
 
-export default function MessageInput({ onSendMessage, onFocus, disabled = false }: MessageInputProps) {
+export default function MessageInput({ onSendMessage, onKeyboardShow, disabled = false }: MessageInputProps) {
   const [messageText, setMessageText] = useState('');
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const keyboardDidShow = () => {
+      onKeyboardShow?.();
+    };
+
+    const subscription = Keyboard.addListener('keyboardDidShow', keyboardDidShow);
+    return () => subscription?.remove();
+  }, [onKeyboardShow]);
 
   const handleSend = () => {
     if (!messageText.trim() || disabled) return;
@@ -28,68 +37,67 @@ export default function MessageInput({ onSendMessage, onFocus, disabled = false 
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'position' : undefined}
-    >
-      <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Mesaj..."
-            placeholderTextColor="#8E8E93"
-            value={messageText}
-            onChangeText={setMessageText}
-            onFocus={onFocus}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={!messageText.trim() || disabled}
-          >
-            <Send size={20} color={messageText.trim() ? '#8B5CF6' : '#D1D5DB'} />
-          </TouchableOpacity>
-        </View>
+    <View style={styles.inputWrapper}>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Mesaj..."
+          placeholderTextColor="#8E8E93"
+          value={messageText}
+          onChangeText={setMessageText}
+          onFocus={() => {
+            // Klavye açıldığında callback'i çağır
+            setTimeout(() => {
+              onKeyboardShow?.();
+            }, 300);
+          }}
+          multiline={false}
+          maxLength={500}
+        />
+        <TouchableOpacity
+          style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
+          onPress={handleSend}
+          disabled={!messageText.trim() || disabled}
+        >
+          <Send size={20} color="#FFF" />
+        </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   inputWrapper: {
     backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    paddingTop: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingBottom: 34,
   },
   inputContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-    alignItems: 'flex-end',
-    gap: 8,
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 25,
   },
   input: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 0,
-    paddingHorizontal: 0,
-    paddingVertical: 2,
-    fontSize: 15,
-    maxHeight: 80,
+    backgroundColor: 'transparent',
+    fontSize: 16,
     color: '#000',
-    borderWidth: 0,
-    minHeight: 20,
+    paddingVertical: 0,
   },
   sendButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    opacity: 1,
+    opacity: 0.5,
   },
 });
