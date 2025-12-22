@@ -20,7 +20,7 @@ module.exports = {
       bundleIdentifier: "com.teklifet.app"
     },
     android: {
-      softwareKeyboardLayoutMode: "pan",
+      softwareKeyboardLayoutMode: "resize",
       package: "com.teklifet.app",
       versionCode: 2,
       minSdkVersion: 23,
