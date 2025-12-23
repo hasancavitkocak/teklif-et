@@ -25,6 +25,8 @@ const PREMIUM_FEATURES = [
 export default function PremiumScreen() {
   const { user, refreshPremiumStatus, isPremium } = useAuth();
   const router = useRouter();
+  
+  // State declarations - all at once to maintain hook order
   const [subscription, setSubscription] = useState<PackagePurchase | null>(null);
   const [subscriptionPackages, setSubscriptionPackages] = useState<Package[]>([]);
   const [addonPackages, setAddonPackages] = useState<Package[]>([]);
@@ -38,12 +40,11 @@ export default function PremiumScreen() {
   const [activeTab, setActiveTab] = useState<'plans' | 'addons'>('plans');
   const [packageSuccessModalVisible, setPackageSuccessModalVisible] = useState(false);
   const [purchasedPackage, setPurchasedPackage] = useState<Package | null>(null);
-  
-  // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadData = useCallback(async () => {
+  // Load data function - memoized to prevent unnecessary re-renders
+  const loadData = async () => {
     if (!user?.id) return;
     
     try {
@@ -69,12 +70,12 @@ export default function PremiumScreen() {
     } catch (error) {
       console.error('❌ Paket verilerini yükleme hatası:', error);
     }
-  }, [user?.id]);
+  };
 
-  // Load packages and subscription data
+  // Load packages and subscription data on mount
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [user?.id]);
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
@@ -337,7 +338,7 @@ export default function PremiumScreen() {
                   <View key={index} style={styles.creditItem}>
                     <Text style={styles.creditType}>
                       {credit.credit_type === 'super_like' ? 'Super Like' :
-                       credit.credit_type === 'boost' ? 'Boost' : 'Profil Görüntüleme'}
+                       credit.credit_type === 'boost' ? 'Boost' : 'Diğer'}
                     </Text>
                     <Text style={styles.creditAmount}>{credit.amount} adet</Text>
                   </View>
@@ -362,7 +363,6 @@ export default function PremiumScreen() {
                 }]}>
                   {addon.category === 'super_like' && <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />}
                   {addon.category === 'boost' && <Crown size={24} color="#F59E0B" />}
-                  {addon.category === 'profile_views' && <Eye size={24} color="#3B82F6" />}
                 </View>
                 <View style={styles.addOnContent}>
                   <Text style={styles.addOnTitle}>{addon.name}</Text>

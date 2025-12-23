@@ -410,7 +410,8 @@ export default function ProposalsScreen() {
         ? 'Başka Biri Kabul Edildi'
         : 'Beklemede';
 
-    const userId = request.requester_id;
+    // Profil ID'sini doğru belirle: received'da requester, sent'te proposal creator
+    const userId = type === 'received' ? request.requester_id : request.proposal.creator.id;
 
     return (
       <TouchableOpacity 
