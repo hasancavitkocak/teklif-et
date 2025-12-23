@@ -25,8 +25,7 @@ export default function Index() {
         setTimeout(() => {
           console.log('🔄 Router replace to welcome çağrılıyor...');
           try {
-            // Navigation stack'ini temizle ve welcome'a git
-            router.dismissAll();
+            // Direkt replace kullan, dismissAll gereksiz
             router.replace('/auth/welcome');
             console.log('✅ Router replace başarılı');
           } catch (error) {

@@ -23,7 +23,6 @@ import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Stor
   Activity, Waves, Trophy, Target, Flower2, Bike, Mountain, Film, Headphones, Theater, 
   Guitar, Piano, Brush, Tent, Trees, Coffee, PenTool, ShoppingBag, Shirt, Laptop, 
   Lightbulb, TrendingUp, Mic, HandHeart, Dog, Brain, Leaf } from 'lucide-react-native';
-import * as Location from 'expo-location';
 import { getDistrictFromNeighborhood } from '@/constants/neighborhoodToDistrict';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -50,7 +49,17 @@ import { PROVINCES } from '@/constants/cities';
 const { width, height } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
-  const { user, isPremium, refreshPremiumStatus, currentCity, requestLocationPermission, refreshUserStats } = useAuth();
+  const { 
+    user, 
+    isPremium, 
+    refreshPremiumStatus, 
+    currentCity, 
+    requestLocationPermission, 
+    refreshUserStats,
+    getCachedLocation,
+    updateLocationManually,
+    clearLocationCache
+  } = useAuth();
   const { registerForPushNotifications } = usePushNotifications();
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
@@ -300,6 +309,14 @@ export default function DiscoverScreen() {
       return;
     }
     
+    // Önce cache'i kontrol et
+    const cachedLocation = getCachedLocation();
+    if (cachedLocation && cachedLocation.city) {
+      console.log('📍 Cache\'den konum kullanılıyor:', cachedLocation.city);
+      // Cache'den konum var, API çağrısı yapmaya gerek yok
+      return;
+    }
+    
     // Premium kullanıcılar için otomatik konum güncellemesi yapma
     if (isPremium) {
       console.log('👑 Premium kullanıcı, otomatik konum güncellemesi atlanıyor');
@@ -309,79 +326,16 @@ export default function DiscoverScreen() {
     isUpdatingLocationRef.current = true;
     
     try {
-      console.log('🔄 Ana sayfada konum güncelleniyor...');
+      console.log('🔄 Ana sayfada konum güncelleniyor (cache yok)...');
       
-      // Konum izni kontrol et
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        // İzin yoksa kullanıcıya sor
-        console.log('❌ Konum izni yok, kullanıcıdan izin isteniyor');
+      // AuthContext'teki cache'li konum güncelleme fonksiyonunu kullan
+      const result = await updateLocationManually();
+      
+      if (result.success && result.city) {
+        console.log('✅ Ana sayfada konum güncellendi:', result.city);
+      } else if (result.error === 'permission_denied') {
+        console.log('❌ Konum izni reddedildi');
         showLocationPermissionAlert();
-        return;
-      }
-
-      // Mevcut konumu al
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const { latitude, longitude } = location.coords;
-
-      // Reverse geocoding ile şehir bilgisini al
-      const geocodeResults = await Location.reverseGeocodeAsync({ 
-        latitude, 
-        longitude 
-      });
-      
-      if (geocodeResults && geocodeResults.length > 0) {
-        const geocode = geocodeResults[0];
-        
-        // İlçe bilgisini akıllı şekilde belirle
-        let cityName = '';
-        let districtName = '';
-        let regionName = geocode.region || '';
-        
-        // Önce subregion'ı kontrol et
-        if (geocode.subregion && geocode.subregion.trim()) {
-          districtName = geocode.subregion.trim();
-          console.log('📍 Index - Subregion kullanıldı:', districtName);
-        }
-        // Subregion yoksa district'i kontrol et
-        else if (geocode.district && geocode.district.trim()) {
-          districtName = geocode.district.trim();
-          console.log('📍 Index - District kullanıldı:', districtName);
-        }
-        // Son çare olarak city'yi kullan
-        else if (geocode.city) {
-          districtName = geocode.city;
-          console.log('📍 Index - City kullanıldı:', districtName);
-        }
-        
-        // Final şehir adını oluştur
-        if (districtName && regionName) {
-          cityName = `${districtName}, ${regionName}`;
-        } else if (districtName) {
-          cityName = districtName;
-        } else if (regionName) {
-          cityName = regionName;
-        }
-
-        if (cityName) {
-          // Profildeki şehir ve koordinat bilgilerini güncelle
-          const { error } = await supabase
-            .from('profiles')
-            .update({
-              city: cityName,
-              latitude,
-              longitude,
-            })
-            .eq('id', user.id);
-
-          if (!error) {
-            console.log('✅ Ana sayfada konum güncellendi:', cityName);
-            // AuthContext'teki currentCity otomatik güncellenecek
-          }
-        }
       }
     } catch (error) {
       // Sessizce logla, kullanıcıyı rahatsız etme
@@ -873,6 +827,7 @@ export default function DiscoverScreen() {
               setRefreshing(true);
               setCurrentIndex(0);
               setSkippedProposalIds(new Set()); // Geçilen teklifleri temizle
+              clearLocationCache(); // Konum cache'ini temizle
               loadProposals(true); // resetIndex = true
             }}
           >
