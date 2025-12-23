@@ -67,13 +67,9 @@ export default function ChatScreen() {
   }, [id, user?.id]);
 
   // Mesajlar yüklendiğinde en son mesaja scroll
+  // Inverted FlatList kullanıyoruz, scroll gerekmiyor
   useEffect(() => {
-    if (messages.length > 0) {
-      // Daha kısa timeout ile hızlı scroll
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 50);
-    }
+    // Inverted FlatList otomatik olarak en son mesajı gösteriyor
   }, [messages]);
 
   const initializeConversation = async () => {
@@ -117,10 +113,7 @@ export default function ChatScreen() {
       await messagesAPI.sendMessage(id as string, user.id, messageContent);
       await loadMessages();
       
-      // Mesaj gönderildikten sonra scroll
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 50);
+      // Inverted FlatList ile scroll gerekmiyor
     } catch (error: any) {
       console.error('Send message error:', error);
       setErrorMessage('Mesaj gönderilemedi');
@@ -276,7 +269,7 @@ export default function ChatScreen() {
       >
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={messages.slice().reverse()}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           style={styles.messagesList}
@@ -284,24 +277,9 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
-          maintainVisibleContentPosition={{
-            minIndexForVisible: 0,
-            autoscrollToTopThreshold: 10,
-          }}
-          onContentSizeChange={() => {
-            if (messages.length > 0) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: false });
-              }, 50);
-            }
-          }}
-          onLayout={() => {
-            if (messages.length > 0) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: false });
-              }, 100);
-            }
-          }}
+          inverted={true}
+          scrollEnabled={true}
+          removeClippedSubviews={false}
         />
         
         {/* Input */}
@@ -515,12 +493,12 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   messagesContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 16,
-    flexGrow: 1,
-    justifyContent: 'flex-end',
+    paddingTop: 16,
+    paddingBottom: 0,
   },
   messagesContainerEmpty: {
     paddingHorizontal: 12,
