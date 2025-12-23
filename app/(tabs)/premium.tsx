@@ -42,6 +42,7 @@ export default function PremiumScreen() {
   const [purchasedPackage, setPurchasedPackage] = useState<Package | null>(null);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Load data function - memoized to prevent unnecessary re-renders
   const loadData = useCallback(async () => {
@@ -60,6 +61,7 @@ export default function PremiumScreen() {
       setAddonPackages(addons);
       setSubscription(activeSubscription);
       setUserCredits(credits);
+      setDataLoaded(true);
 
       console.log('📦 Paketler yüklendi:', {
         subscriptions: subscriptions.length,
@@ -69,13 +71,19 @@ export default function PremiumScreen() {
       });
     } catch (error) {
       console.error('❌ Paket verilerini yükleme hatası:', error);
+      setErrorMessage('Paket bilgileri yüklenirken bir hata oluştu');
+      setShowErrorToast(true);
     }
   }, [user?.id]);
 
   // Load packages and subscription data on mount
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // Premium kullanıcılar için varsayılan tab'ı addons yap
+    if (isPremium) {
+      setActiveTab('addons');
+    }
+  }, [loadData, isPremium]);
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
@@ -254,31 +262,33 @@ export default function PremiumScreen() {
         </View>
 
         {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'plans' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('plans')}
-          >
-            <Crown size={20} color={activeTab === 'plans' ? '#8B5CF6' : '#6B7280'} />
-            <Text style={[styles.tabText, activeTab === 'plans' && styles.tabTextActive]}>
-              Planlar
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'addons' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('addons')}
-          >
-            <Sparkles size={20} color={activeTab === 'addons' ? '#8B5CF6' : '#6B7280'} />
-            <Text style={[styles.tabText, activeTab === 'addons' && styles.tabTextActive]}>
-              Ek Paketler
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {!isPremium && (
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'plans' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('plans')}
+            >
+              <Crown size={20} color={activeTab === 'plans' ? '#8B5CF6' : '#6B7280'} />
+              <Text style={[styles.tabText, activeTab === 'plans' && styles.tabTextActive]}>
+                Planlar
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'addons' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('addons')}
+            >
+              <Sparkles size={20} color={activeTab === 'addons' ? '#8B5CF6' : '#6B7280'} />
+              <Text style={[styles.tabText, activeTab === 'addons' && styles.tabTextActive]}>
+                Ek Paketler
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Tab Content */}
-        {activeTab === 'plans' && !isPremium && (
+        {activeTab === 'plans' && !isPremium && dataLoaded && (
           <View style={styles.plansSection}>
-            {subscriptionPackages.map((plan, index) => (
+            {subscriptionPackages.length > 0 ? subscriptionPackages.map((plan, index) => (
               <TouchableOpacity
                 key={plan.id}
                 style={[styles.planCard, plan.is_popular && styles.planCardPopular]}
@@ -320,11 +330,15 @@ export default function PremiumScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Planlar yükleniyor...</Text>
+              </View>
+            )}
           </View>
         )}
 
-        {activeTab === 'addons' && (
+        {activeTab === 'addons' && dataLoaded && (
           <View style={styles.addOnsSection}>
             <Text style={styles.addOnsSubtitle}>
               İhtiyacınız olan özellikleri tek seferlik satın alın
@@ -347,7 +361,7 @@ export default function PremiumScreen() {
             )}
 
             {/* Addon Packages */}
-            {addonPackages.map((addon, index) => (
+            {addonPackages.length > 0 ? addonPackages.map((addon, index) => (
               <TouchableOpacity 
                 key={addon.id}
                 style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
@@ -377,7 +391,11 @@ export default function PremiumScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Ek paketler yükleniyor...</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -788,5 +806,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#3B82F6',
+  },
+  // Empty State Styles
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
