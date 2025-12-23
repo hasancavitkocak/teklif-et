@@ -28,6 +28,8 @@ interface AuthContextType {
   updateLocationManually: () => Promise<{ success: boolean; city?: string; error?: string }>;
   updateCityFromSettings: (newCity: string) => Promise<boolean>;
   requestLocationPermission: () => Promise<{ granted: boolean; error?: string }>;
+  getCachedLocation: () => { coordinates: { latitude: number; longitude: number } | null; city: string; timestamp: number } | null;
+  clearLocationCache: () => void;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
   resendOtp: (phone: string) => Promise<boolean>;
@@ -47,6 +49,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dailyProposalLimit, setDailyProposalLimit] = useState(0);
   const [remainingRequestsToday, setRemainingRequestsToday] = useState(0);
   const [dailyRequestLimit, setDailyRequestLimit] = useState(0);
+
+  // Konum cache sistemi
+  const [locationCache, setLocationCache] = useState<{
+    coordinates: { latitude: number; longitude: number } | null;
+    city: string;
+    timestamp: number;
+  }>({
+    coordinates: null,
+    city: '',
+    timestamp: 0
+  });
+
+  const LOCATION_CACHE_DURATION = 10 * 60 * 1000; // 10 dakika cache
+
+  // Cache'den konum al
+  const getCachedLocation = () => {
+    const now = Date.now();
+    if (locationCache.timestamp && (now - locationCache.timestamp) < LOCATION_CACHE_DURATION) {
+      console.log('📍 Cache\'den konum alındı:', locationCache.city);
+      return locationCache;
+    }
+    return null;
+  };
+
+  // Cache'e konum kaydet
+  const setCachedLocation = (coordinates: { latitude: number; longitude: number } | null, city: string) => {
+    const newCache = {
+      coordinates,
+      city,
+      timestamp: Date.now()
+    };
+    setLocationCache(newCache);
+    console.log('💾 Konum cache\'e kaydedildi:', city);
+  };
+
+  // Cache'i temizle
+  const clearLocationCache = () => {
+    setLocationCache({
+      coordinates: null,
+      city: '',
+      timestamp: 0
+    });
+    console.log('🗑️ Konum cache temizlendi');
+  };
 
   const refreshPremiumStatus = async () => {
     if (!user?.id) return;
@@ -204,6 +250,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false };
     }
     
+    // Önce cache'i kontrol et
+    const cachedLocation = getCachedLocation();
+    if (cachedLocation && cachedLocation.city) {
+      console.log('📍 Cache\'den konum kullanılıyor:', cachedLocation.city);
+      setCurrentCity(cachedLocation.city);
+      return { success: true, city: cachedLocation.city };
+    }
+    
     try {
       console.log('📍 Manuel konum güncelleme başlatılıyor... User ID:', user.id);
       
@@ -212,6 +266,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (result.success && result.city) {
         console.log('✅ Manuel konum güncelleme tamamlandı, yeni şehir:', result.city);
+        
+        // Cache'e kaydet
+        setCachedLocation(result.coordinates || null, result.city);
+        
         return { success: true, city: result.city };
       } else if (result.error === 'permission_denied') {
         console.log('❌ Konum izni reddedildi');
@@ -298,7 +356,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Global state'i güncelle
       setCurrentCity(newCity);
-      console.log('✅ Ayarlardan şehir güncellendi:', newCity);
+      
+      // Cache'i güncelle
+      const cacheCoordinates = coordinates ? { latitude: coordinates.lat, longitude: coordinates.lon } : null;
+      setCachedLocation(cacheCoordinates, newCity);
+      
+      console.log('✅ Ayarlardan şehir güncellendi ve cache güncellendi:', newCity);
       return true;
     } catch (error) {
       console.error('❌ Ayarlar şehir güncelleme hatası:', error);
@@ -845,6 +908,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateLocationManually,
         updateCityFromSettings,
         requestLocationPermission,
+        getCachedLocation,
+        clearLocationCache,
         signInWithPhone,
         verifyOtp,
         resendOtp,
