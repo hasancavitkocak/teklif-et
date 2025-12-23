@@ -5,15 +5,15 @@ module.exports = {
     owner: "hasancavitkocak",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/images/app-icon-new.png",
+    icon: "./assets/images/puzzle-iconnew.png",
     scheme: "myapp",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     jsEngine: "hermes",
     splash: {
-      image: "./assets/images/app-icon-new.png",
+      image: "./assets/images/puzzle-iconnew.png",
       resizeMode: "contain",
-      backgroundColor: "#8B5CF6"
+      backgroundColor: "#FFFFFF"
     },
     ios: {
       supportsTablet: true,
@@ -25,9 +25,11 @@ module.exports = {
       versionCode: 2,
       minSdkVersion: 23,
       targetSdkVersion: 34,
+      icon: "./assets/images/puzzle-iconnew.png",
       adaptiveIcon: {
-        foregroundImage: "./assets/images/app-icon-new.png",
-        backgroundColor: "#8B5CF6"
+        foregroundImage: "./assets/images/puzzle-iconnew.png",
+        backgroundColor: "#FFFFFF",
+        monochromeImage: "./assets/images/puzzle-iconnew.png"
       },
       permissions: [
         "ACCESS_FINE_LOCATION",
@@ -57,7 +59,7 @@ module.exports = {
       [
         "expo-notifications",
         {
-          icon: "./assets/images/app-icon-new.png",
+          icon: "./assets/images/puzzle-iconnew.png",
           color: "#8B5CF6",
           mode: "production"
         }
