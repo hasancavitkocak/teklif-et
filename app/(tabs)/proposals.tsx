@@ -539,9 +539,13 @@ export default function ProposalsScreen() {
                   </View>
                   <View style={styles.proposalActions}>
                     {(proposal.requests_count ?? 0) > 0 && (
-                      <View style={styles.badge}>
+                      <TouchableOpacity 
+                        style={styles.badge}
+                        onPress={() => setActiveTab('received')}
+                        activeOpacity={0.7}
+                      >
                         <Text style={styles.badgeText}>{proposal.requests_count}</Text>
-                      </View>
+                      </TouchableOpacity>
                     )}
                     <TouchableOpacity
                       onPress={() => handleInviteUsers(proposal)}
