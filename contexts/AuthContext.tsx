@@ -27,6 +27,7 @@ interface AuthContextType {
   unfreezeAccount: () => Promise<boolean>;
   updateLocationManually: () => Promise<{ success: boolean; city?: string; error?: string }>;
   updateCityFromSettings: (newCity: string) => Promise<boolean>;
+  onLocationUpdate?: (newCity: string) => void; // Konum güncellendiğinde çağrılacak callback
   requestLocationPermission: () => Promise<{ granted: boolean; error?: string }>;
   getCachedLocation: () => { coordinates: { latitude: number; longitude: number } | null; city: string; timestamp: number } | null;
   clearLocationCache: () => void;
@@ -250,24 +251,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false };
     }
     
-    // Önce cache'i kontrol et
-    const cachedLocation = getCachedLocation();
-    if (cachedLocation && cachedLocation.city) {
-      console.log('📍 Cache\'den konum kullanılıyor:', cachedLocation.city);
-      setCurrentCity(cachedLocation.city);
-      return { success: true, city: cachedLocation.city };
-    }
-    
     try {
-      console.log('📍 Manuel konum güncelleme başlatılıyor... User ID:', user.id);
+      console.log('📍 Manuel konum güncelleme başlatılıyor (GPS\'ten gerçek konum alınacak)... User ID:', user.id);
       
-      // Konum güncelleme işlemini yap ve güncellenmiş şehir bilgisini al
+      // Manuel güncelleme için cache'i atla, direkt GPS'ten konum al
       const result = await updateUserLocationWithResult();
       
       if (result.success && result.city) {
         console.log('✅ Manuel konum güncelleme tamamlandı, yeni şehir:', result.city);
         
-        // Cache'e kaydet
+        // Cache'i yeni konum ile güncelle
         setCachedLocation(result.coordinates || null, result.city);
         
         return { success: true, city: result.city };
@@ -467,7 +460,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Otomatik konum güncelleme kaldırıldı - sadece onboarding'de konum alınacak
 
-  const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string; error?: string }> => {
+  const updateUserLocationWithResult = async (): Promise<{ success: boolean; city?: string; error?: string; coordinates?: { latitude: number; longitude: number } }> => {
     if (!user?.id) return { success: false };
     
     try {
@@ -636,7 +629,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           console.log('✅ Konum güncellendi:', finalCityName);
           setCurrentCity(finalCityName); // Global state'i güncelle
-          return { success: true, city: finalCityName };
+          return { success: true, city: finalCityName, coordinates: { latitude, longitude } };
         }
       } else {
         console.warn('⚠️ Şehir bilgisi bulunamadı, sadece koordinatlar kaydediliyor');
@@ -657,7 +650,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           console.log('✅ Koordinatlar kaydedildi');
           setCurrentCity('Konum Tespit Edilemedi');
-          return { success: true, city: 'Konum Tespit Edilemedi' };
+          return { success: true, city: 'Konum Tespit Edilemedi', coordinates: { latitude, longitude } };
         }
       }
     } catch (error) {

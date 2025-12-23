@@ -662,10 +662,10 @@ export default function ProfileScreen() {
             <Text style={styles.locationTextLarge}>{profile.city}</Text>
             <TouchableOpacity 
               onPress={async () => {
-                console.log('🔄 Manuel konum güncelleme butonu tıklandı');
+                console.log('🔄 Mevcut konum güncelleme butonu tıklandı (GPS\'ten gerçek konum alınacak)');
                 setIsUpdatingLocation(true);
                 const result = await updateLocationManually();
-                console.log('📍 Manuel güncelleme sonucu:', result);
+                console.log('📍 Mevcut konum güncelleme sonucu:', result);
                 if (result.success) {
                   console.log('✅ Profil yeniden yükleniyor...');
                   await loadProfile(); // Profili yeniden yükle
@@ -675,7 +675,6 @@ export default function ProfileScreen() {
                   if (result.city && profile) {
                     console.log('🏙️ Şehir bilgisi direkt güncelleniyor:', result.city);
                     setProfile({ ...profile, city: result.city });
-                    setEditCity(result.city); // Ayarlar modalındaki şehir bilgisini de güncelle
                   }
                 }
                 setIsUpdatingLocation(false);

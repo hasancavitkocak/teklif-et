@@ -44,7 +44,7 @@ export default function PremiumScreen() {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Load data function - memoized to prevent unnecessary re-renders
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user?.id) return;
     
     try {
@@ -70,12 +70,12 @@ export default function PremiumScreen() {
     } catch (error) {
       console.error('❌ Paket verilerini yükleme hatası:', error);
     }
-  };
+  }, [user?.id]);
 
   // Load packages and subscription data on mount
   useEffect(() => {
     loadData();
-  }, [user?.id]);
+  }, [loadData]);
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
@@ -347,9 +347,7 @@ export default function PremiumScreen() {
             )}
 
             {/* Addon Packages */}
-            {addonPackages
-              .filter(addon => addon.category !== 'profile_views') // Profil görüntüleme paketini kaldır
-              .map((addon, index) => (
+            {addonPackages.map((addon, index) => (
               <TouchableOpacity 
                 key={addon.id}
                 style={[styles.addOnCard, loading && { opacity: 0.6 }]} 

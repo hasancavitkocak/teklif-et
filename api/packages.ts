@@ -5,7 +5,7 @@ export interface Package {
   name: string;
   description?: string;
   type: 'subscription' | 'addon';
-  category: 'premium' | 'super_like' | 'boost' | 'profile_views';
+  category: 'premium' | 'super_like' | 'boost';
   duration_type?: 'weekly' | 'monthly' | 'yearly' | 'one_time';
   duration_value?: number;
   price_amount: number;
@@ -35,7 +35,7 @@ export interface PackagePurchase {
 }
 
 export interface UserCredit {
-  credit_type: 'super_like' | 'boost' | 'profile_views';
+  credit_type: 'super_like' | 'boost';
   amount: number;
   expires_at?: string;
 }
@@ -203,7 +203,7 @@ class PackagesAPI {
    * Kredi kullan
    */
   async useCredit(
-    creditType: 'super_like' | 'boost' | 'profile_views',
+    creditType: 'super_like' | 'boost',
     amount: number = 1
   ): Promise<{ success: boolean; error?: string }> {
     try {
