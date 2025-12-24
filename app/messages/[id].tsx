@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ export default function ChatScreen() {
   const [matchInfo, setMatchInfo] = useState<MatchInfo | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,6 +44,7 @@ export default function ChatScreen() {
   const [infoMessage, setInfoMessage] = useState('');
   
   const flatListRef = useRef<FlatList>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!id || !user?.id) return;
@@ -72,10 +75,33 @@ export default function ChatScreen() {
     // Inverted FlatList otomatik olarak en son mesajı gösteriyor
   }, [messages]);
 
+  // Pulsating animation for loading icon
+  useEffect(() => {
+    if (messagesLoading) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.6,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [messagesLoading, pulseAnim]);
+
   const initializeConversation = async () => {
     if (!user?.id || !id) return;
     
     try {
+      setMessagesLoading(true);
       const { matchInfo: info, messages: msgs } = await messagesAPI.initializeConversation(
         id as string,
         user.id
@@ -88,6 +114,7 @@ export default function ChatScreen() {
       setShowErrorToast(true);
     } finally {
       setLoading(false);
+      setMessagesLoading(false);
     }
   };
 
@@ -273,13 +300,41 @@ export default function ChatScreen() {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           style={styles.messagesList}
-          contentContainerStyle={messages.length === 0 ? styles.messagesContainerEmpty : styles.messagesContainer}
+          contentContainerStyle={styles.messagesContainer}
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
           inverted={true}
           scrollEnabled={true}
           removeClippedSubviews={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              {messagesLoading ? (
+                <View style={styles.loadingMessages}>
+                  <Animated.View style={[styles.pulsatingIcon, { opacity: pulseAnim }]}>
+                    <Image 
+                      source={require('@/assets/images/puzzle-iconnew.png')} 
+                      style={styles.loadingIcon}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                  <Text style={styles.loadingMessagesText}>Mesajlar yükleniyor...</Text>
+                </View>
+              ) : (
+                <View style={styles.noMessages}>
+                  <Image 
+                    source={require('@/assets/images/puzzle-iconnew.png')} 
+                    style={styles.emptyIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.noMessagesTitle}>Henüz mesajınız yok</Text>
+                  <Text style={styles.noMessagesSubtitle}>
+                    {matchInfo?.otherUser?.name} ile sohbete başlamak için ilk mesajı gönderin
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         />
         
         {/* Input */}
@@ -499,6 +554,58 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 16,
     paddingBottom: 0,
+    flexGrow: 1,
+  },
+  // Empty State Styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  loadingMessages: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  pulsatingIcon: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingIcon: {
+    width: 60,
+    height: 60,
+    tintColor: '#8B5CF6',
+    opacity: 0.8,
+  },
+  loadingMessagesText: {
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontWeight: '500',
+  },
+  noMessages: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    tintColor: '#D1D5DB',
+    marginBottom: 8,
+  },
+  noMessagesTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  noMessagesSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   messagesContainerEmpty: {
     paddingHorizontal: 12,

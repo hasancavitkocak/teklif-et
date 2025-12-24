@@ -4,7 +4,7 @@ import { Crown, Filter, Eye, Check, Sparkles, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { packagesAPI, type Package, type PackagePurchase, type UserCredit } from '@/api/packages';
 import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
@@ -44,8 +44,8 @@ export default function PremiumScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load data function - memoized to prevent unnecessary re-renders
-  const loadData = useCallback(async () => {
+  // Load data function
+  const loadData = async () => {
     if (!user?.id) return;
     
     try {
@@ -74,16 +74,21 @@ export default function PremiumScreen() {
       setErrorMessage('Paket bilgileri yüklenirken bir hata oluştu');
       setShowErrorToast(true);
     }
-  }, [user?.id]);
+  };
 
   // Load packages and subscription data on mount
   useEffect(() => {
-    loadData();
-    // Premium kullanıcılar için varsayılan tab'ı addons yap
+    if (user?.id) {
+      loadData();
+    }
+  }, [user?.id]);
+
+  // Premium kullanıcılar için varsayılan tab'ı addons yap
+  useEffect(() => {
     if (isPremium) {
       setActiveTab('addons');
     }
-  }, [loadData, isPremium]);
+  }, [isPremium]);
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);

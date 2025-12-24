@@ -224,16 +224,18 @@ export default function DiscoverScreen() {
     useCallback(() => {
       console.log('Discover screen focused');
       if (user?.id) {
-        // Loading'i hemen başlat
-        setLoading(true);
-        
-        // Konum güncellemesi tamamlandıktan sonra teklifleri yükle
-        updateUserLocationOnFocus().then(() => {
-          loadProposals();
-        }).catch(() => {
-          // Konum güncellemesi başarısız olsa bile teklifleri yükle
-          loadProposals();
-        });
+        // Eğer proposals boşsa veya loading durumundaysa yükle
+        if (proposals.length === 0 || loading) {
+          setLoading(true);
+          
+          // Konum güncellemesi tamamlandıktan sonra teklifleri yükle
+          updateUserLocationOnFocus().then(() => {
+            loadProposals();
+          }).catch(() => {
+            // Konum güncellemesi başarısız olsa bile teklifleri yükle
+            loadProposals();
+          });
+        }
         
         loadRemainingProposals(); // Kalan teklif kredisini yükle
         refreshPremiumStatus(); // Premium durumunu yenile
@@ -246,7 +248,7 @@ export default function DiscoverScreen() {
           setSelectedCity(currentCity);
         }
       }
-    }, [user?.id, isPremium]) // selectedCity ve selectedInterest dependency'lerini kaldır
+    }, [user?.id, isPremium, proposals.length, loading]) // proposals.length ve loading ekledik
   );
 
   const loadRemainingProposals = async () => {

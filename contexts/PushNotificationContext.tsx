@@ -100,10 +100,14 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
+        name: 'Teklif Et Bildirimleri',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
+        lightColor: '#8B5CF6',
+        sound: 'default',
+        enableLights: true,
+        enableVibrate: true,
+        showBadge: true,
       });
     }
 
@@ -112,7 +116,19 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
       let finalStatus = existingStatus;
       
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowAnnouncements: true,
+          },
+          android: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+          },
+        });
         finalStatus = status;
       }
       
