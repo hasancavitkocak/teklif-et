@@ -8,24 +8,27 @@ import {
   Dimensions,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Heart, MessageCircle, X, Sparkles, Users } from 'lucide-react-native';
+import { UserCheck, MessageCircle, X, Sparkles, CheckCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
-interface MatchSuccessModalProps {
+interface InvitationAcceptedModalProps {
   visible: boolean;
   onClose: () => void;
-  userName: string;
-  onMessage?: () => void;
+  onMessage: () => void;
+  inviterName?: string;
+  proposalName?: string;
 }
 
-export default function MatchSuccessModal({
-  visible,
-  onClose,
-  userName,
+export default function InvitationAcceptedModal({ 
+  visible, 
+  onClose, 
   onMessage,
-}: MatchSuccessModalProps) {
+  inviterName = "Kullanıcı",
+  proposalName = "Teklif"
+}: InvitationAcceptedModalProps) {
+
   return (
     <Modal
       visible={visible}
@@ -38,12 +41,12 @@ export default function MatchSuccessModal({
           <View style={styles.modal}>
             {/* Header */}
             <View style={styles.header}>
-              <View style={styles.matchIconContainer}>
+              <View style={styles.acceptIconContainer}>
                 <LinearGradient
-                  colors={['#8B5CF6', '#7C3AED']}
-                  style={styles.matchIconGradient}
+                  colors={['#10B981', '#059669']}
+                  style={styles.acceptIconGradient}
                 >
-                  <Heart size={32} color="#FFF" fill="#FFF" />
+                  <UserCheck size={32} color="#FFF" />
                 </LinearGradient>
               </View>
               
@@ -56,35 +59,35 @@ export default function MatchSuccessModal({
             <View style={styles.celebrationContainer}>
               <View style={styles.sparkleContainer}>
                 <Sparkles size={24} color="#F59E0B" />
-                <Sparkles size={20} color="#EF4444" />
+                <Sparkles size={20} color="#10B981" />
                 <Sparkles size={18} color="#8B5CF6" />
               </View>
             </View>
 
             {/* Title */}
-            <Text style={styles.title}>🎉 Eşleşme Gerçekleşti!</Text>
+            <Text style={styles.title}>🎉 Davet Kabul Edildi!</Text>
             <Text style={styles.subtitle}>
-              {userName} ile karşılıklı beğeni aldınız! Artık mesajlaşabilirsiniz.
+              {inviterName} kullanıcısının "{proposalName}" davetini kabul ettiniz. {inviterName} kullanıcısıyla eşleştiniz!
             </Text>
 
-            {/* Match Info */}
-            <View style={styles.matchInfoBox}>
-              <View style={styles.matchInfoHeader}>
-                <Users size={20} color="#8B5CF6" />
-                <Text style={styles.matchInfoTitle}>Yeni Eşleşme</Text>
+            {/* Success Info */}
+            <View style={styles.successInfoBox}>
+              <View style={styles.successInfoHeader}>
+                <CheckCircle size={20} color="#10B981" />
+                <Text style={styles.successInfoTitle}>Eşleşme Tamamlandı</Text>
               </View>
-              <Text style={styles.matchInfoText}>
-                Bu kişi sizin teklifinizi beğendi ve siz de onun teklifini beğendiniz. 
-                Harika bir başlangıç için mesajlaşmaya başlayabilirsiniz!
+              <Text style={styles.successInfoText}>
+                Davet kabul edildi ve artık teklif sahibiyle mesajlaşabilirsiniz.
               </Text>
             </View>
 
             {/* Tips Box */}
             <View style={styles.tipsBox}>
-              <Text style={styles.tipsTitle}>💡 İpucu</Text>
+              <Text style={styles.tipsTitle}>💡 Sırada Ne Var?</Text>
               <Text style={styles.tipsText}>
-                İlk mesajınızda kendinizi tanıtın ve ortak ilgi alanlarınızdan bahsedin. 
-                Samimi ve dostane bir ton kullanın!
+                • Teklif sahibi ile mesajlaşmaya başlayabilirsiniz{'\n'}
+                • Etkinlik detaylarını konuşabilirsiniz{'\n'}
+                • Buluşma planlarınızı yapabilirsiniz
               </Text>
             </View>
 
@@ -94,9 +97,9 @@ export default function MatchSuccessModal({
                 <Text style={styles.laterButtonText}>Sonra Mesajlaş</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.messageButton} onPress={onMessage || onClose}>
+              <TouchableOpacity style={styles.messageButton} onPress={onMessage}>
                 <LinearGradient
-                  colors={['#8B5CF6', '#7C3AED']}
+                  colors={['#10B981', '#059669']}
                   style={styles.messageButtonGradient}
                 >
                   <MessageCircle size={18} color="#FFF" />
@@ -138,16 +141,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 20,
   },
-  matchIconContainer: {
+  acceptIconContainer: {
     marginTop: 4,
   },
-  matchIconGradient: {
+  acceptIconGradient: {
     width: 64,
     height: 64,
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#8B5CF6',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -184,28 +187,28 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 24,
   },
-  matchInfoBox: {
-    backgroundColor: '#F8FAFC',
+  successInfoBox: {
+    backgroundColor: '#F0FDF4',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#8B5CF6',
+    borderLeftColor: '#10B981',
   },
-  matchInfoHeader: {
+  successInfoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 8,
   },
-  matchInfoTitle: {
+  successInfoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#7C3AED',
+    color: '#059669',
   },
-  matchInfoText: {
+  successInfoText: {
     fontSize: 14,
-    color: '#475569',
+    color: '#065F46',
     lineHeight: 20,
   },
   tipsBox: {
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 12,
-    shadowColor: '#8B5CF6',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

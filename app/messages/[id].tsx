@@ -294,48 +294,51 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages.slice().reverse()}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.messagesList}
-          contentContainerStyle={styles.messagesContainer}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-          overScrollMode="never"
-          inverted={true}
-          scrollEnabled={true}
-          removeClippedSubviews={false}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              {messagesLoading ? (
-                <View style={styles.loadingMessages}>
-                  <Animated.View style={[styles.pulsatingIcon, { opacity: pulseAnim }]}>
-                    <Image 
-                      source={require('@/assets/images/puzzle-iconnew.png')} 
-                      style={styles.loadingIcon}
-                      resizeMode="contain"
-                    />
-                  </Animated.View>
-                  <Text style={styles.loadingMessagesText}>Mesajlar yükleniyor...</Text>
-                </View>
-              ) : (
-                <View style={styles.noMessages}>
+        {messages.length === 0 ? (
+          // Empty State - FlatList dışında
+          <View style={styles.emptyStateWrapper}>
+            {messagesLoading ? (
+              <View style={styles.loadingMessages}>
+                <Animated.View style={[styles.pulsatingIcon, { opacity: pulseAnim }]}>
                   <Image 
                     source={require('@/assets/images/puzzle-iconnew.png')} 
-                    style={styles.emptyIcon}
+                    style={styles.loadingIcon}
                     resizeMode="contain"
                   />
-                  <Text style={styles.noMessagesTitle}>Henüz mesajınız yok</Text>
-                  <Text style={styles.noMessagesSubtitle}>
-                    {matchInfo?.otherUser?.name} ile sohbete başlamak için ilk mesajı gönderin
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        />
+                </Animated.View>
+                <Text style={styles.loadingMessagesText}>Mesajlar yükleniyor...</Text>
+              </View>
+            ) : (
+              <View style={styles.noMessages}>
+                <Image 
+                  source={require('@/assets/images/puzzle-iconnew.png')} 
+                  style={styles.emptyIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.noMessagesTitle}>Henüz mesajınız yok</Text>
+                <Text style={styles.noMessagesSubtitle}>
+                  {matchInfo?.otherUser?.name} ile sohbete başlamak için ilk mesajı gönderin
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          // Messages List
+          <FlatList
+            ref={flatListRef}
+            data={messages.slice().reverse()}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            style={styles.messagesList}
+            contentContainerStyle={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            overScrollMode="never"
+            inverted={true}
+            scrollEnabled={true}
+            removeClippedSubviews={false}
+          />
+        )}
         
         {/* Input */}
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -557,12 +560,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   // Empty State Styles
+  emptyStateWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+    backgroundColor: '#FFFFFF',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
     paddingVertical: 60,
+    transform: [{ scaleY: -1 }], // Inverted FlatList için düzelt
   },
   loadingMessages: {
     alignItems: 'center',

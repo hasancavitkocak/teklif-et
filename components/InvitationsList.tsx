@@ -10,11 +10,17 @@ import { invitationsAPI, ProposalInvitation } from '@/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
 import InvitationSwipeCards from './InvitationSwipeCards';
+import InvitationAcceptedModal from './InvitationAcceptedModal';
 
 export default function InvitationsList() {
   const { user } = useAuth();
   const [invitations, setInvitations] = useState<ProposalInvitation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false);
+  const [acceptedInvitation, setAcceptedInvitation] = useState<{
+    inviterName: string;
+    proposalName: string;
+  } | null>(null);
 
   useEffect(() => {
     loadInvitations();
@@ -35,20 +41,21 @@ export default function InvitationsList() {
 
   const handleAccept = async (invitationId: string, proposalId: string) => {
     try {
+      // Davet bilgilerini al
+      const invitation = invitations.find(inv => inv.id === invitationId);
+      
       await invitationsAPI.acceptInvitation(invitationId);
-      Alert.alert(
-        'Başarılı! 🎉',
-        'Davet kabul edildi. Artık bu teklife başvurdunuz.',
-        [
-          {
-            text: 'Tamam',
-            onPress: () => {
-              loadInvitations();
-              router.push('/(tabs)/proposals');
-            },
-          },
-        ]
-      );
+      
+      // Modal için bilgileri ayarla
+      if (invitation) {
+        setAcceptedInvitation({
+          inviterName: invitation.inviter.name,
+          proposalName: invitation.proposal.activity_name
+        });
+        setShowAcceptedModal(true);
+      }
+      
+      loadInvitations();
     } catch (error) {
       console.error('Error accepting invitation:', error);
       Alert.alert('Hata', 'Davet kabul edilirken bir hata oluştu');
@@ -77,12 +84,31 @@ export default function InvitationsList() {
   const pendingInvitations = invitations.filter(inv => inv.status === 'pending');
 
   return (
-    <InvitationSwipeCards
-      invitations={pendingInvitations}
-      onAccept={handleAccept}
-      onDecline={handleDecline}
-      onEmpty={loadInvitations}
-    />
+    <>
+      <InvitationSwipeCards
+        invitations={pendingInvitations}
+        onAccept={handleAccept}
+        onDecline={handleDecline}
+        onEmpty={loadInvitations}
+      />
+
+      {/* Invitation Accepted Modal */}
+      <InvitationAcceptedModal
+        visible={showAcceptedModal}
+        onClose={() => {
+          setShowAcceptedModal(false);
+          setAcceptedInvitation(null);
+          router.push('/(tabs)/proposals');
+        }}
+        onMessage={() => {
+          setShowAcceptedModal(false);
+          setAcceptedInvitation(null);
+          router.push('/(tabs)/matches');
+        }}
+        inviterName={acceptedInvitation?.inviterName}
+        proposalName={acceptedInvitation?.proposalName}
+      />
+    </>
   );
 }
 
