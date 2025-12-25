@@ -23,7 +23,9 @@ export default function MatchesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setUnreadCount } = useUnread();
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [matches, setMatches] = useState<MatchType[]>([]);
+  const [archivedMatches, setArchivedMatches] = useState<ArchivedMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatchForMenu, setSelectedMatchForMenu] = useState<MatchType | null>(null);
@@ -89,12 +91,17 @@ export default function MatchesScreen() {
     }
     
     try {
-      // API katmanından veri al
-      const data = await matchesAPI.getMatches(user.id);
-      setMatches(data);
+      // Aktif ve geçmiş sohbetleri paralel yükle
+      const [activeData, archivedData] = await Promise.all([
+        matchesAPI.getMatches(user.id),
+        matchesAPI.getArchivedMatches(user.id)
+      ]);
+      
+      setMatches(activeData);
+      setArchivedMatches(archivedData);
       
       // Kaç kişiden okunmamış mesaj var
-      const unreadPeopleCount = data.filter(match => (match.unreadCount || 0) > 0).length;
+      const unreadPeopleCount = activeData.filter(match => (match.unreadCount || 0) > 0).length;
       setUnreadCount(unreadPeopleCount);
     } catch (error: any) {
       setErrorMessage(error.message);
@@ -175,78 +182,157 @@ export default function MatchesScreen() {
         <Text style={styles.headerTitle}>Mesajlar</Text>
       </View>
 
-      {/* Matches List */}
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+            Aktif Sohbetler
+          </Text>
+          {matches.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'active' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, activeTab === 'active' && styles.tabBadgeTextActive]}>
+                {matches.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'archived' && styles.tabActive]}
+          onPress={() => setActiveTab('archived')}
+        >
+          <Text style={[styles.tabText, activeTab === 'archived' && styles.tabTextActive]}>
+            Geçmiş Sohbetler
+          </Text>
+          {archivedMatches.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'archived' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, activeTab === 'archived' && styles.tabBadgeTextActive]}>
+                {archivedMatches.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
       <ScrollView
         style={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={loadMatches} />
         }
       >
-        {matches.length > 0 ? (
-          matches.map(match => (
-            <View key={match.id} style={styles.matchCardWrapper}>
+        {activeTab === 'active' ? (
+          // Aktif Sohbetler
+          matches.length > 0 ? (
+            matches.map(match => (
+              <View key={match.id} style={styles.matchCardWrapper}>
+                <TouchableOpacity
+                  style={styles.matchCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/messages/[id]',
+                      params: { id: match.id }
+                    });
+                  }}
+                >
+                  <Image
+                    source={{ uri: match.otherUser?.profile_photo }}
+                    style={styles.matchImage}
+                  />
+                  <View style={styles.matchInfo}>
+                    <View style={styles.matchHeader}>
+                      <Text style={styles.matchName}>
+                        {match.otherUser?.name}
+                      </Text>
+                      {(match.unreadCount ?? 0) > 0 && (
+                        <View style={styles.unreadDot} />
+                      )}
+                    </View>
+                    <Text style={styles.proposalName} numberOfLines={1}>
+                      {match.proposal_name || match.proposal?.activity_name || 'Teklif'}
+                    </Text>
+                    {match.lastMessage ? (
+                      <Text style={styles.lastMessage} numberOfLines={1}>
+                        {match.lastMessage.content}
+                      </Text>
+                    ) : (
+                      <Text style={styles.lastMessage}>Yeni eşleşme</Text>
+                    )}
+                  </View>
+                  <View style={styles.matchRight}>
+                    <Text style={styles.timeText}>
+                      {match.lastMessage ? formatTime(match.lastMessage.created_at) : formatTime(match.matched_at)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={(event) => {
+                    event.currentTarget.measure((x, y, width, height, pageX, pageY) => {
+                      setMenuPosition({ top: pageY + height, right: 16 });
+                      setSelectedMatchForMenu(match);
+                    });
+                  }}
+                >
+                  <MoreVertical size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MessageCircle size={64} color="#D1D5DB" strokeWidth={1.5} />
+              <Text style={styles.emptyText}>Mesajınız yok</Text>
+              <Text style={styles.emptySubtext}>
+                Yeni insanlarla tanışın ve sohbet edin
+              </Text>
+            </View>
+          )
+        ) : (
+          // Geçmiş Sohbetler
+          archivedMatches.length > 0 ? (
+            archivedMatches.map(archivedMatch => (
               <TouchableOpacity
-                style={styles.matchCard}
+                key={archivedMatch.id}
+                style={styles.archivedMatchCard}
                 activeOpacity={0.7}
                 onPress={() => {
                   router.push({
                     pathname: '/messages/[id]',
-                    params: { id: match.id }
+                    params: { 
+                      id: archivedMatch.id,
+                      archived: 'true'
+                    }
                   });
                 }}
               >
-                <Image
-                  source={{ uri: match.otherUser?.profile_photo }}
-                  style={styles.matchImage}
-                />
-                <View style={styles.matchInfo}>
-                  <View style={styles.matchHeader}>
-                    <Text style={styles.matchName}>
-                      {match.otherUser?.name}
-                    </Text>
-                    {(match.unreadCount ?? 0) > 0 && (
-                      <View style={styles.unreadDot} />
-                    )}
-                  </View>
-                  {/* Teklif adını göster */}
-                  <Text style={styles.proposalName} numberOfLines={1}>
-                    {match.proposal_name || match.proposal?.activity_name || 'Teklif'}
+                <View style={styles.archivedMatchInfo}>
+                  <Text style={styles.archivedMatchName}>
+                    {archivedMatch.otherUserName}
                   </Text>
-                  {match.lastMessage ? (
-                    <Text style={styles.lastMessage} numberOfLines={1}>
-                      {match.lastMessage.content}
-                    </Text>
-                  ) : (
-                    <Text style={styles.lastMessage}>Yeni eşleşme</Text>
-                  )}
-                </View>
-                <View style={styles.matchRight}>
-                  <Text style={styles.timeText}>
-                    {match.lastMessage ? formatTime(match.lastMessage.created_at) : formatTime(match.matched_at)}
+                  <Text style={styles.archivedProposalName}>
+                    {archivedMatch.proposalName}
+                  </Text>
+                  <Text style={styles.archivedMatchDate}>
+                    Eşleşme: {formatTime(archivedMatch.matchedAt)}
                   </Text>
                 </View>
+                <View style={styles.archivedBadge}>
+                  <Text style={styles.archivedBadgeText}>Geçmiş</Text>
+                </View>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={(event) => {
-                  event.currentTarget.measure((x, y, width, height, pageX, pageY) => {
-                    setMenuPosition({ top: pageY + height, right: 16 });
-                    setSelectedMatchForMenu(match);
-                  });
-                }}
-              >
-                <MoreVertical size={20} color="#8E8E93" />
-              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MessageCircle size={64} color="#D1D5DB" strokeWidth={1.5} />
+              <Text style={styles.emptyText}>Geçmiş sohbet yok</Text>
+              <Text style={styles.emptySubtext}>
+                Sonlandırılan sohbetler burada görünecek
+              </Text>
             </View>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <MessageCircle size={64} color="#D1D5DB" strokeWidth={1.5} />
-            <Text style={styles.emptyText}>Mesajınız yok</Text>
-            <Text style={styles.emptySubtext}>
-              Yeni insanlarla tanışın ve sohbet edin
-            </Text>
-          </View>
+          )
         )}
       </ScrollView>
 
@@ -538,5 +624,97 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
+  },
+  // Tab Styles
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFF',
+    marginHorizontal: 4,
+    gap: 8,
+  },
+  tabActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  tabTextActive: {
+    color: '#FFF',
+  },
+  tabBadge: {
+    backgroundColor: '#E5E7EB',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  tabBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  tabBadgeTextActive: {
+    color: '#FFF',
+  },
+  // Archived Match Styles
+  archivedMatchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  archivedMatchInfo: {
+    flex: 1,
+  },
+  archivedMatchName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  archivedProposalName: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  archivedMatchDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  archivedBadge: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  archivedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
   },
 });

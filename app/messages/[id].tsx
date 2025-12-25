@@ -21,12 +21,15 @@ import { supabase } from '@/lib/supabase';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import { messagesAPI, type Message, type MatchInfo } from '@/api/messages';
+import { matchesAPI } from '@/api/matches';
 
 export default function ChatScreen() {
   const { user } = useAuth();
-  const { id } = useLocalSearchParams();
+  const { id, archived } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  
+  const isArchived = archived === 'true'; // Arşiv modunda mı?
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [matchInfo, setMatchInfo] = useState<MatchInfo | null>(null);
@@ -155,15 +158,27 @@ export default function ChatScreen() {
     if (!id || !user?.id) return;
     
     try {
-      await messagesAPI.deleteMatch(id as string, user.id);
-      setShowDeleteConfirm(false);
-      setInfoMessage('Sohbet sonlandırıldı');
-      setShowInfoToast(true);
-      setTimeout(() => {
-        router.back();
-      }, 1500);
+      if (isArchived) {
+        // Geçmiş sohbetlerden gizle
+        await matchesAPI.hideFromUserArchive(id as string, user.id);
+        setShowDeleteConfirm(false);
+        setInfoMessage('Sohbet geçmiş sohbetlerden kaldırıldı');
+        setShowInfoToast(true);
+        setTimeout(() => {
+          router.back();
+        }, 1500);
+      } else {
+        // Normal sohbeti sonlandır (geçmiş sohbetlere taşı)
+        await messagesAPI.deleteMatch(id as string, user.id);
+        setShowDeleteConfirm(false);
+        setInfoMessage('Sohbet sonlandırıldı');
+        setShowInfoToast(true);
+        setTimeout(() => {
+          router.back();
+        }, 1500);
+      }
     } catch (error: any) {
-      setErrorMessage(error.message || 'Sohbet sonlandırılamadı');
+      setErrorMessage(error.message || 'İşlem gerçekleştirilemedi');
       setShowErrorToast(true);
       setShowDeleteConfirm(false);
     }
@@ -196,7 +211,11 @@ export default function ChatScreen() {
     return (
       <View style={styles.messageRow}>
         {!isCurrentUser && matchInfo && (
-          <TouchableOpacity onPress={goToProfile} activeOpacity={0.7}>
+          <TouchableOpacity 
+            onPress={isArchived ? undefined : goToProfile} 
+            activeOpacity={isArchived ? 1 : 0.7}
+            disabled={isArchived}
+          >
             <Image
               source={{ uri: matchInfo.otherUser.profile_photo }}
               style={styles.messageAvatar}
@@ -257,8 +276,9 @@ export default function ChatScreen() {
           
           <TouchableOpacity 
             style={styles.headerCenter}
-            onPress={goToProfile}
-            activeOpacity={0.7}
+            onPress={isArchived ? undefined : goToProfile} // Geçmiş sohbetlerde profile gitme
+            activeOpacity={isArchived ? 1 : 0.7}
+            disabled={isArchived}
           >
             {matchInfo ? (
               <>
@@ -286,17 +306,26 @@ export default function ChatScreen() {
             <MoreVertical size={22} color="#000000" strokeWidth={2} />
           </TouchableOpacity>
         </View>
+
+        {/* Geçmiş Sohbet Uyarısı - Header'ın altında, Safe Area içinde */}
+        {isArchived && (
+          <View style={styles.archivedNotice}>
+            <Text style={styles.archivedNoticeText}>
+              Bu geçmiş bir sohbettir. Mesaj gönderilemez, sadece okunabilir.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Messages */}
       <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
+        style={[styles.keyboardAvoidingView, isArchived && { marginTop: -insets.top + 120 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {messages.length === 0 ? (
           // Empty State - FlatList dışında
-          <View style={styles.emptyStateWrapper}>
+          <View style={[styles.emptyStateWrapper, isArchived && { marginTop: 0 }]}>
             {messagesLoading ? (
               <View style={styles.loadingMessages}>
                 <Animated.View style={[styles.pulsatingIcon, { opacity: pulseAnim }]}>
@@ -329,8 +358,8 @@ export default function ChatScreen() {
             data={messages.slice().reverse()}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
-            style={styles.messagesList}
-            contentContainerStyle={styles.messagesContainer}
+            style={[styles.messagesList, isArchived && { marginTop: 0 }]}
+            contentContainerStyle={[styles.messagesContainer, isArchived && { paddingTop: 8 }]}
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
@@ -340,38 +369,40 @@ export default function ChatScreen() {
           />
         )}
         
-        {/* Input */}
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <TextInput
-            style={styles.input}
-            placeholder="Mesaj yaz..."
-            placeholderTextColor="#8E8E93"
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={500}
-            returnKeyType="send"
-            onSubmitEditing={sendMessage}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton, 
-              (!newMessage.trim() || sendingMessage) && styles.sendButtonDisabled
-            ]}
-            onPress={sendMessage}
-            disabled={!newMessage.trim() || sendingMessage}
-          >
-            {sendingMessage ? (
-              <ActivityIndicator size={20} color="#FFFFFF" />
-            ) : (
-              <Send
-                size={20}
-                color={newMessage.trim() ? '#FFFFFF' : '#C7C7CC'}
-                strokeWidth={2}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Input - Geçmiş sohbetlerde gösterme */}
+        {!isArchived && (
+          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Mesaj yaz..."
+              placeholderTextColor="#8E8E93"
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              onSubmitEditing={sendMessage}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton, 
+                (!newMessage.trim() || sendingMessage) && styles.sendButtonDisabled
+              ]}
+              onPress={sendMessage}
+              disabled={!newMessage.trim() || sendingMessage}
+            >
+              {sendingMessage ? (
+                <ActivityIndicator size={20} color="#FFFFFF" />
+              ) : (
+                <Send
+                  size={20}
+                  color={newMessage.trim() ? '#FFFFFF' : '#C7C7CC'}
+                  strokeWidth={2}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Menu Modal */}
@@ -387,36 +418,52 @@ export default function ChatScreen() {
           onPress={() => setShowMenu(false)}
         >
           <View style={styles.menuPopup}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={goToProfile}
-            >
-              <User size={20} color="#8B5CF6" strokeWidth={2} />
-              <Text style={styles.menuItemText}>Profile Git</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.menuDivider} />
-            
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleReport}
-            >
-              <Flag size={20} color="#F59E0B" strokeWidth={2} />
-              <Text style={styles.menuItemTextWarning}>Rapor Et</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.menuDivider} />
-            
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowMenu(false);
-                setTimeout(() => setShowDeleteConfirm(true), 100);
-              }}
-            >
-              <XCircle size={20} color="#FF3B30" strokeWidth={2} />
-              <Text style={styles.menuItemTextDanger}>Sohbeti Sonlandır</Text>
-            </TouchableOpacity>
+            {!isArchived ? (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={goToProfile}
+                >
+                  <User size={20} color="#8B5CF6" strokeWidth={2} />
+                  <Text style={styles.menuItemText}>Profile Git</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.menuDivider} />
+                
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleReport}
+                >
+                  <Flag size={20} color="#F59E0B" strokeWidth={2} />
+                  <Text style={styles.menuItemTextWarning}>Rapor Et</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.menuDivider} />
+                
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    setTimeout(() => setShowDeleteConfirm(true), 100);
+                  }}
+                >
+                  <XCircle size={20} color="#FF3B30" strokeWidth={2} />
+                  <Text style={styles.menuItemTextDanger}>Sohbeti Sonlandır</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              // Geçmiş sohbetlerde sadece sil seçeneği
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  setTimeout(() => setShowDeleteConfirm(true), 100);
+                }}
+              >
+                <XCircle size={20} color="#FF3B30" strokeWidth={2} />
+                <Text style={styles.menuItemTextDanger}>Sohbeti Sil</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -434,9 +481,14 @@ export default function ChatScreen() {
           onPress={() => setShowDeleteConfirm(false)}
         >
           <View style={styles.confirmModal}>
-            <Text style={styles.confirmTitle}>Sohbeti Sonlandır</Text>
+            <Text style={styles.confirmTitle}>
+              {isArchived ? 'Sohbeti Sil' : 'Sohbeti Sonlandır'}
+            </Text>
             <Text style={styles.confirmMessage}>
-              Bu sohbeti sonlandırmak istediğinize emin misiniz? Bu işlem geri alınamaz.
+              {isArchived 
+                ? 'Bu geçmiş sohbeti kaldırmak istediğinize emin misiniz? Sadece sizin görünümünüzden kaldırılacak.'
+                : 'Bu sohbeti sonlandırmak istediğinize emin misiniz? Geçmiş sohbetler bölümüne taşınacak.'
+              }
             </Text>
             <View style={styles.confirmButtons}>
               <TouchableOpacity
@@ -449,7 +501,9 @@ export default function ChatScreen() {
                 style={styles.confirmButtonDelete}
                 onPress={handleDeleteMatch}
               >
-                <Text style={styles.confirmButtonDeleteText}>Sonlandır</Text>
+                <Text style={styles.confirmButtonDeleteText}>
+                  {isArchived ? 'Sil' : 'Sonlandır'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -493,6 +547,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 0.5,
     borderBottomColor: '#E5E7EB',
+    zIndex: 10, // Header'ı mesajların üstünde tut
   },
   header: {
     flexDirection: 'row',
@@ -555,7 +610,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingHorizontal: 12,
-    paddingTop: 16,
+    paddingTop: 8, // Daha az padding
     paddingBottom: 0,
     flexGrow: 1,
   },
@@ -831,5 +886,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  archivedNotice: {
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F59E0B',
+    alignItems: 'center',
+    zIndex: 9, // Header'ın altında ama mesajların üstünde
+    elevation: 9, // Android için
+  },
+  archivedNoticeText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

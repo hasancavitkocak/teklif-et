@@ -23,6 +23,14 @@ export interface Match {
   unreadCount?: number;
 }
 
+export interface ArchivedMatch {
+  id: string;
+  otherUserName: string;
+  proposalName: string;
+  matchedAt: string;
+  deletedBy: string;
+}
+
 export const matchesAPI = {
   // Tüm eşleşmeleri getir (optimize edilmiş - tek sorguda)
   getMatches: async (userId: string) => {
@@ -128,6 +136,86 @@ export const matchesAPI = {
     const { error } = await supabase
       .from('matches')
       .update({ deleted_by: userId })
+      .eq('id', matchId);
+
+    if (error) throw error;
+  },
+
+  // Geçmiş sohbetleri getir (her iki kullanıcı için)
+  getArchivedMatches: async (userId: string) => {
+    const { data: matches, error } = await supabase
+      .from('matches')
+      .select(`
+        id,
+        user1_id,
+        user2_id,
+        matched_at,
+        deleted_by,
+        proposal_name,
+        archived_hidden_by,
+        proposal:proposals(activity_name)
+      `)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .not('deleted_by', 'is', null) // Arşivlenmiş olanlar
+      .order('matched_at', { ascending: false });
+
+    if (error) throw error;
+    if (!matches || matches.length === 0) return [];
+
+    // Bu kullanıcının gizlediği match'leri filtrele
+    const visibleMatches = matches.filter((match: any) => {
+      if (!match.archived_hidden_by) return true;
+      return !match.archived_hidden_by.includes(userId);
+    });
+
+    // Diğer kullanıcı ID'lerini topla
+    const otherUserIds = visibleMatches.map((match: any) => 
+      match.user1_id === userId ? match.user2_id : match.user1_id
+    );
+
+    if (otherUserIds.length === 0) return [];
+
+    // Kullanıcı isimlerini al
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('id', otherUserIds);
+
+    const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]));
+
+    return visibleMatches.map((match: any) => {
+      const otherUserId = match.user1_id === userId ? match.user2_id : match.user1_id;
+      const otherUser = profilesMap.get(otherUserId);
+      
+      return {
+        id: match.id,
+        otherUserName: otherUser?.name || 'Bilinmeyen Kullanıcı',
+        proposalName: match.proposal_name || match.proposal?.activity_name || 'Teklif',
+        matchedAt: match.matched_at,
+        deletedBy: match.deleted_by,
+      };
+    });
+  },
+
+  // Kullanıcının geçmiş sohbetlerinden gizle
+  hideFromUserArchive: async (matchId: string, userId: string) => {
+    // Önce mevcut archived_hidden_by değerini al
+    const { data: match } = await supabase
+      .from('matches')
+      .select('archived_hidden_by')
+      .eq('id', matchId)
+      .single();
+
+    let hiddenByArray = match?.archived_hidden_by || [];
+    
+    // Bu kullanıcıyı listeye ekle (eğer yoksa)
+    if (!hiddenByArray.includes(userId)) {
+      hiddenByArray.push(userId);
+    }
+
+    const { error } = await supabase
+      .from('matches')
+      .update({ archived_hidden_by: hiddenByArray })
       .eq('id', matchId);
 
     if (error) throw error;
