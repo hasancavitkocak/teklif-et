@@ -42,7 +42,8 @@ module.exports = {
         "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "com.android.vending.BILLING"
       ],
       blockedPermissions: [],
       gradleProperties: {

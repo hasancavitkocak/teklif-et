@@ -77,7 +77,44 @@ class PackagesAPI {
   }
 
   /**
-   * Paket satın al
+   * Google Play Store satın alma kaydet
+   */
+  async recordGooglePlayPurchase(
+    packageId: string,
+    transactionId: string,
+    purchaseToken: string,
+    productId: string
+  ): Promise<{ success: boolean; purchaseId?: string; error?: string }> {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        return { success: false, error: 'Kullanıcı oturumu bulunamadı' };
+      }
+
+      // Google Play Store satın almasını kaydet
+      const { data, error } = await supabase.rpc('record_google_play_purchase', {
+        p_user_id: user.user.id,
+        p_package_id: packageId,
+        p_transaction_id: transactionId,
+        p_purchase_token: purchaseToken,
+        p_product_id: productId
+      });
+
+      if (error) {
+        console.error('❌ Google Play satın alma kaydetme hatası:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Google Play satın alma kaydedildi:', data);
+      return { success: true, purchaseId: data };
+    } catch (error: any) {
+      console.error('❌ Google Play satın alma kaydetme hatası:', error);
+      return { success: false, error: error.message || 'Satın alma kaydedilemedi' };
+    }
+  }
+
+  /**
+   * Paket satın al (eski method - backward compatibility için)
    */
   async purchasePackage(
     packageId: string,

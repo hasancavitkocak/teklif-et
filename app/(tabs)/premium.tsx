@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, Filter, Eye, Check, Sparkles, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,12 +6,14 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { packagesAPI, type Package, type PackagePurchase, type UserCredit } from '@/api/packages';
+import { purchaseService, type PurchaseProduct } from '@/services/PurchaseService';
 import PremiumSubscriptionModal from '@/components/PremiumSubscriptionModal';
 import PremiumCancelModal from '@/components/PremiumCancelModal';
 import PremiumSuccessModal from '@/components/PremiumSuccessModal';
 import PremiumCancelledModal from '@/components/PremiumCancelledModal';
 import PackagePurchaseSuccessModal from '@/components/PackagePurchaseSuccessModal';
 import ErrorToast from '@/components/ErrorToast';
+import RestoreInfoModal from '@/components/RestoreInfoModal';
 
 const { width } = Dimensions.get('window');
 
@@ -43,12 +45,31 @@ export default function PremiumScreen() {
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [storeProducts, setStoreProducts] = useState<PurchaseProduct[]>([]);
+  const [purchaseInitialized, setPurchaseInitialized] = useState(false);
+  const [restoreModalVisible, setRestoreModalVisible] = useState(false);
+  const [restoreModalData, setRestoreModalData] = useState({
+    title: '',
+    message: '',
+    type: 'info' as 'info' | 'success' | 'error'
+  });
 
   // Load data function
   const loadData = async () => {
     if (!user?.id) return;
     
     try {
+      // Initialize purchase service
+      if (!purchaseInitialized) {
+        const initialized = await purchaseService.initialize();
+        if (initialized) {
+          const products = await purchaseService.getProducts();
+          setStoreProducts(products);
+          setPurchaseInitialized(true);
+          console.log('🏪 Store ürünleri yüklendi:', products.length);
+        }
+      }
+
       // Load packages
       const [subscriptions, addons, activeSubscription, credits] = await Promise.all([
         packagesAPI.getSubscriptionPackages(),
@@ -81,6 +102,13 @@ export default function PremiumScreen() {
     if (user?.id) {
       loadData();
     }
+
+    // Cleanup - disconnect purchase service on unmount
+    return () => {
+      if (purchaseInitialized) {
+        purchaseService.disconnect();
+      }
+    };
   }, [user?.id]);
 
   // Premium kullanıcılar için varsayılan tab'ı addons yap
@@ -95,27 +123,52 @@ export default function PremiumScreen() {
     setSubscriptionModalVisible(true);
   };
 
+  // Paket tipine göre store product ID'sini belirle
+  const getStoreProductId = (packageData: Package): string => {
+    if (packageData.duration_type === 'yearly') {
+      return purchaseService.PRODUCTS.PREMIUM_YEARLY;
+    } else if (packageData.category === 'super_like') {
+      if (packageData.credits_amount === 5) return purchaseService.PRODUCTS.SUPER_LIKE_5;
+      if (packageData.credits_amount === 10) return purchaseService.PRODUCTS.SUPER_LIKE_10;
+    } else if (packageData.category === 'boost') {
+      if (packageData.credits_amount === 3) return purchaseService.PRODUCTS.BOOST_3;
+    }
+    return purchaseService.PRODUCTS.PREMIUM_MONTHLY;
+  };
+
   const confirmSubscription = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan || !user?.id) return;
     
     setLoading(true);
     try {
-      // Mock payment process - always success for now
-      const paymentSuccess = true;
+      // Store'dan satın alma işlemi
+      const storeProductId = getStoreProductId(selectedPlan);
+      const purchaseResult = await purchaseService.purchaseProduct(storeProductId);
       
-      if (!paymentSuccess) {
-        throw new Error('Ödeme işlemi başarısız oldu');
+      if (!purchaseResult.success) {
+        throw new Error(purchaseResult.error || 'Satın alma işlemi başarısız');
       }
 
-      // Purchase package via API
-      const result = await packagesAPI.purchasePackage(
+      // Satın almayı doğrula (production'da backend validation)
+      const isValid = await purchaseService.validatePurchase(
+        purchaseResult.transactionId || '',
+        purchaseResult.productId || ''
+      );
+
+      if (!isValid) {
+        throw new Error('Satın alma doğrulanamadı');
+      }
+
+      // Google Play Store satın almasını backend'e kaydet
+      const result = await packagesAPI.recordGooglePlayPurchase(
         selectedPlan.id,
-        'test_payment',
-        `test_${Date.now()}`
+        purchaseResult.transactionId || '',
+        'purchase_token_placeholder', // Gerçek purchase token buraya gelecek
+        storeProductId
       );
 
       if (!result.success) {
-        throw new Error(result.error || 'Satın alma işlemi başarısız');
+        throw new Error(result.error || 'Satın alma kaydedilemedi');
       }
       
       // Refresh data
@@ -143,22 +196,34 @@ export default function PremiumScreen() {
     
     setLoading(true);
     try {
-      // Mock payment process
-      const paymentSuccess = true;
+      // Store'dan satın alma işlemi
+      const storeProductId = getStoreProductId(addon);
+      const purchaseResult = await purchaseService.purchaseProduct(storeProductId);
       
-      if (!paymentSuccess) {
-        throw new Error('Ödeme işlemi başarısız oldu');
+      if (!purchaseResult.success) {
+        throw new Error(purchaseResult.error || 'Satın alma işlemi başarısız');
       }
 
-      // Purchase addon via API
-      const result = await packagesAPI.purchasePackage(
+      // Satın almayı doğrula (production'da backend validation)
+      const isValid = await purchaseService.validatePurchase(
+        purchaseResult.transactionId || '',
+        purchaseResult.productId || ''
+      );
+
+      if (!isValid) {
+        throw new Error('Satın alma doğrulanamadı');
+      }
+
+      // Google Play Store satın almasını backend'e kaydet
+      const result = await packagesAPI.recordGooglePlayPurchase(
         addon.id,
-        'test_payment',
-        `test_${Date.now()}`
+        purchaseResult.transactionId || '',
+        'purchase_token_placeholder', // Gerçek purchase token buraya gelecek
+        storeProductId
       );
 
       if (!result.success) {
-        throw new Error(result.error || 'Satın alma işlemi başarısız');
+        throw new Error(result.error || 'Satın alma kaydedilemedi');
       }
 
       // Refresh data
@@ -199,6 +264,62 @@ export default function PremiumScreen() {
     }
   };
 
+  const handleRestorePurchases = async () => {
+    setLoading(true);
+    try {
+      const restoredPurchases = await purchaseService.restorePurchases();
+      
+      if (restoredPurchases.length === 0) {
+        setRestoreModalData({
+          title: 'Bilgi',
+          message: 'Geri yüklenecek satın alma bulunamadı. Daha önce bu hesapla satın alma yapmadıysanız bu normal bir durumdur.',
+          type: 'info'
+        });
+        setRestoreModalVisible(true);
+        return;
+      }
+
+      // Başarılı satın almaları say
+      const successfulPurchases = restoredPurchases.filter(p => p.success);
+      
+      if (successfulPurchases.length > 0) {
+        // Her geri yüklenen satın alma için backend'i güncelle
+        for (const purchase of successfulPurchases) {
+          if (purchase.transactionId && purchase.productId) {
+            console.log('🔄 Geri yüklenen satın alma:', purchase);
+            // Burada backend'e bildirim gönderebilirsiniz
+          }
+        }
+
+        await refreshPremiumStatus();
+        await loadData();
+        
+        setRestoreModalData({
+          title: 'Başarılı',
+          message: `${successfulPurchases.length} satın alma başarıyla geri yüklendi. Premium özellikleriniz aktif edildi.`,
+          type: 'success'
+        });
+        setRestoreModalVisible(true);
+      } else {
+        setRestoreModalData({
+          title: 'Hata',
+          message: 'Satın almalar geri yüklenemedi. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+          type: 'error'
+        });
+        setRestoreModalVisible(true);
+      }
+    } catch (error: any) {
+      setRestoreModalData({
+        title: 'Hata',
+        message: error.message || 'Satın almalar geri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+        type: 'error'
+      });
+      setRestoreModalVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#8B5CF6', '#A855F7']} style={styles.header}>
@@ -209,7 +330,11 @@ export default function PremiumScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* Current Subscription Status */}
         {isPremium && subscription && (
           <View style={styles.currentSubscriptionSection}>
@@ -293,49 +418,55 @@ export default function PremiumScreen() {
         {/* Tab Content */}
         {activeTab === 'plans' && !isPremium && dataLoaded && (
           <View style={styles.plansSection}>
-            {subscriptionPackages.length > 0 ? subscriptionPackages.map((plan, index) => (
-              <TouchableOpacity
-                key={plan.id}
-                style={[styles.planCard, plan.is_popular && styles.planCardPopular]}
-                onPress={() => handleSubscribe(plan)}
-                activeOpacity={0.9}
-                disabled={loading}
-              >
-                {plan.is_popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularText}>EN POPÜLER</Text>
+            {subscriptionPackages.length > 0 ? subscriptionPackages.map((plan, index) => {
+              const storeProduct = storeProducts.find(p => p.productId === getStoreProductId(plan));
+              
+              return (
+                <TouchableOpacity
+                  key={plan.id}
+                  style={[styles.planCard, plan.is_popular && styles.planCardPopular]}
+                  onPress={() => handleSubscribe(plan)}
+                  activeOpacity={0.9}
+                  disabled={loading}
+                >
+                  {plan.is_popular && (
+                    <View style={styles.popularBadge}>
+                      <Text style={styles.popularText}>EN POPÜLER</Text>
+                    </View>
+                  )}
+                  <View style={styles.planHeader}>
+                    <View>
+                      <Text style={styles.planDuration}>{plan.name}</Text>
+                      {plan.features.includes('33% Tasarruf') && (
+                        <Text style={styles.planSave}>33% Tasarruf</Text>
+                      )}
+                      {plan.features.includes('44% Tasarruf') && (
+                        <Text style={styles.planSave}>44% Tasarruf</Text>
+                      )}
+                      {plan.duration_type === 'weekly' && (
+                        <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
+                      )}
+                      {plan.duration_type === 'yearly' && (
+                        <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
+                      )}
+                    </View>
+                    <Text style={styles.planPrice}>
+                      {storeProduct ? storeProduct.localizedPrice : `₺${Math.round(plan.price_amount / 100)}`}
+                    </Text>
                   </View>
-                )}
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={styles.planDuration}>{plan.name}</Text>
-                    {plan.features.includes('33% Tasarruf') && (
-                      <Text style={styles.planSave}>33% Tasarruf</Text>
-                    )}
-                    {plan.features.includes('44% Tasarruf') && (
-                      <Text style={styles.planSave}>44% Tasarruf</Text>
-                    )}
-                    {plan.duration_type === 'weekly' && (
-                      <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
-                    )}
-                    {plan.duration_type === 'yearly' && (
-                      <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
-                    )}
+                  <View style={styles.planFeatures}>
+                    <View style={styles.planFeatureRow}>
+                      <Check size={16} color="#10B981" />
+                      <Text style={styles.planFeatureText}>Tüm premium özellikler</Text>
+                    </View>
+                    <View style={styles.planFeatureRow}>
+                      <Check size={16} color="#10B981" />
+                      <Text style={styles.planFeatureText}>İstediğin zaman iptal et</Text>
+                    </View>
                   </View>
-                  <Text style={styles.planPrice}>₺{Math.round(plan.price_amount / 100)}</Text>
-                </View>
-                <View style={styles.planFeatures}>
-                  <View style={styles.planFeatureRow}>
-                    <Check size={16} color="#10B981" />
-                    <Text style={styles.planFeatureText}>Tüm premium özellikler</Text>
-                  </View>
-                  <View style={styles.planFeatureRow}>
-                    <Check size={16} color="#10B981" />
-                    <Text style={styles.planFeatureText}>İstediğin zaman iptal et</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )) : (
+                </TouchableOpacity>
+              );
+            }) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>Planlar yükleniyor...</Text>
               </View>
@@ -366,37 +497,43 @@ export default function PremiumScreen() {
             )}
 
             {/* Addon Packages */}
-            {addonPackages.length > 0 ? addonPackages.map((addon, index) => (
-              <TouchableOpacity 
-                key={addon.id}
-                style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
-                activeOpacity={0.9}
-                onPress={() => handlePurchaseAddon(addon)}
-                disabled={loading}
-              >
-                <View style={[styles.addOnIcon, {
-                  backgroundColor: addon.category === 'super_like' ? '#FEF3C7' :
-                                  addon.category === 'boost' ? '#FEF3C7' : '#DBEAFE'
-                }]}>
-                  {addon.category === 'super_like' && <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />}
-                  {addon.category === 'boost' && <Crown size={24} color="#F59E0B" />}
-                </View>
-                <View style={styles.addOnContent}>
-                  <Text style={styles.addOnTitle}>{addon.name}</Text>
-                  <Text style={styles.addOnDescription}>{addon.description}</Text>
-                  {addon.credits_amount && (
-                    <Text style={styles.addOnSubtext}>{addon.credits_amount} adet kredi</Text>
-                  )}
-                </View>
-                <View style={styles.addOnPricing}>
-                  <Text style={styles.addOnPrice}>₺{Math.round(addon.price_amount / 100)}</Text>
-                  <Text style={styles.addOnPriceUnit}>
-                    {addon.duration_type === 'one_time' ? 'tek seferlik' : 
-                     addon.duration_type === 'weekly' ? '7 günlük' : 'aylık'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )) : (
+            {addonPackages.length > 0 ? addonPackages.map((addon, index) => {
+              const storeProduct = storeProducts.find(p => p.productId === getStoreProductId(addon));
+              
+              return (
+                <TouchableOpacity 
+                  key={addon.id}
+                  style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
+                  activeOpacity={0.9}
+                  onPress={() => handlePurchaseAddon(addon)}
+                  disabled={loading}
+                >
+                  <View style={[styles.addOnIcon, {
+                    backgroundColor: addon.category === 'super_like' ? '#FEF3C7' :
+                                    addon.category === 'boost' ? '#FEF3C7' : '#DBEAFE'
+                  }]}>
+                    {addon.category === 'super_like' && <Sparkles size={24} color="#F59E0B" fill="#F59E0B" />}
+                    {addon.category === 'boost' && <Crown size={24} color="#F59E0B" />}
+                  </View>
+                  <View style={styles.addOnContent}>
+                    <Text style={styles.addOnTitle}>{addon.name}</Text>
+                    <Text style={styles.addOnDescription}>{addon.description}</Text>
+                    {addon.credits_amount && (
+                      <Text style={styles.addOnSubtext}>{addon.credits_amount} adet kredi</Text>
+                    )}
+                  </View>
+                  <View style={styles.addOnPricing}>
+                    <Text style={styles.addOnPrice}>
+                      {storeProduct ? storeProduct.localizedPrice : `₺${Math.round(addon.price_amount / 100)}`}
+                    </Text>
+                    <Text style={styles.addOnPriceUnit}>
+                      {addon.duration_type === 'one_time' ? 'tek seferlik' : 
+                       addon.duration_type === 'weekly' ? '7 günlük' : 'aylık'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>Ek paketler yükleniyor...</Text>
               </View>
@@ -405,6 +542,16 @@ export default function PremiumScreen() {
         )}
 
         <View style={styles.termsSection}>
+          <TouchableOpacity
+            style={[styles.restoreButton, loading && { opacity: 0.6 }]}
+            onPress={handleRestorePurchases}
+            disabled={loading}
+          >
+            <Text style={styles.restoreButtonText}>
+              {loading ? 'Geri Yükleniyor...' : 'Satın Almaları Geri Yükle'}
+            </Text>
+          </TouchableOpacity>
+          
           <Text style={styles.termsText}>
             Premium üyeliğiniz otomatik olarak yenilenir. İstediğiniz zaman iptal edebilirsiniz.
             İptal etmediğiniz sürece aboneliğiniz devam edecektir.
@@ -462,6 +609,15 @@ export default function PremiumScreen() {
         visible={showErrorToast}
         message={errorMessage}
         onHide={() => setShowErrorToast(false)}
+      />
+
+      {/* Restore Info Modal */}
+      <RestoreInfoModal
+        visible={restoreModalVisible}
+        onClose={() => setRestoreModalVisible(false)}
+        title={restoreModalData.title}
+        message={restoreModalData.message}
+        type={restoreModalData.type}
       />
     </View>
   );
@@ -610,7 +766,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   termsSection: {
-    paddingVertical: 24,
+    paddingVertical: 32,
     paddingHorizontal: 8,
   },
   termsText: {
@@ -618,6 +774,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: 16,
   },
   // Current Subscription Styles
   currentSubscriptionSection: {
@@ -821,6 +978,25 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: '#6B7280',
+    textAlign: 'center',
+  },
+  // Restore Button Styles
+  restoreButton: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    alignSelf: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  restoreButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
 });
