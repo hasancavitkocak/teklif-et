@@ -319,7 +319,7 @@ export default function ChatScreen() {
 
       {/* Messages */}
       <KeyboardAvoidingView 
-        style={[styles.keyboardAvoidingView, isArchived && { marginTop: -insets.top + 120 }]}
+        style={[styles.keyboardAvoidingView, isArchived && { marginTop: -insets.top + 25 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
@@ -361,7 +361,7 @@ export default function ChatScreen() {
             style={[styles.messagesList, isArchived && { marginTop: 0 }]}
             contentContainerStyle={[
               styles.messagesContainer, 
-              isArchived && { paddingTop: 8 }
+              isArchived && { paddingTop: 0 }
             ]}
             showsVerticalScrollIndicator={false}
             bounces={false}
