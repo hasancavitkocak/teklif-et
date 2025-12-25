@@ -125,7 +125,9 @@ export default function PremiumScreen() {
 
   // Paket tipine göre store product ID'sini belirle
   const getStoreProductId = (packageData: Package): string => {
-    if (packageData.duration_type === 'yearly') {
+    if (packageData.duration_type === 'weekly') {
+      return purchaseService.PRODUCTS.PREMIUM_WEEKLY;
+    } else if (packageData.duration_type === 'yearly') {
       return purchaseService.PRODUCTS.PREMIUM_YEARLY;
     } else if (packageData.category === 'super_like') {
       if (packageData.credits_amount === 5) return purchaseService.PRODUCTS.SUPER_LIKE_5;
@@ -443,15 +445,25 @@ export default function PremiumScreen() {
                       {plan.features.includes('44% Tasarruf') && (
                         <Text style={styles.planSave}>44% Tasarruf</Text>
                       )}
-                      {plan.duration_type === 'weekly' && (
+                      {plan.duration_type === 'weekly' && storeProduct && (
+                        <Text style={styles.planPerMonth}>
+                          ₺{Math.round(parseFloat(storeProduct.price) * 4)}/ay
+                        </Text>
+                      )}
+                      {plan.duration_type === 'yearly' && storeProduct && (
+                        <Text style={styles.planPerMonth}>
+                          ₺{Math.round(parseFloat(storeProduct.price) / 12)}/ay
+                        </Text>
+                      )}
+                      {plan.duration_type === 'weekly' && !storeProduct && (
                         <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
                       )}
-                      {plan.duration_type === 'yearly' && (
+                      {plan.duration_type === 'yearly' && !storeProduct && (
                         <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
                       )}
                     </View>
                     <Text style={styles.planPrice}>
-                      {storeProduct ? storeProduct.localizedPrice : `₺${Math.round(plan.price_amount / 100)}`}
+                      {storeProduct?.localizedPrice || '₺39,99'}
                     </Text>
                   </View>
                   <View style={styles.planFeatures}>
@@ -524,7 +536,7 @@ export default function PremiumScreen() {
                   </View>
                   <View style={styles.addOnPricing}>
                     <Text style={styles.addOnPrice}>
-                      {storeProduct ? storeProduct.localizedPrice : `₺${Math.round(addon.price_amount / 100)}`}
+                      {storeProduct?.localizedPrice || '₺39,99'}
                     </Text>
                     <Text style={styles.addOnPriceUnit}>
                       {addon.duration_type === 'one_time' ? 'tek seferlik' : 
@@ -566,6 +578,7 @@ export default function PremiumScreen() {
         onConfirm={confirmSubscription}
         plan={selectedPlan || (subscriptionPackages.length > 0 ? subscriptionPackages[0] : null)}
         loading={loading}
+        storeProduct={selectedPlan ? storeProducts.find(p => p.productId === getStoreProductId(selectedPlan)) : null}
       />
 
       <PremiumCancelModal

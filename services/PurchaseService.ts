@@ -21,28 +21,36 @@ class PurchaseService {
   private isConnected = false;
   private isNativeAvailable = false;
 
-  // Google Play Console'da tanımlanacak ürün ID'leri
+  // Google Play Console'da tanımlanacak ürün ID'leri (alt çizgi olmadan)
   readonly PRODUCTS = {
-    PREMIUM_MONTHLY: 'premium_monthly',
-    PREMIUM_YEARLY: 'premium_yearly',
-    SUPER_LIKE_5: 'super_like_5',
-    SUPER_LIKE_10: 'super_like_10',
-    BOOST_3: 'boost_3',
+    PREMIUM_WEEKLY: 'premiumweekly',
+    PREMIUM_MONTHLY: 'premiummonthly',
+    PREMIUM_YEARLY: 'premiumyearly',
+    SUPER_LIKE_5: 'superlike5',
+    SUPER_LIKE_10: 'superlike10',
+    BOOST_3: 'boost3',
   };
 
   async initialize(): Promise<boolean> {
     try {
       if (this.isConnected) return true;
 
+      console.log('🔄 Purchase Service başlatılıyor...');
+      
       // Native IAP modülünün mevcut olup olmadığını kontrol et
       try {
         const RNIap = require('react-native-iap');
-        await RNIap.initConnection();
+        console.log('✅ react-native-iap modülü bulundu');
+        
+        const result = await RNIap.initConnection();
+        console.log('✅ Google Play Store bağlantısı kuruldu:', result);
+        
         this.isNativeAvailable = true;
         this.isConnected = true;
         console.log('✅ Native Google Play Store bağlantısı kuruldu');
         return true;
       } catch (nativeError) {
+        console.error('❌ Native IAP hatası:', nativeError);
         console.log('⚠️ Native IAP mevcut değil, mock mode kullanılıyor');
         this.isNativeAvailable = false;
         this.isConnected = true;
@@ -60,11 +68,23 @@ class PurchaseService {
         await this.initialize();
       }
 
+      console.log('🛍️ Ürünler yükleniyor...');
+
       if (this.isNativeAvailable) {
         try {
           const RNIap = require('react-native-iap');
           const productIds = Object.values(this.PRODUCTS);
+          
+          console.log('📋 İstenen ürün ID\'leri:', productIds);
+          
           const products = await RNIap.getProducts({ skus: productIds });
+          
+          console.log('✅ Google Play Store\'dan alınan ürünler:', products.length);
+          console.log('📦 Ürün detayları:', products.map(p => ({
+            id: p.productId,
+            price: p.localizedPrice,
+            title: p.title
+          })));
           
           const formattedProducts = products.map(product => ({
             productId: product.productId,
@@ -78,12 +98,26 @@ class PurchaseService {
           console.log('✅ Native Google Play Store ürünleri yüklendi:', formattedProducts.length);
           return formattedProducts;
         } catch (storeError) {
+          console.error('❌ Google Play Store ürün yükleme hatası:', storeError);
+          console.error('🔍 Hata detayları:', {
+            message: storeError.message,
+            code: storeError.code,
+            userInfo: storeError.userInfo
+          });
           console.warn('⚠️ Store ürünleri yüklenemedi, mock data kullanılıyor');
         }
       }
 
       // Mock products (development/fallback için)
       const mockProducts: PurchaseProduct[] = [
+        {
+          productId: this.PRODUCTS.PREMIUM_WEEKLY,
+          price: '14.99',
+          title: 'Premium Haftalık',
+          description: 'Tüm premium özelliklere 1 hafta erişim',
+          localizedPrice: '₺14,99',
+          currency: 'TRY'
+        },
         {
           productId: this.PRODUCTS.PREMIUM_MONTHLY,
           price: '29.99',
@@ -147,35 +181,56 @@ class PurchaseService {
           const RNIap = require('react-native-iap');
           const { Platform } = require('react-native');
           
+          console.log('🛒 Google Play Store satın alma başlatılıyor...');
+          console.log('📋 Ürün ID:', productId);
+          
           // Gerçek Google Play Store satın alma
           const purchase = await RNIap.requestPurchase({ sku: productId });
           
-          console.log('✅ Native Google Play Store satın alma başarılı:', purchase);
+          console.log('✅ Native Google Play Store satın alma başarılı!');
+          console.log('🧾 Purchase detayları:', {
+            transactionId: purchase.transactionId,
+            productId: purchase.productId,
+            purchaseToken: purchase.purchaseToken,
+            purchaseTime: purchase.purchaseTime,
+            purchaseState: purchase.purchaseState
+          });
 
           // Android'de acknowledgment gerekli
           if (Platform.OS === 'android') {
             try {
-              if (productId.includes('super_like') || productId.includes('boost')) {
+              console.log('🔄 Android acknowledgment işlemi başlatılıyor...');
+              
+              if (productId.includes('superlike') || productId.includes('boost')) {
                 await RNIap.consumePurchaseAndroid(purchase.purchaseToken);
-                console.log('✅ Purchase consumed (Android)');
+                console.log('✅ Purchase consumed (Android) - Tek seferlik ürün');
               } else {
                 await RNIap.acknowledgePurchaseAndroid(purchase.purchaseToken);
-                console.log('✅ Purchase acknowledged (Android)');
+                console.log('✅ Purchase acknowledged (Android) - Abonelik');
               }
             } catch (ackError) {
-              console.warn('⚠️ Acknowledgment hatası:', ackError);
+              console.error('❌ Android acknowledgment hatası:', ackError);
+              console.error('🔍 Acknowledgment hata detayları:', {
+                message: ackError.message,
+                code: ackError.code
+              });
             }
           }
 
           // Transaction'ı bitir
           try {
+            console.log('🔄 Transaction sonlandırılıyor...');
             await RNIap.finishTransaction({ 
               purchase, 
-              isConsumable: productId.includes('super_like') || productId.includes('boost') 
+              isConsumable: productId.includes('superlike') || productId.includes('boost') 
             });
-            console.log('✅ Transaction finished');
+            console.log('✅ Transaction başarıyla sonlandırıldı');
           } catch (finishError) {
-            console.warn('⚠️ Transaction finish hatası:', finishError);
+            console.error('❌ Transaction finish hatası:', finishError);
+            console.error('🔍 Finish hata detayları:', {
+              message: finishError.message,
+              code: finishError.code
+            });
           }
 
           return {
@@ -184,14 +239,39 @@ class PurchaseService {
             productId: productId
           };
         } catch (storeError: any) {
-          console.warn('⚠️ Native store hatası, mock işlem yapılıyor:', storeError);
+          console.error('❌ Google Play Store satın alma hatası:', storeError);
+          console.error('🔍 Store hata detayları:', {
+            message: storeError.message,
+            code: storeError.code,
+            userInfo: storeError.userInfo,
+            debugMessage: storeError.debugMessage
+          });
           
           if (storeError.code === 'E_USER_CANCELLED') {
+            console.log('👤 Kullanıcı satın almayı iptal etti');
             return {
               success: false,
               error: 'Kullanıcı satın almayı iptal etti'
             };
           }
+          
+          if (storeError.code === 'E_ITEM_UNAVAILABLE') {
+            console.error('🚫 Ürün mevcut değil - Google Play Console\'da kontrol edin');
+            return {
+              success: false,
+              error: 'Ürün şu anda mevcut değil'
+            };
+          }
+          
+          if (storeError.code === 'E_NETWORK_ERROR') {
+            console.error('🌐 Ağ bağlantısı hatası');
+            return {
+              success: false,
+              error: 'İnternet bağlantınızı kontrol edin'
+            };
+          }
+          
+          console.warn('⚠️ Native store hatası, mock işlem yapılıyor');
         }
       }
 
@@ -241,9 +321,16 @@ class PurchaseService {
       if (this.isNativeAvailable) {
         try {
           const RNIap = require('react-native-iap');
+          console.log('📋 Google Play Store\'dan geçmiş satın almalar alınıyor...');
+          
           const purchases = await RNIap.getAvailablePurchases();
           
           console.log('✅ Native geri yüklenen satın almalar:', purchases.length);
+          console.log('🧾 Geri yüklenen satın alma detayları:', purchases.map(p => ({
+            transactionId: p.transactionId,
+            productId: p.productId,
+            purchaseTime: p.purchaseTime
+          })));
           
           return purchases.map(purchase => ({
             success: true,
@@ -251,7 +338,12 @@ class PurchaseService {
             productId: purchase.productId
           }));
         } catch (storeError) {
-          console.warn('⚠️ Native restore hatası, mock data:', storeError);
+          console.error('❌ Native restore hatası:', storeError);
+          console.error('🔍 Restore hata detayları:', {
+            message: storeError.message,
+            code: storeError.code
+          });
+          console.warn('⚠️ Native restore hatası, mock data kullanılıyor');
         }
       }
 

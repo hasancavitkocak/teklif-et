@@ -33,6 +33,14 @@ interface PremiumSubscriptionModalProps {
     perMonth?: string;
   } | null;
   loading?: boolean;
+  storeProduct?: {
+    productId: string;
+    price: string;
+    title: string;
+    description: string;
+    localizedPrice: string;
+    currency: string;
+  } | null;
 }
 
 export default function PremiumSubscriptionModal({ 
@@ -40,7 +48,8 @@ export default function PremiumSubscriptionModal({
   onClose,
   onConfirm,
   plan,
-  loading = false
+  loading = false,
+  storeProduct = null
 }: PremiumSubscriptionModalProps) {
   const scaleAnim = new Animated.Value(0);
   const fadeAnim = new Animated.Value(0);
@@ -197,7 +206,7 @@ export default function PremiumSubscriptionModal({
                     {plan?.name || plan?.duration || 'Premium Plan'}
                   </Text>
                   <Text style={styles.planPrice}>
-                    {plan?.price_amount ? `₺${Math.round(plan.price_amount / 100)}` : plan?.price || '₺0'}
+                    {storeProduct?.localizedPrice || '₺39,99'}
                   </Text>
                 </View>
                 {(plan?.features?.includes('33% Tasarruf') || plan?.features?.includes('44% Tasarruf') || plan?.save) && (
@@ -207,10 +216,20 @@ export default function PremiumSubscriptionModal({
                     </Text>
                   </View>
                 )}
-                {(plan?.duration_type === 'weekly' && plan?.price_amount) && (
+                {(plan?.duration_type === 'weekly' && storeProduct) && (
+                  <Text style={styles.perMonth}>
+                    ₺{Math.round(parseFloat(storeProduct.price) * 4)}/ay
+                  </Text>
+                )}
+                {(plan?.duration_type === 'yearly' && storeProduct) && (
+                  <Text style={styles.perMonth}>
+                    ₺{Math.round(parseFloat(storeProduct.price) / 12)}/ay
+                  </Text>
+                )}
+                {(plan?.duration_type === 'weekly' && !storeProduct && plan?.price_amount) && (
                   <Text style={styles.perMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
                 )}
-                {(plan?.duration_type === 'yearly' && plan?.price_amount) && (
+                {(plan?.duration_type === 'yearly' && !storeProduct && plan?.price_amount) && (
                   <Text style={styles.perMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
                 )}
                 {plan?.perMonth && (
