@@ -2,7 +2,7 @@ module.exports = {
   expo: {
     name: "Teklif Et",
     slug: "teklif-et",
-    owner: "hasancavitkocakkk",
+    owner: "hasancavitkocak",
     version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/puzzle-iconnew.png",
@@ -75,7 +75,7 @@ module.exports = {
     },
     extra: {
       eas: {
-        projectId: "41b02e83-332b-40a9-a94a-3cc62f4b420e"
+        projectId: "e641448f-0ea3-41cd-bd11-0add24fd7573"
       }
     }
   }
