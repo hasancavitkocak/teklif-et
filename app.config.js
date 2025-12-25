@@ -28,9 +28,11 @@ module.exports = {
       icon: "./assets/images/puzzle-iconnew.png",
       adaptiveIcon: {
         foregroundImage: "./assets/images/puzzle-iconnew.png",
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "#8B5CF6",
         monochromeImage: "./assets/images/puzzle-iconnew.png"
       },
+      roundIconImage: "./assets/images/puzzle-iconnew.png",
+      allowBackup: false,
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
