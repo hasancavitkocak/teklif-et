@@ -2,7 +2,7 @@ module.exports = {
   expo: {
     name: "Teklif Et",
     slug: "teklif-et",
-    owner: "hasancavitkocak",
+    owner: "hasancavitkocakkk",
     version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/puzzle-iconnew.png",
