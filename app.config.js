@@ -3,7 +3,7 @@ module.exports = {
     name: "Teklif Et",
     slug: "teklif-et",
     owner: "hasancavitkocak",
-    version: "1.0.0",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/puzzle-iconnew.png",
     scheme: "myapp",
@@ -22,7 +22,7 @@ module.exports = {
     android: {
       softwareKeyboardLayoutMode: "resize",
       package: "com.teklifet.app",
-      versionCode: 3,
+      versionCode: 4,
       minSdkVersion: 23,
       targetSdkVersion: 34,
       icon: "./assets/images/puzzle-iconnew.png",
@@ -48,7 +48,9 @@ module.exports = {
       blockedPermissions: [],
       gradleProperties: {
         "newArchEnabled": "true",
-        "hermesEnabled": "true"
+        "hermesEnabled": "true",
+        "android.enableR8": "true",
+        "android.enableProguard": "true"
       }
     },
     web: {
