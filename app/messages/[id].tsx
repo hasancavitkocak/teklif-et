@@ -263,7 +263,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={isArchived ? ['top', 'bottom'] : ['top']}>
       {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.header}>
@@ -359,7 +359,10 @@ export default function ChatScreen() {
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
             style={[styles.messagesList, isArchived && { marginTop: 0 }]}
-            contentContainerStyle={[styles.messagesContainer, isArchived && { paddingTop: 8 }]}
+            contentContainerStyle={[
+              styles.messagesContainer, 
+              isArchived && { paddingTop: 8 }
+            ]}
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
@@ -611,7 +614,7 @@ const styles = StyleSheet.create({
   messagesContainer: {
     paddingHorizontal: 12,
     paddingTop: 8, // Daha az padding
-    paddingBottom: 0,
+    paddingBottom: 20, // Alt padding ekle
     flexGrow: 1,
   },
   // Empty State Styles
