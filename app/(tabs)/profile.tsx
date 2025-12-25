@@ -784,11 +784,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <LogOut size={20} color="#EF4444" />
-          <Text style={styles.signOutText}>Çıkış Yap</Text>
-        </TouchableOpacity>
-
           <View style={{ height: 100 }} />
         </View>
       </ScrollView>
@@ -1168,6 +1163,12 @@ export default function ProfileScreen() {
                   <Trash2 size={20} color="#EF4444" />
                   <Text style={[styles.dangerButtonText, styles.deleteButtonText]}>Hesabı Sil</Text>
                   <ChevronRight size={20} color="#EF4444" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.dangerButton, styles.signOutButtonSettings]} onPress={handleSignOut}>
+                  <LogOut size={20} color="#6B7280" />
+                  <Text style={[styles.dangerButtonText, styles.signOutButtonText]}>Çıkış Yap</Text>
+                  <ChevronRight size={20} color="#6B7280" />
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -1758,6 +1759,12 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#EF4444',
+  },
+  signOutButtonSettings: {
+    borderColor: '#E5E7EB',
+  },
+  signOutButtonText: {
+    color: '#6B7280',
   },
   notificationItem: {
     flexDirection: 'row',

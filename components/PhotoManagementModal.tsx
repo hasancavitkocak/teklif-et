@@ -115,7 +115,10 @@ export default function PhotoManagementModal({
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.6, // Daha düşük kalite (manipulator olmadığı için)
+        aspect: [3, 4],
+        exif: false,
+        base64: false,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
@@ -148,7 +151,10 @@ export default function PhotoManagementModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.6, // Daha düşük kalite (manipulator olmadığı için)
+        aspect: [3, 4],
+        exif: false,
+        base64: false,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
@@ -159,6 +165,11 @@ export default function PhotoManagementModal({
       console.error('Gallery error:', error);
       Alert.alert('Hata', `Fotoğraf seçilemedi: ${error.message}`);
     }
+  };
+
+  const resizeImage = async (uri: string): Promise<string> => {
+    // expo-image-manipulator olmadan basit optimizasyon
+    return uri;
   };
 
   const addPhoto = async (uri: string) => {
@@ -174,13 +185,16 @@ export default function PhotoManagementModal({
 
       // Eğer local file ise (file:// ile başlıyorsa) veya data URL ise, Supabase storage'a yükle
       if (uri.startsWith('file://') || uri.startsWith('data:')) {
+        // Önce resmi resize et (şimdilik atlanıyor)
+        const resizedUri = await resizeImage(uri);
+        
         // Dosya adı oluştur
         const timestamp = Date.now();
         const fileName = `${userId}/${timestamp}_${photos.length}.jpg`;
         const filePath = `profile-photos/${fileName}`;
         
         // Fetch ile ArrayBuffer al (hem web hem mobile çalışır)
-        const response = await fetch(uri);
+        const response = await fetch(resizedUri);
         const arrayBuffer = await response.arrayBuffer();
         const fileData = new Uint8Array(arrayBuffer);
         
@@ -190,6 +204,7 @@ export default function PhotoManagementModal({
           .upload(filePath, fileData, {
             contentType: 'image/jpeg',
             upsert: false,
+            cacheControl: '3600', // 1 saat cache
           });
 
         if (uploadError) throw uploadError;
@@ -396,7 +411,12 @@ export default function PhotoManagementModal({
                       activeOpacity={0.9}
                       disabled={index === 0}
                     >
-                      <Image source={{ uri: photo.photo_url }} style={styles.thumbnailImage} />
+                      <Image 
+                        source={{ uri: photo.photo_url }} 
+                        style={styles.thumbnailImage}
+                        resizeMode="cover"
+                        loadingIndicatorSource={require('@/assets/images/puzzle-iconnew.png')}
+                      />
                       {index === 0 && (
                         <View style={styles.primaryBadgeSmall}>
                           <Text style={styles.primaryTextSmall}>Ana</Text>

@@ -213,6 +213,15 @@ export default function UserProfileScreen() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          initialNumToRender={2}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
           onScroll={(event) => {
             const index = Math.round(event.nativeEvent.contentOffset.x / width);
             setCurrentPhotoIndex(index);
@@ -222,7 +231,14 @@ export default function UserProfileScreen() {
               activeOpacity={0.9}
               onPress={() => setSelectedPhotoIndex(index)}
             >
-              <Image source={{ uri: item }} style={styles.profilePhoto} />
+              <Image 
+                source={{ uri: item }} 
+                style={styles.profilePhoto}
+                resizeMode="cover"
+                loadingIndicatorSource={require('@/assets/images/puzzle-iconnew.png')}
+                progressiveRenderingEnabled={true}
+                fadeDuration={200}
+              />
             </TouchableOpacity>
           )}
           keyExtractor={(item, index) => `photo-${index}`}
@@ -273,6 +289,10 @@ export default function UserProfileScreen() {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               initialScrollIndex={selectedPhotoIndex || 0}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              initialNumToRender={1}
               onScroll={(event) => {
                 const index = Math.round(event.nativeEvent.contentOffset.x / width);
                 setModalPhotoIndex(index);
@@ -288,6 +308,9 @@ export default function UserProfileScreen() {
                     source={{ uri: item }} 
                     style={styles.modalPhoto}
                     resizeMode="contain"
+                    loadingIndicatorSource={require('@/assets/images/puzzle-iconnew.png')}
+                    progressiveRenderingEnabled={true}
+                    fadeDuration={200}
                   />
                 </View>
               )}
