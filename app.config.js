@@ -61,6 +61,7 @@ module.exports = {
     plugins: [
       "expo-router", 
       "expo-font",
+      "expo-dev-client",
       [
         "expo-notifications",
         {
