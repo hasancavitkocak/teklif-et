@@ -166,6 +166,29 @@ export default function PremiumScreen() {
         throw new Error('Satın alma doğrulanamadı');
       }
 
+      // ===== BACKEND DOĞRULAMA (ZORUNLU!) =====
+      if (purchaseResult.purchaseDetails?.purchaseToken) {
+        console.log('🔍 Backend doğrulama başlatılıyor...');
+        const backendValidation = await purchaseService.validatePurchaseWithBackend(
+          purchaseResult.purchaseDetails.purchaseToken,
+          storeProductId,
+          selectedPlan.id
+        );
+
+        if (!backendValidation.success) {
+          console.error('❌ Backend doğrulama başarısız:', backendValidation.error);
+          if (__DEV__) {
+            console.warn('⚠️ DEV MODE: Backend doğrulama başarısız ama devam ediliyor');
+          } else {
+            throw new Error(`Backend doğrulama başarısız: ${backendValidation.error}`);
+          }
+        } else {
+          console.log('✅ Backend doğrulama başarılı');
+        }
+      } else {
+        console.warn('⚠️ Purchase token bulunamadı, backend doğrulama atlanıyor');
+      }
+
       // Google Play Store satın almasını backend'e kaydet
       const result = await packagesAPI.recordGooglePlayPurchase(
         selectedPlan.id,
@@ -220,6 +243,29 @@ export default function PremiumScreen() {
 
       if (!isValid) {
         throw new Error('Satın alma doğrulanamadı');
+      }
+
+      // ===== BACKEND DOĞRULAMA (ZORUNLU!) =====
+      if (purchaseResult.purchaseDetails?.purchaseToken) {
+        console.log('🔍 Addon Backend doğrulama başlatılıyor...');
+        const backendValidation = await purchaseService.validatePurchaseWithBackend(
+          purchaseResult.purchaseDetails.purchaseToken,
+          storeProductId,
+          addon.id
+        );
+
+        if (!backendValidation.success) {
+          console.error('❌ Addon Backend doğrulama başarısız:', backendValidation.error);
+          if (__DEV__) {
+            console.warn('⚠️ DEV MODE: Addon Backend doğrulama başarısız ama devam ediliyor');
+          } else {
+            throw new Error(`Backend doğrulama başarısız: ${backendValidation.error}`);
+          }
+        } else {
+          console.log('✅ Addon Backend doğrulama başarılı');
+        }
+      } else {
+        console.warn('⚠️ Addon Purchase token bulunamadı, backend doğrulama atlanıyor');
       }
 
       // Google Play Store satın almasını backend'e kaydet

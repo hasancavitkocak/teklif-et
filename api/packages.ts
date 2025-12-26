@@ -95,14 +95,38 @@ class PackagesAPI {
       signature?: string;
     }
   ): Promise<{ success: boolean; purchaseId?: string; error?: string }> {
+    const startTime = Date.now();
+    console.log('💾 ===== DB KAYIT BAŞLADI =====');
+    console.log('📋 DB Kayit Request:', {
+      packageId,
+      transactionId: transactionId ? `${transactionId.substring(0, 20)}...` : 'YOK',
+      purchaseToken: purchaseToken ? `${purchaseToken.substring(0, 20)}...` : 'YOK',
+      productId,
+      purchaseDetails: purchaseDetails ? {
+        purchaseTime: purchaseDetails.purchaseTime,
+        purchaseState: purchaseDetails.purchaseState,
+        acknowledged: purchaseDetails.acknowledged,
+        autoRenewing: purchaseDetails.autoRenewing,
+        orderId: purchaseDetails.orderId,
+        packageName: purchaseDetails.packageName,
+        hasOriginalJson: !!purchaseDetails.originalJson,
+        hasSignature: !!purchaseDetails.signature
+      } : 'YOK',
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) {
+        console.error('❌ Kullanıcı oturumu bulunamadı');
         return { success: false, error: 'Kullanıcı oturumu bulunamadı' };
       }
 
+      console.log('👤 User ID:', user.user.id);
+
       // Google Play Store satın almasını tüm detaylarıyla kaydet
-      const { data, error } = await supabase.rpc('record_google_play_purchase', {
+      console.log('🚀 Supabase RPC çağrılıyor: record_google_play_purchase');
+      const rpcParams = {
         p_user_id: user.user.id,
         p_package_id: packageId,
         p_transaction_id: transactionId,
@@ -116,17 +140,44 @@ class PackagesAPI {
         p_package_name: purchaseDetails?.packageName || null,
         p_signature: purchaseDetails?.signature || null,
         p_original_json: purchaseDetails?.originalJson || null
+      };
+      console.log('📋 RPC Parameters:', {
+        ...rpcParams,
+        p_purchase_token: rpcParams.p_purchase_token ? `${rpcParams.p_purchase_token.substring(0, 20)}...` : 'YOK',
+        p_original_json: rpcParams.p_original_json ? 'Mevcut' : 'YOK',
+        p_signature: rpcParams.p_signature ? 'Mevcut' : 'YOK'
       });
 
+      const { data, error } = await supabase.rpc('record_google_play_purchase', rpcParams);
+
+      const responseTime = Date.now() - startTime;
+      console.log('⏱️ DB kayit response süresi:', responseTime + 'ms');
+
       if (error) {
-        console.error('❌ Google Play satın alma kaydetme hatası:', error);
+        console.error('❌ DB kayit RPC hatası:', {
+          error: error,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Google Play satın alma kaydedildi:', data);
+      console.log('✅ DB kayit response:', data);
+      console.log('🎉 ===== DB KAYIT TAMAMLANDI =====');
+      
       return { success: true, purchaseId: data };
     } catch (error: any) {
-      console.error('❌ Google Play satın alma kaydetme hatası:', error);
+      const errorTime = Date.now() - startTime;
+      console.error('❌ ===== DB KAYIT HATASI =====');
+      console.error('⏱️ Hata süresi:', errorTime + 'ms');
+      console.error('🔍 DB kayit hatası:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        error: error
+      });
       return { success: false, error: error.message || 'Satın alma kaydedilemedi' };
     }
   }

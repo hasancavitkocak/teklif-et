@@ -4,11 +4,13 @@ import {
   fetchProducts,
   requestPurchase,
   getAvailablePurchases,
+  acknowledgePurchaseAndroid,
   Product,
   Purchase,
   PurchaseError,
 } from 'react-native-iap';
 import { Platform } from 'react-native';
+import { supabase } from '@/lib/supabase';
 
 export interface PurchaseProduct {
   productId: string;
@@ -251,6 +253,24 @@ class PurchaseService {
         signature: purchaseData?.signature ? 'Mevcut' : 'Yok'
       });
 
+      // ===== ACKNOWLEDGE İŞLEMİ (ZORUNLU!) =====
+      if (Platform.OS === 'android' && purchaseData?.purchaseToken) {
+        console.log('🔐 Satın alma acknowledge ediliyor...');
+        const acknowledgeStartTime = Date.now();
+        
+        const acknowledged = await this.acknowledgePurchase(purchaseData.purchaseToken);
+        const acknowledgeTime = Date.now() - acknowledgeStartTime;
+        
+        console.log('⏱️ Acknowledge süresi:', acknowledgeTime + 'ms');
+        
+        if (!acknowledged) {
+          // ❌ KRITIK: Acknowledge başarısız olursa işlemi durdur
+          console.error('❌ KRITIK: Acknowledge başarısız!');
+          throw new Error('Satın alma acknowledge edilemedi. Abonelik askıya alınabilir.');
+        }
+        console.log('✅ Acknowledge başarılı');
+      }
+
       return {
         success: true,
         transactionId: purchaseData?.transactionId || purchaseData?.purchaseToken || '',
@@ -314,6 +334,102 @@ class PurchaseService {
         success: false,
         error: errorMessage,
       };
+    }
+  }
+
+  // ===== ACKNOWLEDGE İŞLEMLERİ (ZORUNLU!) =====
+  async acknowledgePurchase(purchaseToken: string, retryCount: number = 0): Promise<boolean> {
+    try {
+      if (Platform.OS !== 'android') {
+        console.log('🍎 iOS - Acknowledge gerekmiyor');
+        return true;
+      }
+
+      console.log('🔐 Android satın alma acknowledge ediliyor:', purchaseToken, `(Deneme: ${retryCount + 1})`);
+      
+      const result = await acknowledgePurchaseAndroid(purchaseToken);
+      
+      console.log('✅ Acknowledge başarılı:', result);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Acknowledge hatası:', error);
+      
+      // 3 kez dene
+      if (retryCount < 2) {
+        console.log(`🔄 Acknowledge tekrar deneniyor... (${retryCount + 2}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+        return this.acknowledgePurchase(purchaseToken, retryCount + 1);
+      }
+      
+      return false;
+    }
+  }
+
+  // ===== BACKEND DOĞRULAMA =====
+  async validatePurchaseWithBackend(
+    purchaseToken: string, 
+    productId: string, 
+    packageId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const startTime = Date.now();
+    console.log('🔍 ===== BACKEND DOĞRULAMA BAŞLADI =====');
+    console.log('📋 Backend Validation Request:', {
+      purchaseToken: purchaseToken ? `${purchaseToken.substring(0, 20)}...` : 'YOK',
+      productId,
+      packageId,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        console.error('❌ Kullanıcı oturumu bulunamadı');
+        return { success: false, error: 'Kullanıcı oturumu bulunamadı' };
+      }
+
+      console.log('👤 User ID:', user.user.id);
+
+      // Backend doğrulama fonksiyonu çağır
+      console.log('🚀 Supabase RPC çağrılıyor: validate_google_play_purchase');
+      const rpcParams = {
+        p_user_id: user.user.id,
+        p_package_id: packageId,
+        p_purchase_token: purchaseToken,
+        p_product_id: productId
+      };
+      console.log('📋 RPC Parameters:', rpcParams);
+
+      const { data, error } = await supabase.rpc('validate_google_play_purchase', rpcParams);
+
+      const responseTime = Date.now() - startTime;
+      console.log('⏱️ Backend response süresi:', responseTime + 'ms');
+
+      if (error) {
+        console.error('❌ Backend doğrulama RPC hatası:', {
+          error: error,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Backend doğrulama response:', JSON.stringify(data, null, 2));
+      console.log('🎉 ===== BACKEND DOĞRULAMA TAMAMLANDI =====');
+      
+      return { success: true };
+    } catch (error: any) {
+      const errorTime = Date.now() - startTime;
+      console.error('❌ ===== BACKEND DOĞRULAMA HATASI =====');
+      console.error('⏱️ Hata süresi:', errorTime + 'ms');
+      console.error('🔍 Backend doğrulama hatası:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        error: error
+      });
+      return { success: false, error: error.message || 'Backend doğrulama başarısız' };
     }
   }
 
