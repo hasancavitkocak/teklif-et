@@ -76,17 +76,53 @@ class PurchaseService {
           const productIds = Object.values(this.PRODUCTS);
           
           console.log('📋 İstenen ürün ID\'leri:', productIds);
+          console.log('🔍 Google Play Store\'dan ürün çekiliyor...');
           
-          const products = await RNIap.getProducts({ skus: productIds });
+          // Abonelikler ve tek seferlik ürünleri ayır
+          const subscriptionIds = [
+            this.PRODUCTS.PREMIUM_WEEKLY,
+            this.PRODUCTS.PREMIUM_MONTHLY, 
+            this.PRODUCTS.PREMIUM_YEARLY
+          ];
           
-          console.log('✅ Google Play Store\'dan alınan ürünler:', products.length);
-          console.log('📦 Ürün detayları:', products.map(p => ({
+          const productOnlyIds = [
+            this.PRODUCTS.SUPER_LIKE_5,
+            this.PRODUCTS.SUPER_LIKE_10,
+            this.PRODUCTS.BOOST_3
+          ];
+          
+          console.log('📋 Abonelik ID\'leri:', subscriptionIds);
+          console.log('�  Tek seferlik ürün ID\'leri:', productOnlyIds);
+          
+          // Hem abonelikleri hem tek seferlik ürünleri çek
+          const [subscriptions, products] = await Promise.all([
+            RNIap.getSubscriptions({ skus: subscriptionIds }),
+            RNIap.getProducts({ skus: productOnlyIds })
+          ]);
+          
+          // Birleştir
+          const allProducts = [...subscriptions, ...products];
+          
+          console.log('✅ Google Play Store\'dan alınan toplam ürün:', allProducts.length);
+          console.log('📦 Abonelikler:', subscriptions.length);
+          console.log('📦 Tek seferlik ürünler:', products.length);
+          console.log('📦 Ham ürün verisi:', JSON.stringify(allProducts, null, 2));
+          
+          if (allProducts.length === 0) {
+            console.error('❌ Google Play Store\'dan hiç ürün gelmedi!');
+            console.error('🔍 Muhtemel sebepler:');
+            console.error('   - Ürünler henüz aktif değil (2-8 saat bekleyin)');
+            console.error('   - Product ID\'ler eşleşmiyor');
+            console.error('   - Test hesabı license testing\'de değil');
+          }
+          
+          console.log('📦 Ürün detayları:', allProducts.map(p => ({
             id: p.productId,
             price: p.localizedPrice,
             title: p.title
           })));
           
-          const formattedProducts = products.map(product => ({
+          const formattedProducts = allProducts.map(product => ({
             productId: product.productId,
             price: product.price,
             title: product.title,
@@ -106,6 +142,8 @@ class PurchaseService {
           });
           console.warn('⚠️ Store ürünleri yüklenemedi, mock data kullanılıyor');
         }
+      } else {
+        console.log('⚠️ Native IAP mevcut değil, mock mode aktif');
       }
 
       // Mock products (development/fallback için)
@@ -184,8 +222,17 @@ class PurchaseService {
           console.log('🛒 Google Play Store satın alma başlatılıyor...');
           console.log('📋 Ürün ID:', productId);
           
-          // Gerçek Google Play Store satın alma
-          const purchase = await RNIap.requestPurchase({ sku: productId });
+          // Abonelik mi tek seferlik ürün mü kontrol et
+          const isSubscription = productId.includes('premium');
+          
+          let purchase;
+          if (isSubscription) {
+            console.log('📅 Abonelik satın alması başlatılıyor...');
+            purchase = await RNIap.requestSubscription({ sku: productId });
+          } else {
+            console.log('🛒 Tek seferlik ürün satın alması başlatılıyor...');
+            purchase = await RNIap.requestPurchase({ sku: productId });
+          }
           
           console.log('✅ Native Google Play Store satın alma başarılı!');
           console.log('🧾 Purchase detayları:', {
