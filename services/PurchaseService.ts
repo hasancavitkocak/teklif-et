@@ -186,12 +186,19 @@ class PurchaseService {
         
         // ✅ RN-IAP v14 DOĞRU KULLANIM - requestPurchase (subscription için)
         purchase = await requestPurchase({
-          sku: productId,
-          subscriptionOffers: [{
-            sku: productId,
-            offerToken: offerToken,
-          }]
-        } as any);
+        type: 'subs',
+        request: {
+        android: {
+          skus: [productId],
+          subscriptionOffers: [
+            {
+              sku: productId,
+              offerToken: offerToken,
+            }
+            ],
+            },
+          },
+        });
         
       } else {
         // For in-app purchases, use requestPurchase
