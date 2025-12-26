@@ -170,8 +170,9 @@ export default function PremiumScreen() {
       const result = await packagesAPI.recordGooglePlayPurchase(
         selectedPlan.id,
         purchaseResult.transactionId || '',
-        'purchase_token_placeholder', // Gerçek purchase token buraya gelecek
-        storeProductId
+        purchaseResult.purchaseDetails?.purchaseToken || 'purchase_token_placeholder',
+        storeProductId,
+        purchaseResult.purchaseDetails
       );
 
       if (!result.success) {
@@ -225,8 +226,9 @@ export default function PremiumScreen() {
       const result = await packagesAPI.recordGooglePlayPurchase(
         addon.id,
         purchaseResult.transactionId || '',
-        'purchase_token_placeholder', // Gerçek purchase token buraya gelecek
-        storeProductId
+        purchaseResult.purchaseDetails?.purchaseToken || 'purchase_token_placeholder',
+        storeProductId,
+        purchaseResult.purchaseDetails
       );
 
       if (!result.success) {

@@ -83,7 +83,17 @@ class PackagesAPI {
     packageId: string,
     transactionId: string,
     purchaseToken: string,
-    productId: string
+    productId: string,
+    purchaseDetails?: {
+      purchaseTime?: number;
+      purchaseState?: number;
+      acknowledged?: boolean;
+      autoRenewing?: boolean;
+      orderId?: string;
+      packageName?: string;
+      originalJson?: string;
+      signature?: string;
+    }
   ): Promise<{ success: boolean; purchaseId?: string; error?: string }> {
     try {
       const { data: user } = await supabase.auth.getUser();
@@ -91,13 +101,21 @@ class PackagesAPI {
         return { success: false, error: 'Kullanıcı oturumu bulunamadı' };
       }
 
-      // Google Play Store satın almasını kaydet
+      // Google Play Store satın almasını tüm detaylarıyla kaydet
       const { data, error } = await supabase.rpc('record_google_play_purchase', {
         p_user_id: user.user.id,
         p_package_id: packageId,
         p_transaction_id: transactionId,
         p_purchase_token: purchaseToken,
-        p_product_id: productId
+        p_product_id: productId,
+        p_purchase_time: purchaseDetails?.purchaseTime || null,
+        p_purchase_state: purchaseDetails?.purchaseState || null,
+        p_acknowledged: purchaseDetails?.acknowledged || false,
+        p_auto_renewing: purchaseDetails?.autoRenewing || null,
+        p_order_id: purchaseDetails?.orderId || null,
+        p_package_name: purchaseDetails?.packageName || null,
+        p_signature: purchaseDetails?.signature || null,
+        p_original_json: purchaseDetails?.originalJson || null
       });
 
       if (error) {

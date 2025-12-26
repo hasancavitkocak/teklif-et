@@ -24,6 +24,17 @@ export interface PurchaseResult {
   transactionId?: string;
   productId?: string;
   error?: string;
+  purchaseDetails?: {
+    purchaseToken?: string;
+    packageName?: string;
+    purchaseTime?: number;
+    purchaseState?: number;
+    acknowledged?: boolean;
+    autoRenewing?: boolean;
+    orderId?: string;
+    originalJson?: string;
+    signature?: string;
+  };
 }
 
 export interface RestorePurchaseResult {
@@ -198,7 +209,7 @@ class PurchaseService {
             ],
             },
           },
-        });
+  });
         
       } else {
         // For in-app purchases, use requestPurchase
@@ -244,6 +255,18 @@ class PurchaseService {
         success: true,
         transactionId: purchaseData?.transactionId || purchaseData?.purchaseToken || '',
         productId: purchaseData?.productId || productId,
+        // Google Play Store detaylarını da döndür
+        purchaseDetails: {
+          purchaseToken: purchaseData?.purchaseToken,
+          packageName: purchaseData?.packageName,
+          purchaseTime: purchaseData?.purchaseTime,
+          purchaseState: purchaseData?.purchaseState,
+          acknowledged: purchaseData?.acknowledged,
+          autoRenewing: purchaseData?.autoRenewing,
+          orderId: purchaseData?.orderId,
+          originalJson: purchaseData?.originalJson,
+          signature: purchaseData?.signature
+        }
       };
     } catch (error: any) {
       console.error('❌ Google Play Store satın alma hatası:', error);
