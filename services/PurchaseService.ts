@@ -81,10 +81,7 @@ class PurchaseService {
         try {
           const RNIap = require('react-native-iap');
           
-          // Fonksiyonların mevcut olup olmadığını kontrol et
-          if (!RNIap.getProducts || typeof RNIap.getProducts !== 'function') {
-            throw new Error('RNIap.getProducts is not available');
-          }
+          console.log('🔍 RNIap mevcut fonksiyonlar:', Object.keys(RNIap));
           
           const productIds = Object.values(this.PRODUCTS);
           
@@ -114,36 +111,50 @@ class PurchaseService {
           let allProducts = [];
           
           try {
-            // v14'te tek fonksiyon var: getProducts
-            console.log('🛒 Tüm ürünler tek API ile çekiliyor...');
+            console.log('🔄 fetchProducts API çağrısı başlıyor...');
             
-            // Önce abonelikleri dene
-            const subscriptionProducts = await RNIap.getProducts({
+            // v14'te fetchProducts kullanılıyor - abonelikler
+            const subscriptionProducts = await RNIap.fetchProducts({
               skus: subscriptionIds,
-              type: 'subs' // Abonelik tipi
+              type: 'subs'
             });
-            console.log('✅ Abonelikler başarılı:', subscriptionProducts.length);
+            console.log('✅ fetchProducts (subs) başarılı, ürün sayısı:', subscriptionProducts.length);
+            console.log('📦 Abonelik ham verisi:', JSON.stringify(subscriptionProducts, null, 2));
+            
+            // Abonelik offer token'larını sakla
+            subscriptionProducts.forEach((sub: any) => {
+              console.log('🔍 Sub verisi kontrol ediliyor:', sub.id);
+              if (sub.subscriptionOfferDetailsAndroid && sub.subscriptionOfferDetailsAndroid.length > 0) {
+                const baseOffer = sub.subscriptionOfferDetailsAndroid[0];
+                
+                // Map'in var olduğundan emin ol
+                if (!this.subscriptionOffers) {
+                  this.subscriptionOffers = new Map();
+                }
+                
+                this.subscriptionOffers.set(sub.id, {
+                  offerToken: baseOffer.offerToken,
+                  basePlanId: baseOffer.basePlanId,
+                });
+                console.log('💾 Offer token kaydedildi:', sub.id, baseOffer.offerToken);
+              } else {
+                console.log('⚠️ Offer details bulunamadı:', sub.id);
+              }
+            });
+            
             allProducts = [...allProducts, ...subscriptionProducts];
             
-            // Sonra tek seferlik ürünleri dene
-            const inappProducts = await RNIap.getProducts({
+            // Tek seferlik ürünler için fetchProducts
+            const inappProducts = await RNIap.fetchProducts({
               skus: productOnlyIds,
-              type: 'inapp' // Tek seferlik tip
+              type: 'inapp'
             });
-            console.log('✅ Tek seferlik ürünler başarılı:', inappProducts.length);
+            console.log('✅ fetchProducts (inapp) başarılı, ürün sayısı:', inappProducts.length);
             allProducts = [...allProducts, ...inappProducts];
             
-          } catch (apiError) {
-            console.log('❌ Yeni API de başarısız, eski format deneniyor...');
-            
-            try {
-              // Son çare: eski format
-              const oldFormatProducts = await RNIap.getProducts(productIds);
-              console.log('✅ Eski format başarılı:', oldFormatProducts.length);
-              allProducts = oldFormatProducts;
-            } catch (oldError) {
-              console.error('❌ Tüm API formatları başarısız:', oldError.message);
-            }
+          } catch (apiError: any) {
+            console.log('❌ fetchProducts başarısız:', apiError.message);
+            console.log('⚠️ Store ürünleri yüklenemedi, mock data kullanılacak');
           }
           
           console.log('✅ Google Play Store\'dan alınan toplam ürün:', allProducts.length);
@@ -164,12 +175,12 @@ class PurchaseService {
           })));
           
           const formattedProducts = allProducts.map(product => ({
-            productId: product.productId,
-            price: product.price,
-            title: product.title,
-            description: product.description,
-            localizedPrice: product.localizedPrice,
-            currency: product.currency,
+            productId: product.id, // fetchProducts'ta 'id' kullanılıyor
+            price: product.price?.toString() || product.displayPrice || '0',
+            title: product.title || product.displayName || '',
+            description: product.description || '',
+            localizedPrice: product.displayPrice || '₺0,00',
+            currency: product.currency || 'TRY',
           }));
 
           console.log('✅ Native Google Play Store ürünleri yüklendi:', formattedProducts.length);

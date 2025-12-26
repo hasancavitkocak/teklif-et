@@ -67,6 +67,11 @@ export default function PremiumScreen() {
           setStoreProducts(products);
           setPurchaseInitialized(true);
           console.log('🏪 Store ürünleri yüklendi:', products.length);
+          console.log('📋 Store ürün detayları:', products.map(p => ({
+            id: p.productId,
+            price: p.localizedPrice,
+            title: p.title
+          })));
         }
       }
 
@@ -465,6 +470,12 @@ export default function PremiumScreen() {
                     <Text style={styles.planPrice}>
                       {storeProduct?.localizedPrice || '₺39,99'}
                     </Text>
+                    {/* Debug: Play Store verisi */}
+                    {storeProduct && (
+                      <Text style={[styles.planFeatureText, { fontSize: 10, color: '#666', marginTop: 4 }]}>
+                        Store: {storeProduct.productId} - {storeProduct.localizedPrice}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.planFeatures}>
                     <View style={styles.planFeatureRow}>
@@ -542,6 +553,12 @@ export default function PremiumScreen() {
                       {addon.duration_type === 'one_time' ? 'tek seferlik' : 
                        addon.duration_type === 'weekly' ? '7 günlük' : 'aylık'}
                     </Text>
+                    {/* Debug: Play Store verisi */}
+                    {storeProduct && (
+                      <Text style={[styles.addOnPriceUnit, { fontSize: 9, color: '#666' }]}>
+                        Store: {storeProduct.productId}
+                      </Text>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
