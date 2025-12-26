@@ -8,9 +8,6 @@ import {
   Purchase,
   PurchaseError,
 } from 'react-native-iap';
-
-// requestSubscription'ı manuel import et (TypeScript cache problemi için)
-const { requestSubscription } = require('react-native-iap');
 import { Platform } from 'react-native';
 
 export interface PurchaseProduct {
@@ -170,7 +167,7 @@ class PurchaseService {
 
       let purchase: any;
 
-      // For Android subscriptions, use requestSubscription - TEK DOĞRU YOL
+      // For Android subscriptions, use requestPurchase - RN-IAP v14 DOĞRU YÖNTEMİ
       if (Platform.OS === 'android' && product.type === 'subs') {
         const offerToken = this.offerTokens.get(productId);
         if (!offerToken) {
@@ -187,14 +184,14 @@ class PurchaseService {
 
         console.log('📋 Subscription request:', JSON.stringify(subscriptionRequest, null, 2));
         
-        // ✅ TEK DOĞRU ÇÖZÜM - requestSubscription (RN-IAP v14)
-        purchase = await requestSubscription({
+        // ✅ RN-IAP v14 DOĞRU KULLANIM - requestPurchase (subscription için)
+        purchase = await requestPurchase({
           sku: productId,
           subscriptionOffers: [{
             sku: productId,
             offerToken: offerToken,
           }]
-        });
+        } as any);
         
       } else {
         // For in-app purchases, use requestPurchase
