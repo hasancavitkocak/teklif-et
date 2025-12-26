@@ -22,7 +22,7 @@ module.exports = {
     android: {
       softwareKeyboardLayoutMode: "resize",
       package: "com.teklifet.app",
-      versionCode: 8,
+      versionCode: 9,
       minSdkVersion: 23,
       targetSdkVersion: 34,
       icon: "./assets/images/puzzle-iconnew.png",
