@@ -37,6 +37,13 @@ class PurchaseService {
 
       console.log('🔄 Purchase Service başlatılıyor...');
       
+      // Test modu kontrolü
+      const isTestMode = __DEV__ || process.env.NODE_ENV === 'development';
+      
+      if (isTestMode) {
+        console.log('🧪 Test modu aktif - API test edilecek');
+      }
+      
       // Native IAP modülünün mevcut olup olmadığını kontrol et
       try {
         const RNIap = require('react-native-iap');
@@ -94,18 +101,46 @@ class PurchaseService {
           console.log('📋 Abonelik ID\'leri:', subscriptionIds);
           console.log('�  Tek seferlik ürün ID\'leri:', productOnlyIds);
           
-          // Hem abonelikleri hem tek seferlik ürünleri çek
-          const [subscriptions, products] = await Promise.all([
-            RNIap.getSubscriptions({ skus: subscriptionIds }),
-            RNIap.getProducts({ skus: productOnlyIds })
-          ]);
+          // v14 için tamamen yeni API
+          console.log('🔄 RNIap fonksiyonları kontrol ediliyor...');
+          console.log('📋 Mevcut fonksiyonlar:', Object.keys(RNIap));
           
-          // Birleştir
-          const allProducts = [...subscriptions, ...products];
+          let allProducts = [];
+          
+          try {
+            // v14'te tek fonksiyon var: getProducts
+            console.log('🛒 Tüm ürünler tek API ile çekiliyor...');
+            
+            // Önce abonelikleri dene
+            const subscriptionProducts = await RNIap.getProducts({
+              skus: subscriptionIds,
+              type: 'subs' // Abonelik tipi
+            });
+            console.log('✅ Abonelikler başarılı:', subscriptionProducts.length);
+            allProducts = [...allProducts, ...subscriptionProducts];
+            
+            // Sonra tek seferlik ürünleri dene
+            const inappProducts = await RNIap.getProducts({
+              skus: productOnlyIds,
+              type: 'inapp' // Tek seferlik tip
+            });
+            console.log('✅ Tek seferlik ürünler başarılı:', inappProducts.length);
+            allProducts = [...allProducts, ...inappProducts];
+            
+          } catch (apiError) {
+            console.log('❌ Yeni API de başarısız, eski format deneniyor...');
+            
+            try {
+              // Son çare: eski format
+              const oldFormatProducts = await RNIap.getProducts(productIds);
+              console.log('✅ Eski format başarılı:', oldFormatProducts.length);
+              allProducts = oldFormatProducts;
+            } catch (oldError) {
+              console.error('❌ Tüm API formatları başarısız:', oldError.message);
+            }
+          }
           
           console.log('✅ Google Play Store\'dan alınan toplam ürün:', allProducts.length);
-          console.log('📦 Abonelikler:', subscriptions.length);
-          console.log('📦 Tek seferlik ürünler:', products.length);
           console.log('📦 Ham ürün verisi:', JSON.stringify(allProducts, null, 2));
           
           if (allProducts.length === 0) {
@@ -222,17 +257,8 @@ class PurchaseService {
           console.log('🛒 Google Play Store satın alma başlatılıyor...');
           console.log('📋 Ürün ID:', productId);
           
-          // Abonelik mi tek seferlik ürün mü kontrol et
-          const isSubscription = productId.includes('premium');
-          
-          let purchase;
-          if (isSubscription) {
-            console.log('📅 Abonelik satın alması başlatılıyor...');
-            purchase = await RNIap.requestSubscription({ sku: productId });
-          } else {
-            console.log('🛒 Tek seferlik ürün satın alması başlatılıyor...');
-            purchase = await RNIap.requestPurchase({ sku: productId });
-          }
+          // v14 için basit API kullanımı
+          const purchase = await RNIap.requestPurchase({ sku: productId });
           
           console.log('✅ Native Google Play Store satın alma başarılı!');
           console.log('🧾 Purchase detayları:', {
