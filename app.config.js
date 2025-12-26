@@ -69,7 +69,8 @@ module.exports = {
           color: "#8B5CF6",
           mode: "production"
         }
-      ]
+      ],
+      "react-native-iap"
     ],
     experiments: {
       typedRoutes: true

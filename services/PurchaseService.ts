@@ -37,16 +37,16 @@ class PurchaseService {
 
       console.log('🔄 Purchase Service başlatılıyor...');
       
-      // Test modu kontrolü
-      const isTestMode = __DEV__ || process.env.NODE_ENV === 'development';
-      
-      if (isTestMode) {
-        console.log('🧪 Test modu aktif - API test edilecek');
-      }
-      
       // Native IAP modülünün mevcut olup olmadığını kontrol et
       try {
+        // Önce modülün var olup olmadığını kontrol et
         const RNIap = require('react-native-iap');
+        
+        // Fonksiyonların mevcut olup olmadığını kontrol et
+        if (!RNIap.initConnection || typeof RNIap.initConnection !== 'function') {
+          throw new Error('RNIap.initConnection is not available');
+        }
+        
         console.log('✅ react-native-iap modülü bulundu');
         
         const result = await RNIap.initConnection();
@@ -80,6 +80,12 @@ class PurchaseService {
       if (this.isNativeAvailable) {
         try {
           const RNIap = require('react-native-iap');
+          
+          // Fonksiyonların mevcut olup olmadığını kontrol et
+          if (!RNIap.getProducts || typeof RNIap.getProducts !== 'function') {
+            throw new Error('RNIap.getProducts is not available');
+          }
+          
           const productIds = Object.values(this.PRODUCTS);
           
           console.log('📋 İstenen ürün ID\'leri:', productIds);
