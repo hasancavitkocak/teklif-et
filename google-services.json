@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "542232557896",
+    "project_id": "teklifet-1e9d8",
+    "storage_bucket": "teklifet-1e9d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:542232557896:android:0e68ac43f2c992bd035b7d",
+        "android_client_info": {
+          "package_name": "com.teklifet.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnq9y9VKSlzhXtntzrv5qA0jxPfz3jSCw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
