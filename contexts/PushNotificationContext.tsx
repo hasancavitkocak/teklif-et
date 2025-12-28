@@ -85,20 +85,32 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   }, [user?.id]);
 
   const checkPermissionStatus = async (): Promise<string> => {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status;
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      console.log('🔍 [DEBUG] Push permission durumu kontrol edildi:', status);
+      return status;
+    } catch (error) {
+      console.error('❌ [ERROR] Push permission kontrol hatası:', error);
+      return 'undetermined';
+    }
   };
 
   const registerForPushNotifications = async (): Promise<string | null> => {
     let token = null;
 
+    console.log('🚀 [DEBUG] Push notification kayıt işlemi başlatıldı');
+    console.log('🔧 [DEBUG] Device.isDevice:', Device.isDevice);
+    console.log('🔧 [DEBUG] Platform.OS:', Platform.OS);
+    console.log('🔧 [DEBUG] __DEV__:', __DEV__);
+
     // Expo Go'da push notification desteği yok
     if (__DEV__ && !Device.isDevice) {
-      console.log('📱 Expo Go\'da push notifications desteklenmiyor. Development build kullanın.');
+      console.log('📱 [WARNING] Expo Go\'da push notifications desteklenmiyor. Development build kullanın.');
       return null;
     }
 
     if (Platform.OS === 'android') {
+      console.log('🤖 [DEBUG] Android notification channel oluşturuluyor...');
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Teklif Et Bildirimleri',
         importance: Notifications.AndroidImportance.MAX,
@@ -109,13 +121,18 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
         enableVibrate: true,
         showBadge: true,
       });
+      console.log('✅ [DEBUG] Android notification channel oluşturuldu');
     }
 
     if (Device.isDevice) {
+      console.log('📱 [DEBUG] Mevcut izin durumu kontrol ediliyor...');
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log('📱 [DEBUG] Mevcut izin durumu:', existingStatus);
+      
       let finalStatus = existingStatus;
       
       if (existingStatus !== 'granted') {
+        console.log('🔔 [DEBUG] İzin isteniyor...');
         const { status } = await Notifications.requestPermissionsAsync({
           ios: {
             allowAlert: true,
@@ -130,31 +147,39 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
           },
         });
         finalStatus = status;
+        console.log('📱 [DEBUG] İzin isteği sonucu:', finalStatus);
       }
       
       if (finalStatus !== 'granted') {
-        console.log('❌ Push notification izni reddedildi');
+        console.log('❌ [ERROR] Push notification izni reddedildi. Final status:', finalStatus);
         setPermissionStatus('denied');
         return null;
       }
       
       try {
+        console.log('🎯 [DEBUG] Push token alınıyor...');
         const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+        console.log('🎯 [DEBUG] Project ID:', projectId);
+        
         if (!projectId) {
           throw new Error('Project ID bulunamadı');
         }
         
-        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        token = tokenData.data;
+        console.log('✅ [SUCCESS] Push token alındı:', token.substring(0, 50) + '...');
+        
         if (token !== expoPushToken) {
-          console.log('✅ Push token alındı:', token);
+          console.log('🔄 [DEBUG] Token değişti, güncelleniyor...');
         }
         setPermissionStatus('granted');
       } catch (error) {
-        console.error('❌ Push token alma hatası:', error);
+        console.error('❌ [ERROR] Push token alma hatası:', error);
+        console.error('❌ [ERROR] Hata detayı:', JSON.stringify(error, null, 2));
         setPermissionStatus('denied');
       }
     } else {
-      console.log('❌ Push notifications sadece fiziksel cihazlarda çalışır');
+      console.log('❌ [ERROR] Push notifications sadece fiziksel cihazlarda çalışır');
       setPermissionStatus('denied');
     }
 

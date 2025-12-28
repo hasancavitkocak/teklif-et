@@ -26,12 +26,11 @@ module.exports = {
       minSdkVersion: 23,
       targetSdkVersion: 34,
       icon: "./assets/images/puzzle-iconnew.png",
+      googleServicesFile: "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/images/puzzle-iconnew.png",
-        backgroundColor: "#FFFFFF",
-        monochromeImage: "./assets/images/puzzle-iconnew.png"
+        backgroundColor: "#FFFFFF"
       },
-      roundIconImage: "./assets/images/puzzle-iconnew.png",
       allowBackup: false,
       permissions: [
         "ACCESS_FINE_LOCATION",
@@ -43,7 +42,8 @@ module.exports = {
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "WAKE_LOCK",
-        "com.android.vending.BILLING"
+        "com.android.vending.BILLING",
+        "POST_NOTIFICATIONS"
       ],
       blockedPermissions: [],
       gradleProperties: {

@@ -1052,22 +1052,39 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                   {permissionStatus !== 'granted' && (
-                    <TouchableOpacity
-                      style={styles.enablePermissionButton}
-                      onPress={async () => {
-                        const token = await registerForPushNotifications();
-                        if (token) {
-                          setInfoMessage('Bildirim izni verildi!');
-                          setShowInfoToast(true);
-                          await checkPermissionStatus();
-                        } else {
-                          setErrorMessage('Bildirim izni için cihaz ayarlarına gidin.');
-                          setShowErrorToast(true);
-                        }
-                      }}
-                    >
-                      <Text style={styles.enablePermissionButtonText}>İzin Ver</Text>
-                    </TouchableOpacity>
+                    <View style={styles.permissionButtons}>
+                      <TouchableOpacity
+                        style={styles.enablePermissionButton}
+                        onPress={async () => {
+                          console.log('🔔 [DEBUG] İzin ver butonuna basıldı');
+                          const token = await registerForPushNotifications();
+                          if (token) {
+                            setInfoMessage('Bildirim izni verildi!');
+                            setShowInfoToast(true);
+                            await checkPermissionStatus();
+                          } else {
+                            setErrorMessage('Bildirim izni verilemedi. Cihaz ayarlarından kontrol edin.');
+                            setShowErrorToast(true);
+                          }
+                        }}
+                      >
+                        <Text style={styles.enablePermissionButtonText}>İzin Ver</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={styles.openSettingsButton}
+                        onPress={() => {
+                          console.log('⚙️ [DEBUG] Cihaz ayarları butonuna basıldı');
+                          if (Platform.OS === 'android') {
+                            Linking.openSettings();
+                          } else {
+                            Linking.openURL('app-settings:');
+                          }
+                        }}
+                      >
+                        <Text style={styles.openSettingsButtonText}>Cihaz Ayarları</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
                 
@@ -1917,9 +1934,7 @@ const styles = StyleSheet.create({
   },
 
   permissionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     padding: 16,
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
@@ -1928,7 +1943,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   permissionInfo: {
-    flex: 1,
+    marginBottom: 12,
   },
   permissionTitle: {
     fontSize: 14,
@@ -1940,13 +1955,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
+  permissionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   enablePermissionButton: {
+    flex: 1,
     backgroundColor: '#8B5CF6',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
+    alignItems: 'center',
   },
   enablePermissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  openSettingsButton: {
+    flex: 1,
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  openSettingsButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
