@@ -173,6 +173,9 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
           console.log('🔄 [DEBUG] Token değişti, güncelleniyor...');
         }
         setPermissionStatus('granted');
+        
+        // Token'ı database'e kaydet
+        await savePushTokenToDatabase(token);
       } catch (error) {
         console.error('❌ [ERROR] Push token alma hatası:', error);
         console.error('❌ [ERROR] Hata detayı:', JSON.stringify(error, null, 2));

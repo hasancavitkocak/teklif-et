@@ -155,8 +155,10 @@ export const messagesAPI = {
           : (match as any).user2?.name || 'Bilinmeyen';
 
         // Push notification gönder (dinamik import)
+        console.log('📤 [DEBUG] Mesaj bildirimi gönderiliyor...', { recipientId, senderName, content: content.substring(0, 30) });
         const { notificationsAPI } = await import('./notifications');
         await notificationsAPI.sendMessageNotification(recipientId, senderName, content, matchId);
+        console.log('✅ [DEBUG] Mesaj bildirimi gönderildi');
       }
     } catch (error) {
       console.error('Mesaj bildirimi gönderme hatası:', error);
