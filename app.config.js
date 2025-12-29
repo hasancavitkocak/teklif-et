@@ -67,7 +67,8 @@ module.exports = {
         {
           icon: "./assets/images/puzzle-iconnew.png",
           color: "#8B5CF6",
-          mode: "production"
+          mode: "production",
+          fcmServerKey: "AIzaSyCnq9y9VKSlzhXtntzrv5qA0jxPfz3jSCw"
         }
       ],
       "react-native-iap"

@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, Filter, Eye, Check, Sparkles, X } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -26,6 +27,7 @@ const PREMIUM_FEATURES = [
 
 export default function PremiumScreen() {
   const { user, refreshPremiumStatus, isPremium } = useAuth();
+  const { sendTestNotification, expoPushToken, permissionStatus } = usePushNotifications();
   const router = useRouter();
   
   // State declarations - all at once to maintain hook order
@@ -1073,6 +1075,33 @@ const styles = StyleSheet.create({
   },
   restoreButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  // Test Section Styles (DEV ONLY)
+  testSection: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+  },
+  testInfo: {
+    fontSize: 12,
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  testButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  testButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
