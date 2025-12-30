@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import WarningToast from '@/components/WarningToast';
 import ErrorToast from '@/components/ErrorToast';
+import { checkImageBeforeUpload } from '@/utils/imageModeration';
 
 export default function PhotosScreen() {
   const router = useRouter();
@@ -190,7 +191,25 @@ export default function PhotosScreen() {
         .from('profile-photos')
         .getPublicUrl(filePath);
 
-      return data.publicUrl;
+      const publicUrl = data.publicUrl;
+
+      // 🔍 VISION API KONTROLÜ
+      console.log('🔍 Vision API ile fotoğraf kontrol ediliyor...');
+      const moderationResult = await checkImageBeforeUpload(publicUrl);
+      
+      if (!moderationResult.isAppropriate) {
+        // Uygunsuz fotoğraf - Storage'dan sil
+        await supabase.storage
+          .from('profile-photos')
+          .remove([filePath]);
+        
+        throw new Error(`Fotoğraf reddedildi: ${moderationResult.reasons.join(', ')}`);
+      }
+
+      console.log('✅ Fotoğraf Vision API kontrolünden geçti');
+
+      console.log('✅ Fotoğraf Vision API kontrolünden geçti');
+      return publicUrl;
     } catch (error) {
       console.error('Upload error:', error);
       throw error;

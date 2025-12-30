@@ -13,6 +13,7 @@ import {
 import { X, Camera as CameraIcon, Image as ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { AppIconLoader } from './AppIconLoader';
+import { checkImageBeforeUpload } from '@/utils/imageModeration';
 // Platform-specific haptics import
 let Haptics: any = null;
 if (Platform.OS !== 'web') {
@@ -215,6 +216,23 @@ export default function PhotoManagementModal({
           .getPublicUrl(filePath);
         
         uploadedUrl = urlData.publicUrl;
+
+        // 🔍 VISION API KONTROLÜ
+        console.log('🔍 Vision API ile fotoğraf kontrol ediliyor...');
+        const moderationResult = await checkImageBeforeUpload(uploadedUrl);
+        
+        if (!moderationResult.isAppropriate) {
+          // Uygunsuz fotoğraf - Storage'dan sil
+          await supabase.storage
+            .from('profile-photos')
+            .remove([filePath]);
+          
+          throw new Error(`Fotoğraf reddedildi: ${moderationResult.reasons.join(', ')}`);
+        }
+
+        console.log('✅ Fotoğraf Vision API kontrolünden geçti');
+
+        console.log('✅ Fotoğraf Vision API kontrolünden geçti');
       }
 
       // Database'e kaydet

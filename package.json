@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@google-cloud/vision": "^5.3.4",
     "@lucide/lab": "^0.1.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/cli-server-api": "^20.0.2",

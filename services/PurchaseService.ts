@@ -87,12 +87,13 @@ class PurchaseService {
       console.log('📄 fetchProducts API çağrısı başlıyor...');
       
       // Subscription products
-      const subscriptionProducts = await fetchProducts({
-        skus: [this.PRODUCTS.PREMIUM_WEEKLY, this.PRODUCTS.PREMIUM_MONTHLY, this.PRODUCTS.PREMIUM_YEARLY],
-        type: 'subs'
+      const subs = await fetchProducts({
+        skus: [
+          this.PRODUCTS.PREMIUM_WEEKLY,
+          this.PRODUCTS.PREMIUM_MONTHLY,
+          this.PRODUCTS.PREMIUM_YEARLY,
+        ],
       });
-      
-      const subs = subscriptionProducts || [];
       console.log('✅ fetchProducts (subs) başarılı, ürün sayısı:', subs.length);
       console.log('📦 Abonelik ham verisi:', JSON.stringify(subs, null, 2));
       
@@ -109,12 +110,13 @@ class PurchaseService {
       }
       
       // In-app products
-      const inAppProducts = await fetchProducts({
-        skus: [this.PRODUCTS.SUPER_LIKE_5, this.PRODUCTS.SUPER_LIKE_10, this.PRODUCTS.BOOST_3],
-        type: 'in-app'
+      const inApps = await fetchProducts({
+        skus: [
+          this.PRODUCTS.SUPER_LIKE_5,
+          this.PRODUCTS.SUPER_LIKE_10,
+          this.PRODUCTS.BOOST_3,
+        ],
       });
-      
-      const inApps = inAppProducts || [];
       console.log('✅ fetchProducts (inapp) başarılı, ürün sayısı:', inApps.length);
       
       // Combine all products
@@ -173,7 +175,7 @@ class PurchaseService {
 
       console.log('🔍 Bulunan ürün:', {
         id: product.id,
-        type: product.type,
+        isSubscription: !!product.subscriptionOfferDetailsAndroid?.length,
         title: product.title,
         price: product.price
       });
@@ -181,7 +183,8 @@ class PurchaseService {
       let purchase: any;
 
       // For Android subscriptions, use requestPurchase - RN-IAP v14 DOĞRU YÖNTEMİ
-      if (Platform.OS === 'android' && product.type === 'subs') {
+      const isSubscription = product.subscriptionOfferDetailsAndroid?.length > 0;
+      if (Platform.OS === 'android' && isSubscription) {
         const offerToken = this.offerTokens.get(productId);
         if (!offerToken) {
           throw new Error(`Offer token bulunamadı: ${productId}`);
@@ -199,19 +202,12 @@ class PurchaseService {
         
         // ✅ RN-IAP v14 DOĞRU KULLANIM - requestPurchase (subscription için)
         purchase = await requestPurchase({
-        type: 'subs',
-        request: {
-        android: {
-          skus: [productId],
-          subscriptionOffers: [
-            {
-              sku: productId,
-              offerToken: offerToken,
-            }
-            ],
-            },
-          },
-  });
+          sku: productId,
+          subscriptionOffers: [{
+            sku: productId,
+            offerToken,
+          }],
+        });
         
       } else {
         // For in-app purchases, use requestPurchase
@@ -235,7 +231,7 @@ class PurchaseService {
         keys: purchase ? Object.keys(purchase) : 'N/A'
       });
 
-      // Purchase array olabilir, ilkini al
+      // Purchase array olabilir, ilkini al - TEK NOKTADA normalize et
       const purchaseData = Array.isArray(purchase) ? purchase[0] : purchase;
       
       console.log('🔍 İşlenmiş Purchase Data:', JSON.stringify(purchaseData, null, 2));
