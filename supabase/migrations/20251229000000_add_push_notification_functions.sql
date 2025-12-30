@@ -299,7 +299,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Eski trigger'ları kaldır ve yenilerini ekle
+-- Trigger'ları oluştur
 DROP TRIGGER IF EXISTS on_new_proposal_request ON proposal_requests;
 CREATE TRIGGER on_new_proposal_request
 AFTER INSERT ON proposal_requests
@@ -319,54 +319,10 @@ AFTER INSERT ON matches
 FOR EACH ROW
 EXECUTE FUNCTION notify_new_match_with_push();
 
--- Mesaj gönderildiğinde push notification gönder
-CREATE OR REPLACE FUNCTION notify_new_message_with_push()
-RETURNS TRIGGER
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  receiver_id UUID;
-  sender_name TEXT;
-  push_success BOOLEAN;
-BEGIN
-  -- Alıcıyı belirle (match'teki diğer kullanıcı)
-  SELECT 
-    CASE 
-      WHEN m.user1_id = NEW.sender_id THEN m.user2_id
-      ELSE m.user1_id
-    END INTO receiver_id
-  FROM matches m
-  WHERE m.id = NEW.match_id;
-
-  -- Gönderen kişinin adını al
-  SELECT name INTO sender_name
-  FROM profiles
-  WHERE id = NEW.sender_id;
-
-  -- Push notification gönder
-  SELECT send_push_to_user(
-    receiver_id,
-    sender_name || ' mesaj gönderdi 💬',
-    NEW.content,
-    'message',
-    jsonb_build_object(
-      'matchId', NEW.match_id,
-      'messageId', NEW.id,
-      'senderId', NEW.sender_id
-    )
-  ) INTO push_success;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Mesaj trigger'ı ekle (eğer messages tablosu varsa)
+-- Mesaj trigger'ını kaldır (performans için API'den gönderiyoruz)
 DROP TRIGGER IF EXISTS on_new_message ON messages;
-CREATE TRIGGER on_new_message
-AFTER INSERT ON messages
-FOR EACH ROW
-EXECUTE FUNCTION notify_new_message_with_push();
+DROP FUNCTION IF EXISTS notify_new_message_with_push();
 
+-- Fonksiyon açıklamaları
 COMMENT ON FUNCTION send_push_notification IS 'Expo Push Notification gönderir';
 COMMENT ON FUNCTION send_push_to_user IS 'Kullanıcıya push notification gönderir';

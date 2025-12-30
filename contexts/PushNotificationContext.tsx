@@ -72,14 +72,12 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('📱 Bildirim alındı:', notification);
       console.log('📱 Bildirim içeriği:', JSON.stringify(notification, null, 2));
-      alert('Bildirim alındı: ' + notification.request.content.title);
       setNotification(notification);
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('📱 Bildirime tıklandı:', response);
       console.log('📱 Response içeriği:', JSON.stringify(response, null, 2));
-      alert('Bildirime tıklandı: ' + response.notification.request.content.title);
       handleNotificationResponse(response);
     });
 
@@ -278,7 +276,6 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
       });
       
       console.log('✅ Test bildirimi zamanlandı');
-      alert('Test bildirimi 1 saniye içinde gelecek!');
     } catch (error) {
       console.error('❌ Test bildirimi hatası:', error);
       alert('Test bildirimi gönderilemedi: ' + error);

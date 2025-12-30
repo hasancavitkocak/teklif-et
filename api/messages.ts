@@ -133,7 +133,12 @@ export const messagesAPI = {
 
     if (error) throw error;
 
-    // Push notification gönder
+    // Push notification gönder (async - mesaj kaydını bloklamaz)
+    messagesAPI.sendMessageNotificationAsync(matchId, senderId, content);
+  },
+
+  // Async push notification gönderme (fire-and-forget)
+  sendMessageNotificationAsync: async (matchId: string, senderId: string, content: string) => {
     try {
       // Match bilgisini al
       const { data: match } = await supabase
@@ -155,13 +160,13 @@ export const messagesAPI = {
           : (match as any).user2?.name || 'Bilinmeyen';
 
         // Push notification gönder (dinamik import)
-        console.log('📤 [DEBUG] Mesaj bildirimi gönderiliyor...', { recipientId, senderName, content: content.substring(0, 30) });
         const { notificationsAPI } = await import('./notifications');
         await notificationsAPI.sendMessageNotification(recipientId, senderName, content, matchId);
-        console.log('✅ [DEBUG] Mesaj bildirimi gönderildi');
+        console.log('✅ Push notification gönderildi');
       }
     } catch (error) {
-      console.error('Mesaj bildirimi gönderme hatası:', error);
+      // Sessizce logla - mesaj kaydını etkilemesin
+      console.warn('Push notification gönderilemedi:', error);
     }
   },
 
