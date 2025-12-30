@@ -56,28 +56,11 @@ export default function PremiumScreen() {
     type: 'info' as 'info' | 'success' | 'error'
   });
 
-  // Load data function
-  const loadData = async () => {
+  // Refresh data function - sadece paket verilerini yenile
+  const refreshData = async () => {
     if (!user?.id) return;
     
     try {
-      // Initialize purchase service
-      if (!purchaseInitialized) {
-        const initialized = await purchaseService.initialize();
-        if (initialized) {
-          const products = await purchaseService.getProducts();
-          setStoreProducts(products);
-          setPurchaseInitialized(true);
-          console.log('🏪 Store ürünleri yüklendi:', products.length);
-          console.log('📋 Store ürün detayları:', products.map(p => ({
-            id: p.productId,
-            price: p.localizedPrice,
-            title: p.title
-          })));
-        }
-      }
-
-      // Load packages
       const [subscriptions, addons, activeSubscription, credits] = await Promise.all([
         packagesAPI.getSubscriptionPackages(),
         packagesAPI.getAddonPackages(),
@@ -89,34 +72,98 @@ export default function PremiumScreen() {
       setAddonPackages(addons);
       setSubscription(activeSubscription);
       setUserCredits(credits);
-      setDataLoaded(true);
 
-      console.log('📦 Paketler yüklendi:', {
+      console.log('🔄 Paketler yenilendi:', {
         subscriptions: subscriptions.length,
         addons: addons.length,
         activeSubscription: !!activeSubscription,
         credits: credits.length
       });
     } catch (error) {
-      console.error('❌ Paket verilerini yükleme hatası:', error);
-      setErrorMessage('Paket bilgileri yüklenirken bir hata oluştu');
-      setShowErrorToast(true);
+      console.error('❌ Paket verilerini yenileme hatası:', error);
     }
   };
 
-  // Load packages and subscription data on mount
+  // 🔥 IAP INITIALIZATION - SADECE BİR KEZ
   useEffect(() => {
-    if (user?.id) {
-      loadData();
-    }
+    let isMounted = true;
+    
+    const initializePurchaseService = async () => {
+      if (!user?.id || purchaseInitialized) return;
+      
+      try {
+        const initialized = await purchaseService.initialize();
+        if (initialized && isMounted) {
+          const products = await purchaseService.getProducts();
+          setStoreProducts(products);
+          setPurchaseInitialized(true);
+          console.log('🏪 Store ürünleri yüklendi:', products.length);
+          console.log('📋 Store ürün detayları:', products.map(p => ({
+            id: p.productId,
+            price: p.localizedPrice,
+            title: p.title
+          })));
+        }
+      } catch (error) {
+        console.error('❌ Purchase service başlatma hatası:', error);
+      }
+    };
 
-    // Cleanup - disconnect purchase service on unmount
+    initializePurchaseService();
+    
+    // Cleanup function
     return () => {
+      isMounted = false;
       if (purchaseInitialized) {
         purchaseService.disconnect();
       }
     };
-  }, [user?.id]);
+  }, [user?.id]); // Sadece user değiştiğinde, purchaseInitialized dependency YOK
+
+  // 🔥 DATA LOADING - AYRI useEffect
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadPackageData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const [subscriptions, addons, activeSubscription, credits] = await Promise.all([
+          packagesAPI.getSubscriptionPackages(),
+          packagesAPI.getAddonPackages(),
+          packagesAPI.getActiveSubscription(),
+          packagesAPI.getUserCredits()
+        ]);
+
+        if (isMounted) {
+          setSubscriptionPackages(subscriptions);
+          setAddonPackages(addons);
+          setSubscription(activeSubscription);
+          setUserCredits(credits);
+          setDataLoaded(true);
+
+          console.log('📦 Paketler yüklendi:', {
+            subscriptions: subscriptions.length,
+            addons: addons.length,
+            activeSubscription: !!activeSubscription,
+            credits: credits.length
+          });
+        }
+      } catch (error) {
+        console.error('❌ Paket verilerini yükleme hatası:', error);
+        if (isMounted) {
+          setErrorMessage('Paket bilgileri yüklenirken bir hata oluştu');
+          setShowErrorToast(true);
+        }
+      }
+    };
+
+    loadPackageData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]); // Sadece user değiştiğinde
 
   // Premium kullanıcılar için varsayılan tab'ı addons yap
   useEffect(() => {
@@ -147,6 +194,13 @@ export default function PremiumScreen() {
 
   const confirmSubscription = async () => {
     if (!selectedPlan || !user?.id) return;
+    
+    // 🔥 ZORUNLU KORUMA - IAP hazır değilse işlem yapma
+    if (!purchaseInitialized) {
+      setErrorMessage('Store henüz hazır değil. Lütfen bekleyin ve tekrar deneyin.');
+      setShowErrorToast(true);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -206,7 +260,7 @@ export default function PremiumScreen() {
       
       // Refresh data
       await refreshPremiumStatus();
-      await loadData();
+      await refreshData();
       
       // Close subscription modal and show success
       setSubscriptionModalVisible(false);
@@ -226,6 +280,13 @@ export default function PremiumScreen() {
 
   const handlePurchaseAddon = async (addon: Package) => {
     if (!user?.id) return;
+    
+    // 🔥 ZORUNLU KORUMA - IAP hazır değilse işlem yapma
+    if (!purchaseInitialized) {
+      setErrorMessage('Store henüz hazır değil. Lütfen bekleyin ve tekrar deneyin.');
+      setShowErrorToast(true);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -284,7 +345,7 @@ export default function PremiumScreen() {
       }
 
       // Refresh data
-      await loadData();
+      await refreshData();
       await refreshPremiumStatus();
       
       // Show success modal
@@ -310,7 +371,7 @@ export default function PremiumScreen() {
         throw new Error(result.error || 'Abonelik iptal edilemedi');
       }
       
-      await loadData();
+      await refreshData();
       setCancelModalVisible(false);
       setCancelledModalVisible(true);
     } catch (error: any) {
@@ -349,7 +410,7 @@ export default function PremiumScreen() {
         }
 
         await refreshPremiumStatus();
-        await loadData();
+        await refreshData();
         
         setRestoreModalData({
           title: 'Başarılı',
@@ -475,7 +536,12 @@ export default function PremiumScreen() {
         {/* Tab Content */}
         {activeTab === 'plans' && !isPremium && dataLoaded && (
           <View style={styles.plansSection}>
-            {subscriptionPackages.length > 0 ? subscriptionPackages.map((plan, index) => {
+            {/* 🔥 IAP READY KONTROLÜ */}
+            {!purchaseInitialized ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Store bağlantısı kuruluyor...</Text>
+              </View>
+            ) : subscriptionPackages.length > 0 ? subscriptionPackages.map((plan, index) => {
               const storeProduct = storeProducts.find(p => p.productId === getStoreProductId(plan));
               
               return (
@@ -570,7 +636,11 @@ export default function PremiumScreen() {
             )}
 
             {/* Addon Packages */}
-            {addonPackages.length > 0 ? addonPackages.map((addon, index) => {
+            {!purchaseInitialized ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Store bağlantısı kuruluyor...</Text>
+              </View>
+            ) : addonPackages.length > 0 ? addonPackages.map((addon, index) => {
               const storeProduct = storeProducts.find(p => p.productId === getStoreProductId(addon));
               
               return (
