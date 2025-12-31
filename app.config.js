@@ -3,7 +3,7 @@ module.exports = {
     name: "Teklif Et",
     slug: "teklif-et",
     owner: "hasancavitkocak",
-    version: "1.0.15",
+    version: "1.0.16",
     orientation: "portrait",
     icon: "./assets/images/puzzle-iconnew.png",
     scheme: "myapp",
@@ -22,7 +22,7 @@ module.exports = {
     android: {
       softwareKeyboardLayoutMode: "resize",
       package: "com.teklifet.app",
-      versionCode: 15,
+      versionCode: 16,
       minSdkVersion: 23,
       targetSdkVersion: 34,
       icon: "./assets/images/puzzle-iconnew.png",

@@ -105,20 +105,27 @@ class PurchaseService {
           });
         }
         
+        // Purchase state'i doğru formata çevir
+        let purchaseStateValue = purchaseData?.purchaseState;
+        if (typeof purchaseStateValue === 'string') {
+          // String'i integer'a çevir
+          purchaseStateValue = purchaseStateValue.toLowerCase() === 'purchased' ? 0 : 1;
+        }
+
         this.pendingPurchaseResolve({
           success: true,
           transactionId: purchaseData?.transactionId || purchaseData?.purchaseToken || '',
           productId: purchaseData?.productId || '',
           purchaseDetails: {
-            purchaseToken: purchaseData?.purchaseToken,
-            packageName: purchaseData?.packageName,
-            purchaseTime: purchaseData?.purchaseTime,
-            purchaseState: purchaseData?.purchaseState,
-            acknowledged: purchaseData?.acknowledged,
-            autoRenewing: purchaseData?.autoRenewing,
-            orderId: purchaseData?.orderId,
-            originalJson: purchaseData?.originalJson,
-            signature: purchaseData?.signature
+            purchaseToken: purchaseData?.purchaseToken || null,
+            packageName: purchaseData?.packageNameAndroid || purchaseData?.packageName || null,
+            purchaseTime: purchaseData?.transactionDate || purchaseData?.purchaseTime || null,
+            purchaseState: purchaseStateValue ?? 0, // Artık doğru integer değer
+            acknowledged: purchaseData?.isAcknowledgedAndroid ?? purchaseData?.acknowledged ?? false,
+            autoRenewing: purchaseData?.isAutoRenewing ?? purchaseData?.autoRenewingAndroid ?? purchaseData?.autoRenewing ?? null,
+            orderId: purchaseData?.transactionId || purchaseData?.orderId || null,
+            originalJson: purchaseData?.dataAndroid || purchaseData?.originalJson || null,
+            signature: purchaseData?.signatureAndroid || purchaseData?.signature || null
           }
         });
         

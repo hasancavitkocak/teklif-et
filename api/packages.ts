@@ -85,30 +85,30 @@ class PackagesAPI {
     purchaseToken: string,
     productId: string,
     purchaseDetails?: {
-      purchaseTime?: number;
-      purchaseState?: number;
-      acknowledged?: boolean;
-      autoRenewing?: boolean;
-      orderId?: string;
-      packageName?: string;
-      originalJson?: string;
-      signature?: string;
-    }
+      purchaseTime?: number | null;
+      purchaseState?: number | string | null; // Can be number (0,1) or string ('purchased', 'pending')
+      acknowledged?: boolean | null;
+      autoRenewing?: boolean | null;
+      orderId?: string | null;
+      packageName?: string | null;
+      originalJson?: string | null;
+      signature?: string | null;
+    } | null
   ): Promise<{ success: boolean; purchaseId?: string; error?: string }> {
     const startTime = Date.now();
     console.log('💾 ===== DB KAYIT BAŞLADI =====');
     console.log('📋 DB Kayit Request:', {
-      packageId,
+      packageId: packageId || 'YOK',
       transactionId: transactionId ? `${transactionId.substring(0, 20)}...` : 'YOK',
       purchaseToken: purchaseToken ? `${purchaseToken.substring(0, 20)}...` : 'YOK',
-      productId,
+      productId: productId || 'YOK',
       purchaseDetails: purchaseDetails ? {
-        purchaseTime: purchaseDetails.purchaseTime,
-        purchaseState: purchaseDetails.purchaseState,
-        acknowledged: purchaseDetails.acknowledged,
-        autoRenewing: purchaseDetails.autoRenewing,
-        orderId: purchaseDetails.orderId,
-        packageName: purchaseDetails.packageName,
+        purchaseTime: purchaseDetails.purchaseTime ?? 'undefined',
+        purchaseState: purchaseDetails.purchaseState ?? 'undefined',
+        acknowledged: purchaseDetails.acknowledged ?? 'undefined',
+        autoRenewing: purchaseDetails.autoRenewing ?? 'undefined',
+        orderId: purchaseDetails.orderId ?? 'undefined',
+        packageName: purchaseDetails.packageName ?? 'undefined',
         hasOriginalJson: !!purchaseDetails.originalJson,
         hasSignature: !!purchaseDetails.signature
       } : 'YOK',
@@ -126,26 +126,54 @@ class PackagesAPI {
 
       // Google Play Store satın almasını tüm detaylarıyla kaydet
       console.log('🚀 Supabase RPC çağrılıyor: record_google_play_purchase');
+      
+      // Purchase state'i integer'a çevir (Google Play Billing API standardı)
+      let purchaseStateInt: number | null = null;
+      if (purchaseDetails?.purchaseState !== undefined && purchaseDetails?.purchaseState !== null) {
+        if (typeof purchaseDetails.purchaseState === 'string') {
+          // String değerleri integer'a çevir
+          switch (purchaseDetails.purchaseState.toLowerCase()) {
+            case 'purchased':
+            case 'completed':
+              purchaseStateInt = 0; // PURCHASED
+              break;
+            case 'pending':
+              purchaseStateInt = 1; // PENDING
+              break;
+            default:
+              console.warn('⚠️ Bilinmeyen purchaseState değeri:', purchaseDetails.purchaseState);
+              purchaseStateInt = null;
+          }
+        } else if (typeof purchaseDetails.purchaseState === 'number') {
+          purchaseStateInt = purchaseDetails.purchaseState;
+        } else {
+          console.warn('⚠️ purchaseState beklenmeyen tip:', typeof purchaseDetails.purchaseState);
+          purchaseStateInt = null;
+        }
+      }
+      
       const rpcParams = {
         p_user_id: user.user.id,
         p_package_id: packageId,
-        p_transaction_id: transactionId,
-        p_purchase_token: purchaseToken,
-        p_product_id: productId,
-        p_purchase_time: purchaseDetails?.purchaseTime || null,
-        p_purchase_state: purchaseDetails?.purchaseState || null,
-        p_acknowledged: purchaseDetails?.acknowledged || false,
-        p_auto_renewing: purchaseDetails?.autoRenewing || null,
-        p_order_id: purchaseDetails?.orderId || null,
-        p_package_name: purchaseDetails?.packageName || null,
-        p_signature: purchaseDetails?.signature || null,
-        p_original_json: purchaseDetails?.originalJson || null
+        p_transaction_id: transactionId || null,
+        p_purchase_token: purchaseToken || null,
+        p_product_id: productId || null,
+        p_purchase_time: purchaseDetails?.purchaseTime ?? null,
+        p_purchase_state: purchaseStateInt,
+        p_acknowledged: purchaseDetails?.acknowledged ?? false,
+        p_auto_renewing: purchaseDetails?.autoRenewing ?? null,
+        p_order_id: purchaseDetails?.orderId ?? null,
+        p_package_name: purchaseDetails?.packageName ?? null,
+        p_signature: purchaseDetails?.signature ?? null,
+        p_original_json: purchaseDetails?.originalJson ?? null
       };
       console.log('📋 RPC Parameters:', {
         ...rpcParams,
         p_purchase_token: rpcParams.p_purchase_token ? `${rpcParams.p_purchase_token.substring(0, 20)}...` : 'YOK',
         p_original_json: rpcParams.p_original_json ? 'Mevcut' : 'YOK',
-        p_signature: rpcParams.p_signature ? 'Mevcut' : 'YOK'
+        p_signature: rpcParams.p_signature ? 'Mevcut' : 'YOK',
+        p_purchase_state_original: purchaseDetails?.purchaseState,
+        p_purchase_state_converted: purchaseStateInt
       });
 
       const { data, error } = await supabase.rpc('record_google_play_purchase', rpcParams);
