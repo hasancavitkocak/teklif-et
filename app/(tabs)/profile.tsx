@@ -12,12 +12,17 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react-native';
+import { Settings, MapPin, Crown, LogOut, X, Camera, Trash2, PauseCircle, ChevronRight, ChevronDown, RefreshCw, Target, Zap, FileText, Ticket, Heart, Info } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import PhotoManagementModal from '@/components/PhotoManagementModal';
 import FreezeAccountModal from '@/components/FreezeAccountModal';
+import SuperLikeIcon from '@/components/SuperLikeIcon';
+import AddUserIcon from '@/components/AddUserIcon';
+import PuzzleIcon from '@/components/PuzzleIcon';
+import ActiveIcon from '@/components/ActiveIcon';
+import OfferIcon from '@/components/OfferIcon';
 import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 import SignOutModal from '@/components/SignOutModal';
@@ -691,35 +696,117 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Stats Section - Minimal */}
+        {/* Stats Section - Compact with Info */}
         <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{myProposals}</Text>
-            <Text style={styles.statLabel}>Aktif Teklif</Text>
+          <View style={styles.statsHeader}>
+            <Text style={styles.statsTitle}>Günlük Aktivite</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {remainingProposals === 999 ? '∞' : remainingProposals}
-            </Text>
-            <Text style={styles.statLabel}>Günlük Teklif</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {remainingSuperLikes === 999 ? '∞' : remainingSuperLikes}
-            </Text>
-            <Text style={styles.statLabel}>Super Like</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {remainingRequests === 999 ? '∞' : remainingRequests}
-            </Text>
-            <Text style={styles.statLabel}>Günlük Eşleşme</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {remainingInvitations === 999 ? '∞' : remainingInvitations}
-            </Text>
-            <Text style={styles.statLabel}>Davet Kredisi</Text>
+          
+          <View style={styles.compactStatsContainer}>
+            <View style={styles.compactStat}>
+              <View style={styles.statIconContainer}>
+                <ActiveIcon size={18} tintColor="#10B981" />
+              </View>
+              <Text style={styles.compactStatValue}>{myProposals}</Text>
+              <Text style={styles.compactStatLabel}>Aktif</Text>
+              <TouchableOpacity 
+                style={styles.statInfoButton}
+                onPress={() => {
+                  setInfoMessage(`Şu anda ${myProposals} adet aktif teklifiniz bulunuyor. Bu teklifler diğer kullanıcılar tarafından görülebilir ve yanıtlanabilir.`);
+                  setShowInfoToast(true);
+                }}
+              >
+                <Info size={12} color="#10B981" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.compactStat}>
+              <View style={styles.statIconContainer}>
+                <OfferIcon size={18} tintColor="#8B5CF6" />
+              </View>
+              <Text style={styles.compactStatValue}>
+                {remainingProposals === 999 ? '∞' : remainingProposals}
+              </Text>
+              <Text style={styles.compactStatLabel}>Teklif</Text>
+              <TouchableOpacity 
+                style={styles.statInfoButton}
+                onPress={() => {
+                  const message = isPremium 
+                    ? 'Premium üye olarak sınırsız teklif gönderebilirsiniz!'
+                    : `Günlük ${remainingProposals} teklif hakkınız kaldı. Premium üye olarak sınırsız teklif gönderebilirsiniz.`;
+                  setInfoMessage(message);
+                  setShowInfoToast(true);
+                }}
+              >
+                <Info size={12} color="#8B5CF6" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.compactStat}>
+              <View style={styles.statIconContainer}>
+                <SuperLikeIcon size={18} />
+              </View>
+              <Text style={styles.compactStatValue}>
+                {remainingSuperLikes === 999 ? '∞' : remainingSuperLikes}
+              </Text>
+              <Text style={styles.compactStatLabel}>S.Like</Text>
+              <TouchableOpacity 
+                style={styles.statInfoButton}
+                onPress={() => {
+                  const message = isPremium 
+                    ? 'Premium üye olarak sınırsız Super Like hakkınız var!'
+                    : `Günlük ${remainingSuperLikes} Super Like hakkınız kaldı. Premium üye olarak sınırsız Super Like gönderebilirsiniz.`;
+                  setInfoMessage(message);
+                  setShowInfoToast(true);
+                }}
+              >
+                <Info size={12} color="#FFD700" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.compactStat}>
+              <View style={styles.statIconContainer}>
+                <AddUserIcon size={18} tintColor="#F97316" />
+              </View>
+              <Text style={styles.compactStatValue}>
+                {remainingInvitations === 999 ? '∞' : remainingInvitations}
+              </Text>
+              <Text style={styles.compactStatLabel}>Davet</Text>
+              <TouchableOpacity 
+                style={styles.statInfoButton}
+                onPress={() => {
+                  const message = isPremium 
+                    ? 'Premium üye olarak sınırsız davet hakkınız var!'
+                    : `Günlük ${remainingInvitations} davet hakkınız kaldı. Başkalarını tekliflerinize davet edebilirsiniz. Premium üye olarak sınırsız davet gönderebilirsiniz.`;
+                  setInfoMessage(message);
+                  setShowInfoToast(true);
+                }}
+              >
+                <Info size={12} color="#F97316" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.compactStat}>
+              <View style={styles.statIconContainer}>
+                <PuzzleIcon size={18} tintColor="#EF4444" />
+              </View>
+              <Text style={styles.compactStatValue}>
+                {remainingRequests === 999 ? '∞' : remainingRequests}
+              </Text>
+              <Text style={styles.compactStatLabel}>Eşleşme</Text>
+              <TouchableOpacity 
+                style={styles.statInfoButton}
+                onPress={() => {
+                  const message = isPremium 
+                    ? 'Premium üye olarak sınırsız eşleşme isteği gönderebilirsiniz!'
+                    : `Günlük ${remainingRequests} eşleşme isteği hakkınız kaldı. Premium üye olarak sınırsız eşleşme isteği gönderebilirsiniz.`;
+                  setInfoMessage(message);
+                  setShowInfoToast(true);
+                }}
+              >
+                <Info size={12} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -1409,34 +1496,81 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
   },
   statsSection: {
-    flexDirection: 'row',
-    gap: 8,
     paddingHorizontal: 16,
     marginBottom: 20,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  statsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  statsInfoButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFF',
-    marginBottom: 4,
+  compactStat: {
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    position: 'relative',
   },
-  statLabel: {
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statInfoButton: {
+    position: 'absolute',
+    top: -4,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  compactStatValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  compactStatLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.95)',
+    color: '#6B7280',
     textAlign: 'center',
   },
   contentContainer: {
