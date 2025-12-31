@@ -43,6 +43,7 @@ import RequestLimitModal from '@/components/RequestLimitModal';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import WarningToast from '@/components/WarningToast';
+import SuperLikeIcon from '@/components/SuperLikeIcon';
 
 import { PROVINCES } from '@/constants/cities';
 
@@ -768,10 +769,10 @@ export default function DiscoverScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={isLiking || isSuperLiking || isPassing ? ['#EF444450', '#DC262650'] : ['#EF4444', '#DC2626']}
+                colors={['#FFFFFF', '#FFFFFF']}
                 style={styles.buttonGradient}
               >
-                <X size={28} color="#FFF" strokeWidth={3} />
+                <X size={30} color="#EF4444" strokeWidth={3} />
               </LinearGradient>
             </TouchableOpacity>
             
@@ -783,14 +784,11 @@ export default function DiscoverScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={isLiking || isSuperLiking || isPassing ? ['#F59E0B50', '#D9770050'] : ['#F59E0B', '#D97700']}
+                colors={['#FFFFFF', '#FFFFFF']}
                 style={styles.buttonGradient}
               >
-                <Zap 
-                  size={24} 
-                  color="#FFF" 
-                  fill="#FFF" 
-                  strokeWidth={2}
+                <SuperLikeIcon 
+                  size={30}
                 />
               </LinearGradient>
             </TouchableOpacity>
@@ -803,15 +801,15 @@ export default function DiscoverScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={isLiking || isSuperLiking || isPassing ? ['#8B5CF650', '#7C3AED50'] : ['#8B5CF6', '#7C3AED']}
+                colors={['#FFFFFF', '#FFFFFF']}
                 style={styles.buttonGradient}
               >
                 <Image 
                   source={require('@/assets/images/puzzle-iconnew.png')} 
                   style={{ 
-                    width: 32, 
-                    height: 32, 
-                    tintColor: '#FFF'
+                    width:50, 
+                    height: 50, 
+                    tintColor: '#8B5CF6'
                   }}
                   resizeMode="contain"
                 />
@@ -2140,17 +2138,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   superLikeButton: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#F59E0B',
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    // Özel stil gerekirse buraya eklenebilir
   },
   likeButton: {
     width: 64,
@@ -3702,9 +3690,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

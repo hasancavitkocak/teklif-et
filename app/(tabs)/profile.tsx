@@ -23,6 +23,7 @@ import AddUserIcon from '@/components/AddUserIcon';
 import PuzzleIcon from '@/components/PuzzleIcon';
 import ActiveIcon from '@/components/ActiveIcon';
 import OfferIcon from '@/components/OfferIcon';
+import Constants from 'expo-constants';
 import AccountFrozenSuccessModal from '@/components/AccountFrozenSuccessModal';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 import SignOutModal from '@/components/SignOutModal';
@@ -1281,6 +1282,13 @@ export default function ProfileScreen() {
               <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
                 <Text style={styles.saveButtonText}>Değişiklikleri Kaydet</Text>
               </TouchableOpacity>
+              
+              {/* Version Info */}
+              <View style={styles.versionInfo}>
+                <Text style={styles.versionText}>
+                  Teklif Et v{Constants.expoConfig?.version || '1.0.16'}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -1985,6 +1993,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFF',
     letterSpacing: 0.2,
+  },
+  versionInfo: {
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  versionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  versionSubtext: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   premiumAlertOverlay: {
     flex: 1,
