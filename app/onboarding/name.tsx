@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Info } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import WarningToast from '@/components/WarningToast';
 import ErrorToast from '@/components/ErrorToast';
+import InfoToast from '@/components/InfoToast';
 
 export default function NameScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -18,16 +20,19 @@ export default function NameScreen() {
   const [warningMessage, setWarningMessage] = useState('');
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/auth/welcome');
-  };
+  const [showInfoToast, setShowInfoToast] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+  };
+
+  const handleInfoPress = () => {
+    triggerHaptic();
+    setInfoMessage('Adınız sonradan değiştirilemez. Gerçek adınızı girin.');
+    setShowInfoToast(true);
   };
 
   const handleContinue = async () => {
@@ -97,7 +102,16 @@ export default function NameScreen() {
         <View style={styles.titleContainer}>
           <Text style={styles.stepIndicator}>Adım 1/7</Text>
           <Text style={styles.title}>Adınız nedir?</Text>
-          <Text style={styles.subtitle}>Profilinizde görünecek</Text>
+          <View style={styles.subtitleContainer}>
+            <Text style={styles.subtitle}>Profilinizde görünecek</Text>
+            <TouchableOpacity 
+              style={styles.infoButton}
+              onPress={handleInfoPress}
+              activeOpacity={0.7}
+            >
+              <Info size={16} color="#8B5CF6" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <TextInput
@@ -120,14 +134,14 @@ export default function NameScreen() {
             {loading ? 'Kaydediliyor...' : 'Devam Et'}
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <Text style={styles.logoutText}>Çıkış Yap (Debug)</Text>
-        </TouchableOpacity>
       </View>
+
+      {/* Info Toast */}
+      <InfoToast
+        visible={showInfoToast}
+        message={infoMessage}
+        onHide={() => setShowInfoToast(false)}
+      />
 
       {/* Warning Toast */}
       <WarningToast
@@ -184,10 +198,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: -0.5,
   },
+  subtitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   subtitle: {
     fontSize: 16,
     color: '#6B7280',
     fontWeight: '400',
+  },
+  infoButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: '#F3E8FF',
   },
   input: {
     backgroundColor: '#FFFFFF',
@@ -219,15 +243,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  logoutButton: {
-    marginTop: 20,
-    padding: 12,
-    alignItems: 'center',
-  },
-  logoutText: {
-    fontSize: 14,
-    color: '#EF4444',
-    fontWeight: '600',
   },
 });

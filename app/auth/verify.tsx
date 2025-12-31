@@ -83,8 +83,7 @@ export default function VerifyScreen() {
 
       if (success) {
         setSmsRetrieverActive(true);
-        setInfoMessage('SMS otomatik okunacak');
-        setShowInfoToast(true);
+        // SMS otomatik okunacak mesajını kaldırdık
       }
     } catch (error) {
       console.error('❌ SMS Retriever başlatma hatası:', error);
@@ -217,9 +216,6 @@ export default function VerifyScreen() {
           <Text style={styles.subtitle}>
             {phone} numarasına gönderilen{'\n'}6 haneli kodu girin
           </Text>
-          {Platform.OS === 'android' && smsRetrieverActive && (
-            <Text style={styles.autoReadHint}>📱 SMS otomatik okunacak</Text>
-          )}
           {isDemoMode && (
             <Text style={styles.hint}>Test için: {demoCode}</Text>
           )}
@@ -317,12 +313,6 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     marginTop: 12,
     fontWeight: '600',
-  },
-  autoReadHint: {
-    fontSize: 14,
-    color: '#10B981',
-    marginTop: 8,
-    fontWeight: '500',
   },
   otpContainer: {
     flexDirection: 'row',

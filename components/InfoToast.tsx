@@ -85,7 +85,7 @@ export default function InfoToast({
         <View style={styles.iconContainer}>
           <Info size={20} color="#8B5CF6" />
         </View>
-        <Text style={styles.message} numberOfLines={2}>
+        <Text style={styles.message}>
           {message}
         </Text>
         <TouchableOpacity style={styles.closeButton} onPress={hideToast}>
@@ -109,8 +109,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
+    minHeight: 64,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
