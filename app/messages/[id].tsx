@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, MoreVertical, XCircle, Flag, User } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationBadge } from '@/contexts/NotificationBadgeContext';
 import { supabase } from '@/lib/supabase';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
@@ -25,6 +26,7 @@ import { matchesAPI } from '@/api/matches';
 
 export default function ChatScreen() {
   const { user } = useAuth();
+  const { refreshMessageCount } = useNotificationBadge();
   const { id, archived } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -111,6 +113,9 @@ export default function ChatScreen() {
       );
       setMatchInfo(info);
       setMessages(msgs);
+      
+      // Mesajları okundu olarak işaretle
+      await markMessagesAsRead();
     } catch (error) {
       console.error('Initialize conversation error:', error);
       setErrorMessage('Sohbet yüklenirken hata oluştu');
@@ -118,6 +123,30 @@ export default function ChatScreen() {
     } finally {
       setLoading(false);
       setMessagesLoading(false);
+    }
+  };
+
+  // Mesajları okundu olarak işaretle
+  const markMessagesAsRead = async () => {
+    if (!user?.id || !id) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('match_id', id)
+        .neq('sender_id', user.id) // Kendi gönderdiği mesajlar hariç
+        .eq('read', false);
+
+      if (error) {
+        console.error('Mesajlar okundu işaretleme hatası:', error);
+      } else {
+        console.log('✅ Mesajlar okundu olarak işaretlendi');
+        // Badge sayacını yenile
+        refreshMessageCount();
+      }
+    } catch (error) {
+      console.error('Mesajlar okundu işaretleme hatası:', error);
     }
   };
 

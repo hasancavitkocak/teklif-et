@@ -12,9 +12,10 @@ import {
 import { MessageCircle, MoreVertical, XCircle, Flag } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
+import { useNotificationBadge } from '@/contexts/NotificationBadgeContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { matchesAPI, type Match as MatchType } from '@/api/matches';
+import { matchesAPI, type Match as MatchType, type ArchivedMatch } from '@/api/matches';
 import ErrorToast from '@/components/ErrorToast';
 import InfoToast from '@/components/InfoToast';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
@@ -23,6 +24,7 @@ export default function MatchesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setUnreadCount } = useUnread();
+  const { refreshMessageCount } = useNotificationBadge();
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [matches, setMatches] = useState<MatchType[]>([]);
   const [archivedMatches, setArchivedMatches] = useState<ArchivedMatch[]>([]);
@@ -45,6 +47,8 @@ export default function MatchesScreen() {
       console.log('Matches screen focused');
       if (user?.id) {
         loadMatches();
+        // Matches sayfası açıldığında mesaj sayacını yenile
+        refreshMessageCount();
       }
     }, [user?.id])
   );

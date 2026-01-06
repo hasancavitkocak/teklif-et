@@ -12,6 +12,7 @@ import {
 import { Clock, Check, X as XIcon, Zap, Trash2, UserPlus, MapPin } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnread } from '@/contexts/UnreadContext';
+import { useNotificationBadge } from '@/contexts/NotificationBadgeContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { proposalsAPI, type Proposal, type ProposalRequest } from '@/api/proposals';
@@ -28,6 +29,7 @@ export default function ProposalsScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { setProposalsCount } = useUnread();
+  const { refreshProposalCount, clearProposalCount, clearProposalRequestCount } = useNotificationBadge();
   const [activeTab, setActiveTab] = useState<'my_proposals' | 'received' | 'sent' | 'invitations'>('my_proposals');
   const [myProposals, setMyProposals] = useState<Proposal[]>([]);
   const [received, setReceived] = useState<ProposalRequest[]>([]);
@@ -68,31 +70,73 @@ export default function ProposalsScreen() {
       console.log('Proposals screen focused');
       if (user?.id) {
         loadTabData();
+        // Teklifler sayfası açıldığında tüm teklifleri görüntülendi olarak işaretle
+        markProposalsAsViewed();
+        // NOT: Teklif başvuru sayacını burada temizleme - sadece başvuruları görüntülediğinde temizle
       }
     }, [activeTab, user?.id])
   );
 
+  // Polling sistemi - real-time çalışmıyorsa
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Her 10 saniyede bir güncelle (sadece aktif tab için)
+    const interval = setInterval(() => {
+      console.log('🔄 Polling: Proposals güncelleniyor...');
+      loadTabData();
+    }, 10000); // 10 saniye
+
+    return () => clearInterval(interval);
+  }, [activeTab, user?.id]);
+
+  // Teklifleri görüntülendi olarak işaretle
+  const markProposalsAsViewed = async () => {
+    if (!user?.id) return;
+
+    try {
+      // RPC fonksiyonu ile kullanıcının tekliflerine gelen etkileşimleri görüntülendi olarak işaretle
+      const { data, error } = await supabase.rpc('mark_user_proposals_as_viewed', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Teklifler görüntülendi işaretleme hatası:', error);
+      } else {
+        console.log(`✅ ${data || 0} teklif görüntülendi olarak işaretlendi`);
+        // Badge sayacını temizle
+        clearProposalCount();
+      }
+    } catch (error) {
+      console.error('Teklifler görüntülendi işaretleme hatası:', error);
+    }
+  };
+
   useEffect(() => {
     loadProposals();
 
+    console.log('🔄 Proposals real-time dinleme başlatılıyor...');
+
     // Real-time başvuru dinleme
     const subscription = supabase
-      .channel('proposal-requests-changes')
+      .channel(`proposal-requests-changes-${user?.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'proposal_requests' 
       }, (payload) => {
-        console.log('Proposal request change:', payload);
+        console.log('🆕 Proposal request change:', payload);
         // Sadece ilgili tab'ı güncelle
         if (user?.id) {
           if (payload.eventType === 'INSERT' && payload.new.requester_id === user.id) {
             // Kullanıcı başvuru yaptı - sent tab'ı güncelle
+            console.log('✅ Kullanıcı başvuru yaptı, sent tab güncelleniyor');
             if (activeTab === 'sent') {
               loadTabData();
             }
           } else {
             // Başka değişiklikler - tüm veriyi yükle
+            console.log('✅ Başka değişiklik, tüm veri yükleniyor');
             loadProposals();
           }
         }
@@ -102,10 +146,11 @@ export default function ProposalsScreen() {
         schema: 'public', 
         table: 'proposals' 
       }, (payload) => {
-        console.log('New proposal created:', payload);
+        console.log('🆕 New proposal created:', payload);
         // Yeni teklif oluşturulduğunda otomatik yükle
         if (user?.id && payload.new.creator_id === user.id) {
           // Kullanıcının kendi teklifi - my_proposals tab'ı güncelle
+          console.log('✅ Kullanıcının yeni teklifi, my_proposals tab güncelleniyor');
           if (activeTab === 'my_proposals') {
             loadTabData();
           }
@@ -113,7 +158,13 @@ export default function ProposalsScreen() {
       })
       .subscribe();
 
+    // Subscription durumunu kontrol et
+    setTimeout(() => {
+      console.log('📡 Proposals subscription durumu:', subscription.state);
+    }, 2000);
+
     return () => {
+      console.log('🔌 Proposals real-time dinleme kapatılıyor...');
       subscription.unsubscribe();
     };
   }, [activeTab, user?.id]);
@@ -126,6 +177,10 @@ export default function ProposalsScreen() {
       if (activeTab === 'sent') {
         resetInvitationsPagination();
         resetRequestsPagination();
+      }
+      // Received tab'ına geçildiğinde başvuru sayacını temizle
+      if (activeTab === 'received') {
+        clearProposalRequestCount();
       }
       loadTabData();
     }

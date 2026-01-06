@@ -3,10 +3,13 @@ import { Platform, View, Text } from 'react-native';
 import { Heart, MessageCircle, FileText, Crown, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUnread } from '@/contexts/UnreadContext';
+import { useNotificationBadge } from '@/contexts/NotificationBadgeContext';
+import TabBadge from '@/components/TabBadge';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { unreadCount } = useUnread();
+  const { proposalCount, messageCount, proposalRequestCount } = useNotificationBadge();
   
   return (
     <Tabs
@@ -47,14 +50,24 @@ export default function TabLayout() {
         name="proposals"
         options={{
           title: 'Tekliflerim',
-          tabBarIcon: ({ size, color }) => <FileText size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => (
+            <View style={{ position: 'relative' }}>
+              <FileText size={size} color={color} />
+              <TabBadge count={proposalRequestCount} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
           title: 'Sohbet',
-          tabBarIcon: ({ size, color }) => <MessageCircle size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => (
+            <View style={{ position: 'relative' }}>
+              <MessageCircle size={size} color={color} />
+              <TabBadge count={messageCount} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
