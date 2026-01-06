@@ -65,7 +65,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const [proposals, setProposals] = useState<DiscoverProposal[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Başlangıçta false yap
   const [refreshing, setRefreshing] = useState(false);
   const [skippedProposalIds, setSkippedProposalIds] = useState<Set<string>>(new Set());
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -118,6 +118,9 @@ export default function DiscoverScreen() {
   
   // Batch update için counter
   const [actionCount, setActionCount] = useState(0);
+  
+  // İlk yükleme kontrolü için
+  const [hasInitialLoaded, setHasInitialLoaded] = useState(false);
   const batchUpdateThreshold = 3; // Her 3 aksiyonda bir güncelle
   
   // Debounce ref'i artık gerekmiyor (manuel filtreleme)
@@ -225,8 +228,9 @@ export default function DiscoverScreen() {
     useCallback(() => {
       console.log('Discover screen focused');
       if (user?.id) {
-        // Eğer proposals boşsa veya loading durumundaysa yükle
-        if (proposals.length === 0 || loading) {
+        // Sadece ilk kez yükle - bir kez yüklendikten sonra tekrar yükleme
+        if (!hasInitialLoaded && !loading) {
+          console.log('📋 İlk kez proposals yükleniyor...');
           setLoading(true);
           
           // Konum güncellemesi tamamlandıktan sonra teklifleri yükle
@@ -249,7 +253,7 @@ export default function DiscoverScreen() {
           setSelectedCity(currentCity);
         }
       }
-    }, [user?.id, isPremium, proposals.length, loading]) // proposals.length ve loading ekledik
+    }, [user?.id, isPremium, hasInitialLoaded, loading, selectedCity, currentCity]) // hasInitialLoaded ekledik
   );
 
   const loadRemainingProposals = async () => {
@@ -268,7 +272,8 @@ export default function DiscoverScreen() {
   };
 
   useEffect(() => {
-    loadProposals();
+    // Sadece interests'i yükle ve real-time dinlemeyi başlat
+    // loadProposals çağrısını kaldırdık - useFocusEffect'te yapılıyor
     loadInterests();
 
     // Real-time yeni teklif dinleme - yeni teklifleri listeye ekle
@@ -279,9 +284,12 @@ export default function DiscoverScreen() {
         schema: 'public', 
         table: 'proposals' 
       }, async (payload) => {
-        console.log('New proposal in feed:', payload);
+        console.log('🆕 Yeni teklif geldi:', payload);
         // Yeni teklifi arka planda yükle - index'i koruyarak
-        loadProposals(false);
+        if (!isLoadingProposalsRef.current) {
+          console.log('🔄 Yeni teklif için proposals güncelleniyor...');
+          loadProposals(false);
+        }
       })
       .subscribe();
 
@@ -428,7 +436,9 @@ export default function DiscoverScreen() {
 
   const loadProposals = async (resetIndex = true) => {
     if (!user?.id) {
+      console.log('❌ User ID yok, proposals yüklenemiyor');
       setLoading(false);
+      setHasInitialLoaded(true); // User yoksa da flag'i set et
       return;
     }
 
@@ -441,8 +451,15 @@ export default function DiscoverScreen() {
     isLoadingProposalsRef.current = true;
 
     try {
+      console.log('🔄 Proposals yükleniyor...');
       setLoading(true);
-      const data = await discoverAPI.getProposals(user.id, {
+      
+      // 5 saniye timeout ekle - daha kısa
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('API çağrısı zaman aşımına uğradı')), 5000)
+      );
+      
+      const apiPromise = discoverAPI.getProposals(user.id, {
         city: undefined, // Şehir filtresini kaldır, sadece mesafe filtresi kullan
         interestId: selectedInterest,
         minAge: isPremium ? minAge : undefined,
@@ -451,8 +468,15 @@ export default function DiscoverScreen() {
         maxDistance: maxDistance, // 50 km varsayılan
         eventDate: selectedDate ? selectedDate.toISOString() : undefined, // Tarih filtresi
       });
+      
+      const data = await Promise.race([apiPromise, timeoutPromise]) as any[];
+      
+      console.log(`📊 API'den ${data.length} teklif geldi`);
+      
       // Geçilen teklifleri frontend'te filtrele (sadece o liste için)
       const filteredData = resetIndex ? data : data.filter(proposal => !skippedProposalIds.has(proposal.id));
+      
+      console.log(`✅ Filtrelemeden sonra ${filteredData.length} teklif kaldı`);
       
       setProposals(filteredData);
       // Sadece manuel yüklemede veya filtre değişiminde index'i sıfırla
@@ -460,11 +484,14 @@ export default function DiscoverScreen() {
         setCurrentIndex(0);
       }
     } catch (error: any) {
-      setErrorMessage(error.message);
+      console.error('❌ Proposals yükleme hatası:', error.message);
+      setErrorMessage(error.message || 'Bir hata oluştu');
       setShowErrorToast(true);
     } finally {
+      console.log('🏁 Proposals yükleme tamamlandı');
       setLoading(false);
       setRefreshing(false);
+      setHasInitialLoaded(true); // İlk yükleme tamamlandı flag'ini set et
       isLoadingProposalsRef.current = false; // Guard'ı serbest bırak
     }
   };
@@ -650,6 +677,7 @@ export default function DiscoverScreen() {
 
   const currentProposal = proposals[currentIndex];
 
+  // Sadece loading true olduğunda göster
   if (loading) {
     return <FullScreenLoader text="Öneriler yükleniyor..." />;
   }
@@ -819,20 +847,33 @@ export default function DiscoverScreen() {
         </View>
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Şu an gösterilecek teklif yok</Text>
-          <Text style={styles.emptySubtext}>Yeni teklifler için daha sonra tekrar kontrol edin</Text>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={() => {
-              setRefreshing(true);
-              setCurrentIndex(0);
-              setSkippedProposalIds(new Set()); // Geçilen teklifleri temizle
-              clearLocationCache(); // Konum cache'ini temizle
-              loadProposals(true); // resetIndex = true
-            }}
-          >
-            <Text style={styles.refreshButtonText}>Yenile</Text>
-          </TouchableOpacity>
+          {loading || refreshing ? (
+            <>
+              <Text style={styles.emptyText}>Öneriler yenileniyor...</Text>
+              <Text style={styles.emptySubtext}>Lütfen bekleyin</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyText}>Şu an gösterilecek teklif yok</Text>
+              <Text style={styles.emptySubtext}>Yeni teklifler için daha sonra tekrar kontrol edin</Text>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={() => {
+                  console.log('🔄 Manuel refresh başlatıldı');
+                  setRefreshing(true);
+                  setCurrentIndex(0);
+                  setSkippedProposalIds(new Set()); // Geçilen teklifleri temizle
+                  clearLocationCache(); // Konum cache'ini temizle
+                  
+                  // Manuel refresh - loading guard'ını bypass et
+                  isLoadingProposalsRef.current = false;
+                  loadProposals(true); // resetIndex = true
+                }}
+              >
+                <Text style={styles.refreshButtonText}>Yenile</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
 
@@ -3595,97 +3636,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
     borderTopColor: 'transparent',
   },
-  // Kart Stilleri
-  cardContainer: {
-    flex: 1,
-    padding: 16,
-    paddingBottom: 120,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 24,
-    paddingTop: 100,
-  },
-  cardBottomContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  cardLeftInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  activityName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  userName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  cardRightInfo: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  interestChip: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  interestText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFF',
-  },
   // Action Buttons
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 24,
-    marginTop: 20,
-  },
   actionButton: {
     alignItems: 'center',
   },
@@ -3700,14 +3651,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
-  },
-  passButton: {
-    // Özel stil gerekirse buraya eklenebilir
-  },
-  superLikeButton: {
-    // Özel stil gerekirse buraya eklenebilir
-  },
-  likeButton: {
-    // Özel stil gerekirse buraya eklenebilir
   },
 });
