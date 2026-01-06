@@ -46,7 +46,8 @@ import {
   HandHeart,
   Dog,
   Brain,
-  Leaf
+  Leaf,
+  Sparkles
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -100,15 +101,17 @@ export default function InterestsScreen() {
       case 'fitness':
         return <Dumbbell {...iconProps} />;
       case 'koşu':
-        return <Zap {...iconProps} />;
+        return <Activity {...iconProps} />;
       case 'yürüyüş':
         return <Activity {...iconProps} />;
       case 'bisiklet':
         return <Bike {...iconProps} />;
       case 'dağcılık':
         return <Mountain {...iconProps} />;
+      case 'spor':
+        return <Activity {...iconProps} />;
       
-      // Sanat & Müzik
+      // Sanat & Müzik & Eğlence
       case 'sinema':
         return <Film {...iconProps} />;
       case 'müzik':
@@ -127,6 +130,10 @@ export default function InterestsScreen() {
         return <Brush {...iconProps} />;
       case 'fotoğrafçılık':
         return <Camera {...iconProps} />;
+      case 'eğlence':
+        return <Sparkles {...iconProps} />;
+      case 'kültür':
+        return <Book {...iconProps} />;
       
       // Yaşam Tarzı
       case 'seyahat':
@@ -135,42 +142,34 @@ export default function InterestsScreen() {
         return <Tent {...iconProps} />;
       case 'doğa':
         return <Trees {...iconProps} />;
-      case 'yemek yapmak':
       case 'yemek':
         return <Utensils {...iconProps} />;
       case 'kahve':
         return <Coffee {...iconProps} />;
-      case 'kitap okuma':
+      case 'içecek':
+        return <Coffee {...iconProps} />;
       case 'kitap':
         return <Book {...iconProps} />;
-      case 'yazma':
-        return <PenTool {...iconProps} />;
       case 'alışveriş':
         return <ShoppingBag {...iconProps} />;
-      case 'moda':
-        return <Shirt {...iconProps} />;
       
       // Teknoloji & Oyun
       case 'teknoloji':
         return <Laptop {...iconProps} />;
       case 'oyun':
         return <Gamepad2 {...iconProps} />;
-      case 'tasarım':
-        return <Palette {...iconProps} />;
       case 'girişimcilik':
         return <Lightbulb {...iconProps} />;
-      case 'yatırım':
-        return <TrendingUp {...iconProps} />;
-      case 'podcast':
-        return <Mic {...iconProps} />;
+      case 'satranç':
+        return <Target {...iconProps} />;
+      case 'okey':
+        return <Users {...iconProps} />;
+      case 'tavla':
+        return <Circle {...iconProps} />;
       
       // Sosyal & Diğer
-      case 'gönüllülük':
-        return <HandHeart {...iconProps} />;
       case 'hayvanlar':
         return <Dog {...iconProps} />;
-      case 'meditasyon':
-        return <Brain {...iconProps} />;
       case 'bahçecilik':
         return <Leaf {...iconProps} />;
       

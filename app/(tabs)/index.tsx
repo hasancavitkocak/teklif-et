@@ -390,16 +390,21 @@ export default function DiscoverScreen() {
     const iconProps = { size, color, strokeWidth: 2 };
     
     switch (interestName.toLowerCase()) {
+      // Spor & Aktivite
       case 'futbol': return <Circle {...iconProps} />;
       case 'basketbol': return <Trophy {...iconProps} />;
       case 'yüzme': return <Waves {...iconProps} />;
-      case 'voleybol': case 'tenis': return <Target {...iconProps} />;
+      case 'voleybol': return <Target {...iconProps} />;
+      case 'tenis': return <Target {...iconProps} />;
       case 'yoga': return <Flower2 {...iconProps} />;
       case 'fitness': return <Dumbbell {...iconProps} />;
       case 'koşu': return <Activity {...iconProps} />;
       case 'yürüyüş': return <Activity {...iconProps} />;
       case 'bisiklet': return <Bike {...iconProps} />;
       case 'dağcılık': return <Mountain {...iconProps} />;
+      case 'spor': return <Activity {...iconProps} />;
+      
+      // Sanat & Müzik & Eğlence
       case 'sinema': return <Film {...iconProps} />;
       case 'müzik': return <Music {...iconProps} />;
       case 'dans': return <Users {...iconProps} />;
@@ -409,25 +414,31 @@ export default function DiscoverScreen() {
       case 'piyano': return <Piano {...iconProps} />;
       case 'resim': return <Brush {...iconProps} />;
       case 'fotoğrafçılık': return <Camera {...iconProps} />;
+      case 'eğlence': return <Sparkles {...iconProps} />;
+      case 'kültür': return <Book {...iconProps} />;
+      
+      // Yaşam Tarzı
       case 'seyahat': return <Plane {...iconProps} />;
       case 'kamp': return <Tent {...iconProps} />;
       case 'doğa': return <Trees {...iconProps} />;
-      case 'yemek yapmak': case 'yemek': return <Utensils {...iconProps} />;
+      case 'yemek': return <Utensils {...iconProps} />;
       case 'kahve': return <Coffee {...iconProps} />;
-      case 'kitap okuma': case 'kitap': return <Book {...iconProps} />;
-      case 'yazma': return <PenTool {...iconProps} />;
+      case 'içecek': return <Coffee {...iconProps} />;
+      case 'kitap': return <Book {...iconProps} />;
       case 'alışveriş': return <ShoppingBag {...iconProps} />;
-      case 'moda': return <Shirt {...iconProps} />;
+      
+      // Teknoloji & Oyun
       case 'teknoloji': return <Laptop {...iconProps} />;
       case 'oyun': return <Gamepad2 {...iconProps} />;
-      case 'tasarım': return <Palette {...iconProps} />;
       case 'girişimcilik': return <Lightbulb {...iconProps} />;
-      case 'yatırım': return <TrendingUp {...iconProps} />;
-      case 'podcast': return <Mic {...iconProps} />;
-      case 'gönüllülük': return <HandHeart {...iconProps} />;
+      case 'satranç': return <Target {...iconProps} />;
+      case 'okey': return <Users {...iconProps} />;
+      case 'tavla': return <Circle {...iconProps} />;
+      
+      // Sosyal & Diğer
       case 'hayvanlar': return <Dog {...iconProps} />;
-      case 'meditasyon': return <Brain {...iconProps} />;
       case 'bahçecilik': return <Leaf {...iconProps} />;
+      
       default: return <Heart {...iconProps} />;
     }
   };
@@ -1575,20 +1586,11 @@ function CreateProposalModal({
   const [activityName, setActivityName] = useState('');
   const [venueName, setVenueName] = useState('');
   const [eventDate, setEventDate] = useState(() => {
-    const now = new Date();
-    const hour = now.getHours();
-    // Saat 18:00'den önce bugün, sonra yarın
-    if (hour < 18) {
-      // Bugün saat 23:59'a ayarla
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      return today;
-    } else {
-      // Yarın saat 23:59'a ayarla
-      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      tomorrow.setHours(23, 59, 59, 999);
-      return tomorrow;
-    }
+    // Default olarak 10 gün sonrası
+    const tenDaysLater = new Date();
+    tenDaysLater.setDate(tenDaysLater.getDate() + 10);
+    tenDaysLater.setHours(23, 59, 59, 999);
+    return tenDaysLater;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState<string | null>(null);
@@ -1623,16 +1625,21 @@ function CreateProposalModal({
     const iconProps = { size, color, strokeWidth: 2 };
     
     switch (interestName.toLowerCase()) {
+      // Spor & Aktivite
       case 'futbol': return <Circle {...iconProps} />;
       case 'basketbol': return <Trophy {...iconProps} />;
       case 'yüzme': return <Waves {...iconProps} />;
-      case 'voleybol': case 'tenis': return <Target {...iconProps} />;
+      case 'voleybol': return <Target {...iconProps} />;
+      case 'tenis': return <Target {...iconProps} />;
       case 'yoga': return <Flower2 {...iconProps} />;
       case 'fitness': return <Dumbbell {...iconProps} />;
       case 'koşu': return <Activity {...iconProps} />;
       case 'yürüyüş': return <Activity {...iconProps} />;
       case 'bisiklet': return <Bike {...iconProps} />;
       case 'dağcılık': return <Mountain {...iconProps} />;
+      case 'spor': return <Activity {...iconProps} />;
+      
+      // Sanat & Müzik & Eğlence
       case 'sinema': return <Film {...iconProps} />;
       case 'müzik': return <Music {...iconProps} />;
       case 'dans': return <Users {...iconProps} />;
@@ -1642,25 +1649,31 @@ function CreateProposalModal({
       case 'piyano': return <Piano {...iconProps} />;
       case 'resim': return <Brush {...iconProps} />;
       case 'fotoğrafçılık': return <Camera {...iconProps} />;
+      case 'eğlence': return <Sparkles {...iconProps} />;
+      case 'kültür': return <Book {...iconProps} />;
+      
+      // Yaşam Tarzı
       case 'seyahat': return <Plane {...iconProps} />;
       case 'kamp': return <Tent {...iconProps} />;
       case 'doğa': return <Trees {...iconProps} />;
-      case 'yemek yapmak': case 'yemek': return <Utensils {...iconProps} />;
+      case 'yemek': return <Utensils {...iconProps} />;
       case 'kahve': return <Coffee {...iconProps} />;
-      case 'kitap okuma': case 'kitap': return <Book {...iconProps} />;
-      case 'yazma': return <PenTool {...iconProps} />;
+      case 'içecek': return <Coffee {...iconProps} />;
+      case 'kitap': return <Book {...iconProps} />;
       case 'alışveriş': return <ShoppingBag {...iconProps} />;
-      case 'moda': return <Shirt {...iconProps} />;
+      
+      // Teknoloji & Oyun
       case 'teknoloji': return <Laptop {...iconProps} />;
       case 'oyun': return <Gamepad2 {...iconProps} />;
-      case 'tasarım': return <Palette {...iconProps} />;
       case 'girişimcilik': return <Lightbulb {...iconProps} />;
-      case 'yatırım': return <TrendingUp {...iconProps} />;
-      case 'podcast': return <Mic {...iconProps} />;
-      case 'gönüllülük': return <HandHeart {...iconProps} />;
+      case 'satranç': return <Target {...iconProps} />;
+      case 'okey': return <Users {...iconProps} />;
+      case 'tavla': return <Circle {...iconProps} />;
+      
+      // Sosyal & Diğer
       case 'hayvanlar': return <Dog {...iconProps} />;
-      case 'meditasyon': return <Brain {...iconProps} />;
       case 'bahçecilik': return <Leaf {...iconProps} />;
+      
       default: return <Heart {...iconProps} />;
     }
   };
@@ -1736,18 +1749,11 @@ function CreateProposalModal({
       // Form'u temizle
       setActivityName('');
       setVenueName('');
-      // Event date'i yeniden hesapla
-      const now = new Date();
-      const hour = now.getHours();
-      if (hour < 18) {
-        const today = new Date();
-        today.setHours(23, 59, 59, 999);
-        setEventDate(today);
-      } else {
-        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        tomorrow.setHours(23, 59, 59, 999);
-        setEventDate(tomorrow);
-      }
+      // Event date'i 10 gün sonrası olarak ayarla
+      const tenDaysLater = new Date();
+      tenDaysLater.setDate(tenDaysLater.getDate() + 10);
+      tenDaysLater.setHours(23, 59, 59, 999);
+      setEventDate(tenDaysLater);
       setSelectedInterest(null);
       // Form reset
       
