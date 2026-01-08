@@ -184,10 +184,11 @@ export default function PremiumScreen() {
     } else if (packageData.duration_type === 'yearly') {
       return purchaseService.PRODUCTS.PREMIUM_YEARLY;
     } else if (packageData.category === 'super_like') {
-      if (packageData.credits_amount === 5) return purchaseService.PRODUCTS.SUPER_LIKE_5;
-      if (packageData.credits_amount === 10) return purchaseService.PRODUCTS.SUPER_LIKE_10;
+      // Super Like kategorisindeki tüm paketler için superlike10 kullan
+      return purchaseService.PRODUCTS.SUPER_LIKE_10;
     } else if (packageData.category === 'boost') {
-      if (packageData.credits_amount === 3) return purchaseService.PRODUCTS.BOOST_3;
+      // Boost kategorisindeki tüm paketler için boost3 kullan
+      return purchaseService.PRODUCTS.BOOST_3;
     }
     return purchaseService.PRODUCTS.PREMIUM_MONTHLY;
   };
