@@ -92,6 +92,10 @@ export default function ProfileScreen() {
   const [remainingProposals, setRemainingProposals] = useState<number>(0);
   const [remainingRequests, setRemainingRequests] = useState<number>(0);
   
+  // Toplam super like sayısı (günlük + satın alınan)
+  const [totalSuperLikes, setTotalSuperLikes] = useState<number>(0);
+  const [purchasedBoosts, setPurchasedBoosts] = useState<number>(0);
+  
   // Toast states
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -314,6 +318,30 @@ export default function ProfileScreen() {
         });
         console.log('🔢 Remaining requests today:', remainingReqs);
         setRemainingRequests(remainingReqs || 0);
+
+        // Satın alınan kredileri al
+        const { data: userCredits } = await supabase.rpc('get_user_credits', {
+          p_user_id: user.id
+        });
+        
+        let purchasedSuperLikes = 0;
+        if (userCredits) {
+          const superLikeCredit = userCredits.find((c: any) => c.credit_type === 'super_like');
+          const boostCredit = userCredits.find((c: any) => c.credit_type === 'boost');
+          
+          purchasedSuperLikes = superLikeCredit?.amount || 0;
+          setPurchasedBoosts(boostCredit?.amount || 0);
+        }
+        
+        // Toplam super like = günlük hak + satın alınan krediler
+        const totalSuperLikeCount = (remainingLikes || 0) + purchasedSuperLikes;
+        setTotalSuperLikes(totalSuperLikeCount);
+        
+        console.log('💳 Super Like hesaplaması:', {
+          günlük: remainingLikes || 0,
+          satınAlınan: purchasedSuperLikes,
+          toplam: totalSuperLikeCount
+        });
       }
     } catch (error: any) {
       setErrorMessage(error.message);
@@ -756,15 +784,18 @@ export default function ProfileScreen() {
                 <SuperLikeIcon size={18} />
               </View>
               <Text style={styles.compactStatValue}>
-                {remainingSuperLikes === 999 ? '∞' : remainingSuperLikes}
+                {totalSuperLikes === 999 ? '∞' : totalSuperLikes}
               </Text>
               <Text style={styles.compactStatLabel}>S.Like</Text>
               <TouchableOpacity 
                 style={styles.statInfoButton}
                 onPress={() => {
-                  const message = isPremium 
-                    ? 'Premium üye olarak sınırsız Super Like hakkınız var!'
-                    : `Günlük ${remainingSuperLikes} Super Like hakkınız kaldı. Premium üye olarak sınırsız Super Like gönderebilirsiniz.`;
+                  let message = '';
+                  if (isPremium) {
+                    message = 'Premium üye olarak sınırsız Super Like hakkınız var!';
+                  } else {
+                    message = `Toplam ${totalSuperLikes} Super Like hakkınız var.`;
+                  }
                   setInfoMessage(message);
                   setShowInfoToast(true);
                 }}

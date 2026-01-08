@@ -153,10 +153,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUserCredits = async () => {
-    // Bu fonksiyon profil sayfasının kredilerini yenilemek için kullanılacak
-    // Premium sayfasından satın alma sonrası çağrılacak
-    console.log('🔄 User credits refresh triggered');
-    // Event emitter pattern - profil sayfası bu eventi dinleyecek
+    if (!user?.id) return;
+    
+    try {
+      console.log('🔄 User credits yenileniyor...');
+      
+      // Kredileri yenile - bu event'i premium sayfası dinleyecek
+      const { data: credits, error } = await supabase.rpc('get_user_credits', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('❌ User credits yenileme hatası:', error);
+        return;
+      }
+
+      console.log('✅ User credits yenilendi:', credits?.length || 0);
+      
+      // Event emitter pattern - premium sayfası bu eventi dinleyecek
+      // Şimdilik console log, ileride event system eklenebilir
+      
+    } catch (error) {
+      console.error('❌ User credits yenileme hatası:', error);
+    }
   };
 
   const refreshProposalLimits = async () => {

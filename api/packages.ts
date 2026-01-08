@@ -381,6 +381,105 @@ class PackagesAPI {
   }
 
   /**
+   * Boost kredisi kullan
+   */
+  async useBoostCredit(): Promise<{ success: boolean; error?: string; expiresAt?: string }> {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        return { success: false, error: 'Kullanıcı oturumu bulunamadı' };
+      }
+
+      const { data, error } = await supabase.rpc('use_boost_credit', {
+        p_user_id: user.user.id
+      });
+
+      if (error) {
+        console.error('❌ Boost kredisi kullanma hatası:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (!data.success) {
+        return { success: false, error: data.error };
+      }
+
+      return { 
+        success: true, 
+        expiresAt: data.expires_at 
+      };
+    } catch (error: any) {
+      console.error('❌ Boost kredisi kullanma hatası:', error);
+      return { success: false, error: error.message || 'Boost kredisi kullanılamadı' };
+    }
+  }
+
+  /**
+   * Aktif boost oturumunu getir
+   */
+  async getActiveBoostSession(): Promise<{
+    active: boolean;
+    sessionId?: string;
+    startedAt?: string;
+    expiresAt?: string;
+    remainingSeconds?: number;
+  }> {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        return { active: false };
+      }
+
+      const { data, error } = await supabase.rpc('get_active_boost_session', {
+        p_user_id: user.user.id
+      });
+
+      if (error) {
+        console.error('❌ Aktif boost oturumu getirme hatası:', error);
+        return { active: false };
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('❌ Aktif boost oturumu getirme hatası:', error);
+      return { active: false };
+    }
+  }
+
+  /**
+   * Boost cooldown durumunu kontrol et
+   */
+  async getBoostCooldownStatus(): Promise<{
+    hasCooldown: boolean;
+    cooldownSeconds: number;
+    canUseBoost: boolean;
+  }> {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        return { hasCooldown: false, cooldownSeconds: 0, canUseBoost: false };
+      }
+
+      const { data, error } = await supabase.rpc('get_boost_cooldown_status', {
+        p_user_id: user.user.id
+      });
+
+      if (error) {
+        console.error('❌ Boost cooldown durumu getirme hatası:', error);
+        return { hasCooldown: false, cooldownSeconds: 0, canUseBoost: false };
+      }
+
+      return {
+        hasCooldown: data.has_cooldown,
+        cooldownSeconds: data.cooldown_seconds,
+        canUseBoost: data.can_use_boost
+      };
+    } catch (error: any) {
+      console.error('❌ Boost cooldown durumu getirme hatası:', error);
+      return { hasCooldown: false, cooldownSeconds: 0, canUseBoost: false };
+    }
+  }
+
+  /**
    * Subscription iptal et
    */
   async cancelSubscription(purchaseId: string): Promise<{ success: boolean; error?: string }> {

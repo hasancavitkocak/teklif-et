@@ -56,28 +56,60 @@ export default function PremiumScreen() {
     type: 'info' as 'info' | 'success' | 'error'
   });
 
+  // Boost geri sayım state'leri
+  const [activeBoostSession, setActiveBoostSession] = useState<{
+    active: boolean;
+    sessionId?: string;
+    startedAt?: string;
+    expiresAt?: string;
+    remainingSeconds?: number;
+  }>({ active: false });
+  const [boostCountdown, setBoostCountdown] = useState<number>(0);
+  const [boostCooldown, setBoostCooldown] = useState<{
+    hasCooldown: boolean;
+    cooldownSeconds: number;
+    canUseBoost: boolean;
+  }>({ hasCooldown: false, cooldownSeconds: 0, canUseBoost: true });
+  const [cooldownTimer, setCooldownTimer] = useState<number>(0);
+
   // Refresh data function - sadece paket verilerini yenile
   const refreshData = async () => {
     if (!user?.id) return;
     
     try {
-      const [subscriptions, addons, activeSubscription, credits] = await Promise.all([
+      const [subscriptions, addons, activeSubscription, credits, boostSession, cooldownStatus] = await Promise.all([
         packagesAPI.getSubscriptionPackages(),
         packagesAPI.getAddonPackages(),
         packagesAPI.getActiveSubscription(),
-        packagesAPI.getUserCredits()
+        packagesAPI.getUserCredits(),
+        packagesAPI.getActiveBoostSession(),
+        packagesAPI.getBoostCooldownStatus()
       ]);
 
       setSubscriptionPackages(subscriptions);
       setAddonPackages(addons);
       setSubscription(activeSubscription);
       setUserCredits(credits);
+      setActiveBoostSession(boostSession);
+      setBoostCooldown(cooldownStatus);
+
+      // Boost geri sayımını başlat
+      if (boostSession.active && boostSession.remainingSeconds) {
+        setBoostCountdown(boostSession.remainingSeconds);
+      }
+
+      // Cooldown timer'ını başlat
+      if (cooldownStatus.hasCooldown && cooldownStatus.cooldownSeconds > 0) {
+        setCooldownTimer(cooldownStatus.cooldownSeconds);
+      }
 
       console.log('🔄 Paketler yenilendi:', {
         subscriptions: subscriptions.length,
         addons: addons.length,
         activeSubscription: !!activeSubscription,
-        credits: credits.length
+        credits: credits.length,
+        activeBoost: boostSession.active,
+        cooldown: cooldownStatus.hasCooldown
       });
     } catch (error) {
       console.error('❌ Paket verilerini yenileme hatası:', error);
@@ -171,6 +203,80 @@ export default function PremiumScreen() {
       setActiveTab('addons');
     }
   }, [isPremium]);
+
+  // Boost geri sayım timer'ı
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (activeBoostSession.active && boostCountdown > 0) {
+      interval = setInterval(() => {
+        setBoostCountdown(prev => {
+          if (prev <= 1) {
+            // Süre bitti, boost oturumunu deaktif et
+            setActiveBoostSession({ active: false });
+            
+            // Backend'de boost durumunu güncelle
+            if (user?.id) {
+              updateUserBoostStatus();
+            }
+            
+            // Cooldown başlat (30 dakika)
+            setBoostCooldown({ hasCooldown: true, cooldownSeconds: 1800, canUseBoost: false });
+            setCooldownTimer(1800);
+            
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [activeBoostSession.active, boostCountdown]);
+
+  // Cooldown timer'ı
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (boostCooldown.hasCooldown && cooldownTimer > 0) {
+      interval = setInterval(() => {
+        setCooldownTimer(prev => {
+          if (prev <= 1) {
+            // Cooldown bitti
+            setBoostCooldown({ hasCooldown: false, cooldownSeconds: 0, canUseBoost: true });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [boostCooldown.hasCooldown, cooldownTimer]);
+
+  const updateUserBoostStatus = async () => {
+    try {
+      // Backend'de süresi dolan boost oturumlarını deaktif et
+      await supabase.rpc('deactivate_expired_boost_sessions');
+      console.log('✅ Boost durumu güncellendi');
+    } catch (error) {
+      console.error('❌ Boost durumu güncelleme hatası:', error);
+    }
+  };
+
+  const formatCountdown = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   const handleSubscribe = (plan: Package) => {
     setSelectedPlan(plan);
@@ -566,16 +672,7 @@ export default function PremiumScreen() {
                 </View>
               </View>
               
-              {subscription.auto_renew && !subscription.cancelled_at && (
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelSubscription}
-                  disabled={loading}
-                >
-                  <X size={16} color="#EF4444" />
-                  <Text style={styles.cancelButtonText}>Aboneliği İptal Et</Text>
-                </TouchableOpacity>
-              )}
+              {/* Store butonları kaldırıldı - gelir koruması için */}
             </View>
           </View>
         )}
@@ -654,19 +751,19 @@ export default function PremiumScreen() {
                       )}
                       {plan.duration_type === 'weekly' && storeProduct && (
                         <Text style={styles.planPerMonth}>
-                          ₺{Math.round(parseFloat(storeProduct.price) * 4)}/ay
+                          ₺{(parseFloat(storeProduct.price) * 4).toFixed(2)}/ay
                         </Text>
                       )}
                       {plan.duration_type === 'yearly' && storeProduct && (
                         <Text style={styles.planPerMonth}>
-                          ₺{Math.round(parseFloat(storeProduct.price) / 12)}/ay
+                          ₺{(parseFloat(storeProduct.price) / 12).toFixed(2)}/ay
                         </Text>
                       )}
                       {plan.duration_type === 'weekly' && !storeProduct && (
-                        <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
+                        <Text style={styles.planPerMonth}>₺{(plan.price_amount * 4 / 100).toFixed(2)}/ay</Text>
                       )}
                       {plan.duration_type === 'yearly' && !storeProduct && (
-                        <Text style={styles.planPerMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
+                        <Text style={styles.planPerMonth}>₺{(plan.price_amount / 12 / 100).toFixed(2)}/ay</Text>
                       )}
                     </View>
                     <Text style={styles.planPrice}>
@@ -728,14 +825,22 @@ export default function PremiumScreen() {
               </View>
             ) : addonPackages.length > 0 ? addonPackages.map((addon, index) => {
               const storeProduct = storeProducts.find(p => p.productId === getStoreProductId(addon));
+              const isBoostAddon = addon.category === 'boost';
+              const boostCredits = userCredits.find(c => c.credit_type === 'boost')?.amount || 0;
               
               return (
                 <TouchableOpacity 
                   key={addon.id}
                   style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
                   activeOpacity={0.9}
-                  onPress={() => handlePurchaseAddon(addon)}
-                  disabled={loading}
+                  onPress={() => {
+                    if (!isBoostAddon) {
+                      // Boost değil, normal satın alma
+                      handlePurchaseAddon(addon);
+                    }
+                    // Boost ise hiçbir şey yapma (otomatik başlar)
+                  }}
+                  disabled={loading || (isBoostAddon && (activeBoostSession.active || boostCooldown.hasCooldown))}
                 >
                   <View style={[styles.addOnIcon, {
                     backgroundColor: addon.category === 'super_like' ? '#FEF3C7' :
@@ -745,9 +850,26 @@ export default function PremiumScreen() {
                     {addon.category === 'boost' && <Crown size={24} color="#F59E0B" />}
                   </View>
                   <View style={styles.addOnContent}>
-                    <Text style={styles.addOnTitle}>{addon.name}</Text>
-                    <Text style={styles.addOnDescription}>{addon.description}</Text>
-                    {addon.credits_amount && (
+                    <Text style={styles.addOnTitle}>
+                      {isBoostAddon && activeBoostSession.active 
+                        ? 'Boost Aktif' 
+                        : isBoostAddon && boostCooldown.hasCooldown
+                        ? 'Boost Cooldown'
+                        : addon.name
+                      }
+                    </Text>
+                    <Text style={styles.addOnDescription}>
+                      {isBoostAddon && activeBoostSession.active 
+                        ? `Kalan süre: ${formatCountdown(boostCountdown)}`
+                        : isBoostAddon && boostCooldown.hasCooldown
+                        ? `Bekleme süresi: ${formatCountdown(cooldownTimer)}`
+                        : addon.description
+                      }
+                    </Text>
+                    {isBoostAddon && !activeBoostSession.active && !boostCooldown.hasCooldown && (
+                      <Text style={styles.addOnSubtext}>Satın alındığında otomatik başlar</Text>
+                    )}
+                    {!isBoostAddon && addon.credits_amount && (
                       <Text style={styles.addOnSubtext}>{addon.credits_amount} adet kredi</Text>
                     )}
                   </View>
@@ -808,7 +930,11 @@ export default function PremiumScreen() {
       {/* Modals */}
       <PremiumSubscriptionModal
         visible={subscriptionModalVisible}
-        onClose={() => setSubscriptionModalVisible(false)}
+        onClose={() => {
+          setSubscriptionModalVisible(false);
+          setLoading(false); // Loading state'ini reset et
+          setSelectedPlan(null); // Selected plan'i reset et
+        }}
         onConfirm={confirmSubscription}
         plan={selectedPlan || (subscriptionPackages.length > 0 ? subscriptionPackages[0] : null)}
         loading={loading}
@@ -817,7 +943,10 @@ export default function PremiumScreen() {
 
       <PremiumCancelModal
         visible={cancelModalVisible}
-        onClose={() => setCancelModalVisible(false)}
+        onClose={() => {
+          setCancelModalVisible(false);
+          setLoading(false); // Loading state'ini reset et
+        }}
         onConfirm={confirmCancelSubscription}
         expiryDate={subscription?.expires_at}
         loading={loading}
@@ -1151,6 +1280,43 @@ const styles = StyleSheet.create({
   addOnPriceUnit: {
     fontSize: 12,
     color: '#6B7280',
+  },
+  boostActiveIndicator: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  boostActiveText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  boostCooldownIndicator: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  boostCooldownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  useBoostButton: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  useBoostText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   // Tab Styles
   tabContainer: {

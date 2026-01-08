@@ -18,7 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Bell, Calendar, Store, ChevronDown, Crown, 
+import { X, Zap, Plus, MapPin, Sparkles, SlidersHorizontal, Calendar, Store, ChevronDown, Crown, 
   Music, Gamepad2, Book, Dumbbell, Camera, Utensils, Plane, Palette, Users, Heart, Circle, 
   Activity, Waves, Trophy, Target, Flower2, Bike, Mountain, Film, Headphones, Theater, 
   Guitar, Piano, Brush, Tent, Trees, Coffee, PenTool, ShoppingBag, Shirt, Laptop, 
@@ -705,13 +705,6 @@ export default function DiscoverScreen() {
           <Text style={[styles.logoText, { fontFamily: 'System' }]}>Teklif Et</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push('/notifications')}
-          >
-            <Bell size={22} color="#8B5CF6" />
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setFilterModalVisible(true)}

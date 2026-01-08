@@ -5,6 +5,7 @@ import {
   requestPurchase,
   getAvailablePurchases,
   acknowledgePurchaseAndroid,
+  consumePurchaseAndroid,
   purchaseUpdatedListener,
   purchaseErrorListener,
 } from 'react-native-iap';
@@ -65,6 +66,18 @@ class PurchaseService {
     BOOST_3: 'boost3',
   };
 
+  // Consumable ürünler - Bu ürünler tekrar tekrar satın alınabilir
+  private readonly CONSUMABLE_PRODUCTS = [
+    'superlike5',
+    'superlike10', 
+    'boost3'
+  ];
+
+  // Ürünün consumable olup olmadığını kontrol et
+  private isConsumableProduct(productId: string): boolean {
+    return this.CONSUMABLE_PRODUCTS.includes(productId);
+  }
+
   async initialize(): Promise<boolean> {
     try {
       console.log('🔄 Purchase service başlatılıyor...');
@@ -102,6 +115,15 @@ class PurchaseService {
           this.acknowledgePurchase(purchaseData.purchaseToken).then((acknowledged) => {
             if (acknowledged) {
               console.log('✅ Purchase acknowledged successfully');
+              
+              // Consumable ürünler için consume işlemi
+              if (this.isConsumableProduct(purchaseData.productId)) {
+                this.consumePurchase(purchaseData.purchaseToken).then((consumed) => {
+                  if (consumed) {
+                    console.log('✅ Consumable product consumed successfully');
+                  }
+                });
+              }
             }
           });
         }
@@ -351,6 +373,25 @@ class PurchaseService {
         return this.acknowledgePurchase(purchaseToken, retryCount + 1);
       }
       
+      return false;
+    }
+  }
+
+  async consumePurchase(purchaseToken: string): Promise<boolean> {
+    try {
+      if (Platform.OS !== 'android') {
+        console.log('🍎 iOS - Consume gerekmiyor');
+        return true;
+      }
+
+      console.log('🔥 Android consumable ürün consume ediliyor:', purchaseToken);
+      
+      const result = await consumePurchaseAndroid(purchaseToken);
+      
+      console.log('✅ Consume başarılı:', result);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Consume hatası:', error);
       return false;
     }
   }

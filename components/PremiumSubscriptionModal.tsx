@@ -218,19 +218,19 @@ export default function PremiumSubscriptionModal({
                 )}
                 {(plan?.duration_type === 'weekly' && storeProduct) && (
                   <Text style={styles.perMonth}>
-                    ₺{Math.round(parseFloat(storeProduct.price) * 4)}/ay
+                    ₺{(parseFloat(storeProduct.price) * 4).toFixed(2)}/ay
                   </Text>
                 )}
                 {(plan?.duration_type === 'yearly' && storeProduct) && (
                   <Text style={styles.perMonth}>
-                    ₺{Math.round(parseFloat(storeProduct.price) / 12)}/ay
+                    ₺{(parseFloat(storeProduct.price) / 12).toFixed(2)}/ay
                   </Text>
                 )}
                 {(plan?.duration_type === 'weekly' && !storeProduct && plan?.price_amount) && (
-                  <Text style={styles.perMonth}>₺{Math.round(plan.price_amount * 4 / 100)}/ay</Text>
+                  <Text style={styles.perMonth}>₺{(plan.price_amount * 4 / 100).toFixed(2)}/ay</Text>
                 )}
                 {(plan?.duration_type === 'yearly' && !storeProduct && plan?.price_amount) && (
-                  <Text style={styles.perMonth}>₺{Math.round(plan.price_amount / 12 / 100)}/ay</Text>
+                  <Text style={styles.perMonth}>₺{(plan.price_amount / 12 / 100).toFixed(2)}/ay</Text>
                 )}
                 {plan?.perMonth && (
                   <Text style={styles.perMonth}>{plan.perMonth}</Text>
