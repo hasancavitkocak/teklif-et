@@ -26,7 +26,7 @@ const PREMIUM_FEATURES = [
 ];
 
 export default function PremiumScreen() {
-  const { user, refreshPremiumStatus, isPremium } = useAuth();
+  const { user, refreshPremiumStatus, isPremium, refreshUserCredits } = useAuth();
   const { sendTestNotification, expoPushToken, permissionStatus } = usePushNotifications();
   const router = useRouter();
   
@@ -347,6 +347,7 @@ export default function PremiumScreen() {
       // Refresh data
       await refreshData();
       await refreshPremiumStatus();
+      await refreshUserCredits(); // Kredileri yenile
       
       // Show success modal
       setPurchasedPackage(addon);
@@ -383,8 +384,20 @@ export default function PremiumScreen() {
   };
 
   const handleRestorePurchases = async () => {
+    // IAP servisinin hazır olduğundan emin ol
+    if (!purchaseInitialized) {
+      setRestoreModalData({
+        title: 'Hata',
+        message: 'Store henüz hazır değil. Lütfen bekleyin ve tekrar deneyin.',
+        type: 'error'
+      });
+      setRestoreModalVisible(true);
+      return;
+    }
+    
     setLoading(true);
     try {
+      console.log('🔄 Satın almalar geri yükleniyor...');
       const restoredPurchases = await purchaseService.restorePurchases();
       
       if (restoredPurchases.length === 0) {
@@ -401,20 +414,91 @@ export default function PremiumScreen() {
       const successfulPurchases = restoredPurchases.filter(p => p.success);
       
       if (successfulPurchases.length > 0) {
-        // Her geri yüklenen satın alma için backend'i güncelle
+        console.log(`✅ ${successfulPurchases.length} başarılı satın alma geri yüklendi`);
+        
+        // Her geri yüklenen satın alma için backend'e bildirim gönder
+        let backendUpdatesCount = 0;
+        const processedTransactions = new Set<string>(); // Duplicate önleme
+        
         for (const purchase of successfulPurchases) {
           if (purchase.transactionId && purchase.productId) {
-            console.log('🔄 Geri yüklenen satın alma:', purchase);
-            // Burada backend'e bildirim gönderebilirsiniz
+            // Duplicate transaction kontrolü
+            if (processedTransactions.has(purchase.transactionId)) {
+              console.warn('⚠️ Duplicate transaction atlandı:', purchase.transactionId);
+              continue;
+            }
+            processedTransactions.add(purchase.transactionId);
+            
+            console.log('🔄 Backend\'e geri yüklenen satın alma bildiriliyor:', {
+              transactionId: purchase.transactionId,
+              productId: purchase.productId
+            });
+            
+            try {
+              // Paketlerin yüklendiğinden emin ol
+              if (subscriptionPackages.length === 0 && addonPackages.length === 0) {
+                console.warn('⚠️ Paketler henüz yüklenmemiş, yeniden yükleniyor...');
+                await refreshData();
+              }
+              
+              // Product ID'den package ID'yi belirle
+              let packageId = '';
+              const allPackages = [...subscriptionPackages, ...addonPackages];
+              const matchingPackage = allPackages.find(pkg => {
+                const storeProductId = getStoreProductId(pkg);
+                return storeProductId === purchase.productId;
+              });
+              
+              if (matchingPackage) {
+                packageId = matchingPackage.id;
+                console.log('📦 Eşleşen paket bulundu:', matchingPackage.name);
+                
+                // Backend'e satın almayı kaydet (timeout ile)
+                const timeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Backend timeout')), 10000)
+                );
+                
+                const result = await Promise.race([
+                  packagesAPI.recordGooglePlayPurchase(
+                    packageId,
+                    purchase.transactionId,
+                    purchase.purchaseToken || purchase.transactionId,
+                    purchase.productId,
+                    {
+                      purchaseState: 0, // PURCHASED
+                      acknowledged: true,
+                      autoRenewing: purchase.productId.includes('weekly') || purchase.productId.includes('monthly') || purchase.productId.includes('yearly'),
+                      orderId: purchase.transactionId,
+                      packageName: 'com.teklifet.app',
+                    }
+                  ),
+                  timeoutPromise
+                ]) as { success: boolean; error?: string };
+                
+                if (result.success) {
+                  backendUpdatesCount++;
+                  console.log('✅ Backend güncellendi:', packageId);
+                } else {
+                  console.error('❌ Backend güncelleme hatası:', result.error);
+                }
+              } else {
+                console.warn('⚠️ Product ID için eşleşen paket bulunamadı:', purchase.productId);
+                console.warn('📋 Mevcut paketler:', allPackages.map(p => ({ id: p.id, name: p.name, storeId: getStoreProductId(p) })));
+              }
+            } catch (error: any) {
+              console.error('❌ Backend bildirim hatası:', error);
+            }
           }
         }
 
+        // Premium durumunu ve verileri yenile
         await refreshPremiumStatus();
         await refreshData();
+        await refreshUserCredits(); // Kredileri yenile
         
         setRestoreModalData({
           title: 'Başarılı',
-          message: `${successfulPurchases.length} satın alma başarıyla geri yüklendi. Premium özellikleriniz aktif edildi.`,
+          message: `${successfulPurchases.length} satın alma başarıyla geri yüklendi${backendUpdatesCount > 0 ? ` ve ${backendUpdatesCount} tanesi profilinize aktif edildi` : ''}. Premium özellikleriniz aktif edildi.`,
           type: 'success'
         });
         setRestoreModalVisible(true);
@@ -427,6 +511,7 @@ export default function PremiumScreen() {
         setRestoreModalVisible(true);
       }
     } catch (error: any) {
+      console.error('❌ Restore purchases hatası:', error);
       setRestoreModalData({
         title: 'Hata',
         message: error.message || 'Satın almalar geri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
@@ -586,10 +671,10 @@ export default function PremiumScreen() {
                     <Text style={styles.planPrice}>
                       {storeProduct?.localizedPrice || '₺39,99'}
                     </Text>
-                    {/* Debug: Play Store verisi */}
-                    {storeProduct && (
+                    {/* Debug: Play Store verisi - Sadece development modunda */}
+                    {__DEV__ && storeProduct && (
                       <Text style={[styles.planFeatureText, { fontSize: 10, color: '#666', marginTop: 4 }]}>
-                        Store: {storeProduct.productId} - {storeProduct.localizedPrice}
+                        DEV: {storeProduct.productId} - {storeProduct.localizedPrice}
                       </Text>
                     )}
                   </View>
@@ -667,16 +752,27 @@ export default function PremiumScreen() {
                   </View>
                   <View style={styles.addOnPricing}>
                     <Text style={styles.addOnPrice}>
-                      {storeProduct?.localizedPrice || '₺39,99'}
+                      {storeProduct?.localizedPrice || `₺${(addon.price_amount / 100).toFixed(2)}`}
                     </Text>
                     <Text style={styles.addOnPriceUnit}>
                       {addon.duration_type === 'one_time' ? 'tek seferlik' : 
                        addon.duration_type === 'weekly' ? '7 günlük' : 'aylık'}
                     </Text>
-                    {/* Debug: Play Store verisi */}
-                    {storeProduct && (
-                      <Text style={[styles.addOnPriceUnit, { fontSize: 9, color: '#666' }]}>
-                        Store: {storeProduct.productId}
+                    {/* Store eşleştirme durumu */}
+                    {!storeProduct && (
+                      <Text style={[styles.addOnPriceUnit, { fontSize: 9, color: '#EF4444' }]}>
+                        Store fiyatı yüklenemedi
+                      </Text>
+                    )}
+                    {/* Debug: Play Store verisi - Sadece development modunda */}
+                    {__DEV__ && storeProduct && (
+                      <Text style={[styles.addOnPriceUnit, { fontSize: 9, color: '#10B981' }]}>
+                        ✅ Store: {storeProduct.productId}
+                      </Text>
+                    )}
+                    {__DEV__ && !storeProduct && (
+                      <Text style={[styles.addOnPriceUnit, { fontSize: 9, color: '#EF4444' }]}>
+                        ❌ Beklenen: {getStoreProductId(addon)}
                       </Text>
                     )}
                   </View>

@@ -55,7 +55,7 @@ interface Profile {
 }
 
 export default function ProfileScreen() {
-  const { user, signOut, isPremium, updateLocationManually, currentCity, updateCityFromSettings } = useAuth();
+  const { user, signOut, isPremium, updateLocationManually, currentCity, updateCityFromSettings, refreshUserCredits } = useAuth();
   const { permissionStatus, checkPermissionStatus, registerForPushNotifications } = usePushNotifications();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -122,6 +122,14 @@ export default function ProfileScreen() {
       setEditCity(currentCity);
     }
   }, [currentCity]);
+
+  // AuthContext'ten kredi yenileme sinyali geldiğinde profili yenile
+  useEffect(() => {
+    if (user?.id) {
+      console.log('🔄 Kredi yenileme sinyali alındı, profil yenileniyor...');
+      loadProfile();
+    }
+  }, [refreshUserCredits, user?.id]);
 
   const updateCurrentLocation = async (forceUpdate = false) => {
     if (!user?.id || isUpdatingLocation) return;

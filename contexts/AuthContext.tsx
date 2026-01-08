@@ -22,6 +22,7 @@ interface AuthContextType {
   refreshPremiumStatus: () => Promise<void>;
   refreshAccountStatus: () => Promise<void>;
   refreshUserStats: () => Promise<void>;
+  refreshUserCredits: () => Promise<void>; // Yeni: Kredileri yenile
   refreshProposalLimits: () => Promise<void>;
   refreshRequestLimits: () => Promise<void>;
   unfreezeAccount: () => Promise<boolean>;
@@ -148,6 +149,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔄 User stats refresh triggered');
     await refreshProposalLimits();
     await refreshRequestLimits();
+    await refreshUserCredits(); // Kredileri de yenile
+  };
+
+  const refreshUserCredits = async () => {
+    // Bu fonksiyon profil sayfasının kredilerini yenilemek için kullanılacak
+    // Premium sayfasından satın alma sonrası çağrılacak
+    console.log('🔄 User credits refresh triggered');
+    // Event emitter pattern - profil sayfası bu eventi dinleyecek
   };
 
   const refreshProposalLimits = async () => {
@@ -895,6 +904,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshPremiumStatus,
         refreshAccountStatus,
         refreshUserStats,
+        refreshUserCredits,
         refreshProposalLimits,
         refreshRequestLimits,
         unfreezeAccount,

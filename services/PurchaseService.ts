@@ -42,6 +42,7 @@ export interface RestorePurchaseResult {
   success: boolean;
   transactionId?: string;
   productId?: string;
+  purchaseToken?: string;
   error?: string;
 }
 
@@ -427,13 +428,37 @@ class PurchaseService {
       const purchases = await getAvailablePurchases();
       
       console.log('📋 Bulunan satın almalar:', purchases.length);
+      console.log('🔍 Satın alma detayları:', purchases.map(p => ({
+        productId: p.productId,
+        transactionId: p.transactionId,
+        purchaseToken: (p as any).purchaseToken,
+        purchaseTime: (p as any).transactionDate || (p as any).purchaseTime,
+        acknowledged: (p as any).isAcknowledgedAndroid || (p as any).acknowledged
+      })));
       
-      const results: RestorePurchaseResult[] = purchases.map((purchase: any) => ({
-        success: true,
-        transactionId: purchase.transactionId || undefined,
-        productId: purchase.productId || '',
-      }));
+      const results: RestorePurchaseResult[] = purchases.map((purchase: any) => {
+        // Android ve iOS için farklı field'ları kontrol et
+        const transactionId = purchase.transactionId || (purchase as any).purchaseToken || '';
+        const productId = purchase.productId || '';
+        const purchaseToken = (purchase as any).purchaseToken || purchase.transactionId || '';
+        
+        console.log('✅ Geri yüklenen satın alma:', {
+          productId,
+          transactionId: transactionId.substring(0, 20) + '...',
+          purchaseToken: purchaseToken.substring(0, 20) + '...',
+          purchaseTime: (purchase as any).transactionDate || (purchase as any).purchaseTime,
+          platform: Platform.OS
+        });
+        
+        return {
+          success: true,
+          transactionId,
+          productId,
+          purchaseToken, // Purchase token'ı da ekle
+        };
+      });
 
+      console.log(`🎉 ${results.length} satın alma başarıyla geri yüklendi`);
       return results;
     } catch (error: any) {
       console.error('❌ Satın alma geri yükleme hatası:', error);
