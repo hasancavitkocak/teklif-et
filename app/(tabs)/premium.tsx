@@ -827,7 +827,13 @@ export default function PremiumScreen() {
                       )}
                     </View>
                     <Text style={styles.planPrice}>
-                      {storeProduct?.localizedPrice || '₺39,99'}
+                      {storeProduct ? 
+                        (storeProduct.localizedPrice.includes('₺') ? 
+                          storeProduct.localizedPrice : 
+                          `₺${storeProduct.localizedPrice}`
+                        ) : 
+                        `₺${(plan.price_amount / 100).toFixed(2)}`
+                      }
                     </Text>
                     {/* Debug: Play Store verisi - Sadece development modunda */}
                     {__DEV__ && storeProduct && (
@@ -929,7 +935,13 @@ export default function PremiumScreen() {
                   </View>
                   <View style={styles.addOnPricing}>
                     <Text style={styles.addOnPrice}>
-                      {storeProduct?.localizedPrice || `₺${(addon.price_amount / 100).toFixed(2)}`}
+                      {storeProduct ? 
+                        (storeProduct.localizedPrice.includes('₺') ? 
+                          storeProduct.localizedPrice : 
+                          `₺${storeProduct.localizedPrice}`
+                        ) : 
+                        `₺${(addon.price_amount / 100).toFixed(2)}`
+                      }
                     </Text>
                     <Text style={styles.addOnPriceUnit}>
                       {addon.duration_type === 'one_time' ? 'tek seferlik' : 

@@ -178,21 +178,6 @@ BEGIN
       amount = user_credits.amount + v_package.credits_amount,
       updated_at = NOW();
       
-    -- Boost paketi ise otomatik baslat
-    IF v_package.category = 'boost' THEN
-      DECLARE
-        v_boost_result JSON;
-      BEGIN
-        SELECT use_boost_credit(p_user_id) INTO v_boost_result;
-        
-        IF (v_boost_result->>'success')::BOOLEAN THEN
-          RAISE NOTICE 'Boost paketi satin alindi ve otomatik baslatildi: %', p_user_id;
-        ELSE
-          RAISE NOTICE 'Boost paketi satin alindi ama baslatilamadi: %', v_boost_result->>'error';
-        END IF;
-      END;
-    END IF;
-      
     RAISE NOTICE 'Consumable urun kredisi eklendi: % % kredi', v_package.category, v_package.credits_amount;
   END IF;
   
@@ -205,6 +190,22 @@ BEGIN
       premium_transaction_id = p_transaction_id,
       updated_at = NOW()
     WHERE id = p_user_id;
+  END IF;
+  
+  -- BOOST OTOMATIK BASLATMA - Transaction sonunda yap
+  IF v_package.type = 'addon' AND v_package.category = 'boost' AND v_package.credits_amount > 0 THEN
+    DECLARE
+      v_boost_result JSON;
+    BEGIN
+      -- Boost kredisi kullan (otomatik baslatma)
+      SELECT use_boost_credit(p_user_id) INTO v_boost_result;
+      
+      IF (v_boost_result->>'success')::BOOLEAN THEN
+        RAISE NOTICE 'Boost paketi satin alindi ve otomatik baslatildi: %', p_user_id;
+      ELSE
+        RAISE NOTICE 'Boost paketi satin alindi ama baslatilamadi: %', v_boost_result->>'error';
+      END IF;
+    END;
   END IF;
   
   RETURN v_purchase_id;
