@@ -34,7 +34,6 @@ interface AuthContextType {
   clearLocationCache: () => void;
   signInWithPhone: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<boolean>;
-  verifyOtpWithPremiumCheck: (phone: string, otp: string, transactionId?: string) => Promise<boolean>;
   resendOtp: (phone: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
@@ -789,55 +788,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const verifyOtpWithPremiumCheck = async (phone: string, otp: string, transactionId?: string) => {
-    // Önce normal OTP doğrulaması yap
-    const loginSuccess = await verifyOtp(phone, otp);
-    
-    if (!loginSuccess) {
-      return false;
-    }
-    
-    // Eğer transaction ID verilmişse premium kontrolü yap
-    if (transactionId && user?.id) {
-      try {
-        console.log('🔍 Login sonrası premium kontrolü başlatılıyor...', {
-          userId: user.id,
-          transactionId: transactionId.substring(0, 20) + '...'
-        });
-        
-        const { data: premiumResult, error } = await supabase.rpc('check_and_update_premium_on_login', {
-          p_user_id: user.id,
-          p_transaction_id: transactionId
-        });
-        
-        if (error) {
-          console.error('❌ Premium kontrol hatası:', error);
-          // Premium kontrolü başarısız olsa bile login'e devam et
-          return true;
-        }
-        
-        if (premiumResult?.success) {
-          console.log('✅ Premium durumu güncellendi:', premiumResult);
-          
-          // Premium durumunu yenile
-          await refreshPremiumStatus();
-          
-          if (premiumResult.previous_premium_user_deactivated) {
-            console.log('⚠️ Önceki premium kullanıcı pasif edildi');
-          }
-        } else {
-          console.warn('⚠️ Premium kontrol başarısız:', premiumResult?.error);
-        }
-        
-      } catch (error) {
-        console.error('❌ Premium kontrol exception:', error);
-        // Hata olsa bile login'e devam et
-      }
-    }
-    
-    return true;
-  };
-
   const verifyOtp = async (phone: string, otp: string) => {
     // OTP doğrulaması
     const verification = otpCache.verifyOtp(phone, otp);
@@ -984,7 +934,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearLocationCache,
         signInWithPhone,
         verifyOtp,
-        verifyOtpWithPremiumCheck,
         resendOtp,
         signOut,
       }}

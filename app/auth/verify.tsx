@@ -11,8 +11,8 @@ import { settingsAPI } from '@/api/settings';
 
 export default function VerifyScreen() {
   const router = useRouter();
-  const { phone, transactionId } = useLocalSearchParams<{ phone: string; transactionId?: string }>();
-  const { verifyOtp, verifyOtpWithPremiumCheck, resendOtp } = useAuth();
+  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { verifyOtp, resendOtp } = useAuth();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60); // 60 saniye geri sayım
@@ -158,20 +158,10 @@ export default function VerifyScreen() {
 
   const verifyCode = async (code: string) => {
     console.log('🔐 Verifying code:', code, 'for phone:', phone);
-    if (transactionId) {
-      console.log('🔍 Transaction ID provided:', transactionId.substring(0, 20) + '...');
-    }
     
     setLoading(true);
     try {
-      let success = false;
-      
-      // Eğer transaction ID varsa premium kontrolü ile doğrula
-      if (transactionId) {
-        success = await verifyOtpWithPremiumCheck(phone, code, transactionId);
-      } else {
-        success = await verifyOtp(phone, code);
-      }
+      const success = await verifyOtp(phone, code);
       
       console.log('✅ Verify result:', success);
       if (success) {

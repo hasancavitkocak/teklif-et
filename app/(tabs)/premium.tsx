@@ -550,10 +550,17 @@ export default function PremiumScreen() {
       if (successfulPurchases.length > 0) {
         console.log(`✅ ${successfulPurchases.length} başarılı satın alma geri yüklendi`);
         
-        // Her geri yüklenen satın alma için backend'e bildirim gönder
         let backendUpdatesCount = 0;
+        let premiumRestoredCount = 0;
         const processedTransactions = new Set<string>(); // Duplicate önleme
         
+        // Paketlerin yüklendiğinden emin ol
+        if (subscriptionPackages.length === 0 && addonPackages.length === 0) {
+          console.warn('⚠️ Paketler henüz yüklenmemiş, yeniden yükleniyor...');
+          await refreshData();
+        }
+        
+        // Tüm satın almaları işle (artık database'de kontrol yapılıyor)
         for (const purchase of successfulPurchases) {
           if (purchase.transactionId && purchase.productId) {
             // Duplicate transaction kontrolü
@@ -563,64 +570,24 @@ export default function PremiumScreen() {
             }
             processedTransactions.add(purchase.transactionId);
             
-            console.log('🔄 Backend\'e geri yüklenen satın alma bildiriliyor:', {
-              transactionId: purchase.transactionId,
+            console.log('🔄 Restore işlemi:', {
+              transactionId: purchase.transactionId.substring(0, 20) + '...',
               productId: purchase.productId
             });
             
             try {
-              // Paketlerin yüklendiğinden emin ol
-              if (subscriptionPackages.length === 0 && addonPackages.length === 0) {
-                console.warn('⚠️ Paketler henüz yüklenmemiş, yeniden yükleniyor...');
-                await refreshData();
+              await processNormalRestore(purchase);
+              backendUpdatesCount++;
+              
+              // Premium ürün ise sayacı artır
+              const subscriptionProducts = ['premiumweekly', 'premiummonthly', 'premiumyearly'];
+              if (subscriptionProducts.includes(purchase.productId || '')) {
+                premiumRestoredCount++;
               }
               
-              // Product ID'den package ID'yi belirle
-              let packageId = '';
-              const allPackages = [...subscriptionPackages, ...addonPackages];
-              const matchingPackage = allPackages.find(pkg => {
-                const storeProductId = getStoreProductId(pkg);
-                return storeProductId === purchase.productId;
-              });
-              
-              if (matchingPackage) {
-                packageId = matchingPackage.id;
-                console.log('📦 Eşleşen paket bulundu:', matchingPackage.name);
-                
-                // Backend'e satın almayı kaydet (timeout ile)
-                const timeoutPromise = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Backend timeout')), 10000)
-                );
-                
-                const result = await Promise.race([
-                  packagesAPI.recordGooglePlayPurchase(
-                    packageId,
-                    purchase.transactionId,
-                    purchase.purchaseToken || purchase.transactionId,
-                    purchase.productId,
-                    {
-                      purchaseState: 0, // PURCHASED
-                      acknowledged: true,
-                      autoRenewing: purchase.productId.includes('weekly') || purchase.productId.includes('monthly') || purchase.productId.includes('yearly'),
-                      orderId: purchase.transactionId,
-                      packageName: 'com.teklifet.app',
-                    }
-                  ),
-                  timeoutPromise
-                ]) as { success: boolean; error?: string };
-                
-                if (result.success) {
-                  backendUpdatesCount++;
-                  console.log('✅ Backend güncellendi:', packageId);
-                } else {
-                  console.error('❌ Backend güncelleme hatası:', result.error);
-                }
-              } else {
-                console.warn('⚠️ Product ID için eşleşen paket bulunamadı:', purchase.productId);
-                console.warn('📋 Mevcut paketler:', allPackages.map(p => ({ id: p.id, name: p.name, storeId: getStoreProductId(p) })));
-              }
             } catch (error: any) {
-              console.error('❌ Backend bildirim hatası:', error);
+              console.error('❌ Restore hatası:', error);
+              // Hata olsa bile devam et
             }
           }
         }
@@ -630,9 +597,20 @@ export default function PremiumScreen() {
         await refreshData();
         await refreshUserCredits(); // Kredileri yenile
         
+        // Sonuç mesajını oluştur
+        let message = `${successfulPurchases.length} satın alma başarıyla geri yüklendi`;
+        
+        if (premiumRestoredCount > 0) {
+          message += ` ve ${premiumRestoredCount} premium abonelik aktif edildi`;
+        }
+        
+        if (backendUpdatesCount > 0) {
+          message += `. ${backendUpdatesCount} ürün profilinize eklendi.`;
+        }
+        
         setRestoreModalData({
           title: 'Başarılı',
-          message: `${successfulPurchases.length} satın alma başarıyla geri yüklendi${backendUpdatesCount > 0 ? ` ve ${backendUpdatesCount} tanesi profilinize aktif edildi` : ''}. Premium özellikleriniz aktif edildi.`,
+          message,
           type: 'success'
         });
         setRestoreModalVisible(true);
@@ -654,6 +632,61 @@ export default function PremiumScreen() {
       setRestoreModalVisible(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Normal restore işlemi için yardımcı fonksiyon
+  const processNormalRestore = async (purchase: any) => {
+    // Paketlerin yüklendiğinden emin ol
+    if (subscriptionPackages.length === 0 && addonPackages.length === 0) {
+      console.warn('⚠️ Paketler henüz yüklenmemiş, yeniden yükleniyor...');
+      await refreshData();
+    }
+    
+    // Product ID'den package ID'yi belirle
+    let packageId = '';
+    const allPackages = [...subscriptionPackages, ...addonPackages];
+    const matchingPackage = allPackages.find(pkg => {
+      const storeProductId = getStoreProductId(pkg);
+      return storeProductId === purchase.productId;
+    });
+    
+    if (matchingPackage) {
+      packageId = matchingPackage.id;
+      console.log('📦 Eşleşen paket bulundu:', matchingPackage.name);
+      
+      // Backend'e satın almayı kaydet (timeout ile)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Backend timeout')), 10000)
+      );
+      
+      const result = await Promise.race([
+        packagesAPI.recordGooglePlayPurchase(
+          packageId,
+          purchase.transactionId,
+          purchase.purchaseToken || purchase.transactionId,
+          purchase.productId,
+          {
+            purchaseState: 0, // PURCHASED
+            acknowledged: true,
+            autoRenewing: purchase.productId.includes('weekly') || purchase.productId.includes('monthly') || purchase.productId.includes('yearly'),
+            orderId: purchase.transactionId,
+            packageName: 'com.teklifet.app',
+          }
+        ),
+        timeoutPromise
+      ]) as { success: boolean; error?: string };
+      
+      if (result.success) {
+        console.log('✅ Backend güncellendi:', packageId);
+      } else {
+        console.error('❌ Backend güncelleme hatası:', result.error);
+        throw new Error(result.error || 'Backend güncelleme başarısız');
+      }
+    } else {
+      console.warn('⚠️ Product ID için eşleşen paket bulunamadı:', purchase.productId);
+      console.warn('📋 Mevcut paketler:', allPackages.map(p => ({ id: p.id, name: p.name, storeId: getStoreProductId(p) })));
+      throw new Error(`Eşleşen paket bulunamadı: ${purchase.productId}`);
     }
   };
 
