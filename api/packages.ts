@@ -132,7 +132,8 @@ class PackagesAPI {
         p_package_id: packageId,
         p_transaction_id: transactionId || null,
         p_purchase_token: purchaseToken || null,
-        p_product_id: productId || null
+        p_product_id: productId || null,
+        p_purchase_time_ms: purchaseDetails?.purchaseTime || null
       };
       
       console.log('📋 RPC Parameters (simplified):', {
@@ -140,7 +141,8 @@ class PackagesAPI {
         p_package_id: rpcParams.p_package_id,
         p_transaction_id: rpcParams.p_transaction_id ? `${rpcParams.p_transaction_id.substring(0, 20)}...` : 'YOK',
         p_purchase_token: rpcParams.p_purchase_token ? `${rpcParams.p_purchase_token.substring(0, 20)}...` : 'YOK',
-        p_product_id: rpcParams.p_product_id
+        p_product_id: rpcParams.p_product_id,
+        p_purchase_time_ms: rpcParams.p_purchase_time_ms
       });
 
       const { data, error } = await supabase.rpc('record_google_play_purchase', rpcParams);
