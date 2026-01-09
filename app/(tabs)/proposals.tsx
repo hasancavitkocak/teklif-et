@@ -77,18 +77,8 @@ export default function ProposalsScreen() {
     }, [activeTab, user?.id])
   );
 
-  // Polling sistemi - real-time çalışmıyorsa
-  useEffect(() => {
-    if (!user?.id) return;
-
-    // Her 10 saniyede bir güncelle (sadece aktif tab için)
-    const interval = setInterval(() => {
-      console.log('🔄 Polling: Proposals güncelleniyor...');
-      loadTabData();
-    }, 10000); // 10 saniye
-
-    return () => clearInterval(interval);
-  }, [activeTab, user?.id]);
+  // Manuel refresh - polling kaldırıldı (gereksiz network trafiği)
+  // Kullanıcı pull-to-refresh yaparak veya sayfa açılırken yenileyebilir
 
   // Teklifleri görüntülendi olarak işaretle
   const markProposalsAsViewed = async () => {

@@ -1,11 +1,12 @@
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { transactionId } = useLocalSearchParams<{ transactionId?: string }>();
 
   return (
     <LinearGradient
@@ -30,7 +31,16 @@ export default function WelcomeScreen() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.startButton}
-            onPress={() => router.push('/auth/phone')}
+            onPress={() => {
+              // Transaction ID varsa phone sayfasına geçir
+              const params: any = {};
+              if (transactionId) {
+                params.transactionId = transactionId;
+                console.log('🔍 Transaction ID phone sayfasına geçiriliyor:', transactionId.substring(0, 20) + '...');
+              }
+              
+              router.push({ pathname: '/auth/phone', params });
+            }}
             activeOpacity={0.9}
           >
             <Text style={styles.startButtonText}>Başlayalım</Text>

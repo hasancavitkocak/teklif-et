@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import ErrorToast from '@/components/ErrorToast';
 
 export default function PhoneScreen() {
   const router = useRouter();
+  const { transactionId } = useLocalSearchParams<{ transactionId?: string }>();
   const { signInWithPhone } = useAuth();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,15 @@ export default function PhoneScreen() {
     setLoading(true);
     try {
       await signInWithPhone('+90' + phone);
-      router.push({ pathname: '/auth/verify', params: { phone: '+90' + phone } });
+      
+      // Transaction ID varsa verify sayfasına geçir
+      const params: any = { phone: '+90' + phone };
+      if (transactionId) {
+        params.transactionId = transactionId;
+        console.log('🔍 Transaction ID verify sayfasına geçiriliyor:', transactionId.substring(0, 20) + '...');
+      }
+      
+      router.push({ pathname: '/auth/verify', params });
     } catch (error: any) {
       // SMS gönderim sınırlaması hatası için özel mesaj
       if (error.message.includes('saniye bekleyin')) {

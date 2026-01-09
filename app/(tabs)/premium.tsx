@@ -456,6 +456,33 @@ export default function PremiumScreen() {
       await refreshPremiumStatus();
       await refreshUserCredits(); // Kredileri yenile
       
+      // Boost paketiyse otomatik başlat
+      if (addon.category === 'boost') {
+        try {
+          console.log('🚀 Boost paketi satın alındı, otomatik başlatılıyor...');
+          const boostResult = await packagesAPI.useBoostCredit();
+          if (boostResult.success) {
+            console.log('✅ Boost oturumu başlatıldı');
+            // Boost verilerini yenile
+            const [boostSession, cooldownStatus] = await Promise.all([
+              packagesAPI.getActiveBoostSession(),
+              packagesAPI.getBoostCooldownStatus()
+            ]);
+            setActiveBoostSession(boostSession);
+            setBoostCooldown(cooldownStatus);
+            
+            // Boost geri sayımını başlat
+            if (boostSession.active && boostSession.remainingSeconds) {
+              setBoostCountdown(boostSession.remainingSeconds);
+            }
+          } else {
+            console.error('❌ Boost oturumu başlatılamadı:', boostResult.error);
+          }
+        } catch (boostError) {
+          console.error('❌ Boost başlatma hatası:', boostError);
+        }
+      }
+      
       // Show success modal
       setPurchasedPackage(addon);
       setPackageSuccessModalVisible(true);
@@ -833,13 +860,7 @@ export default function PremiumScreen() {
                   key={addon.id}
                   style={[styles.addOnCard, loading && { opacity: 0.6 }]} 
                   activeOpacity={0.9}
-                  onPress={() => {
-                    if (!isBoostAddon) {
-                      // Boost değil, normal satın alma
-                      handlePurchaseAddon(addon);
-                    }
-                    // Boost ise hiçbir şey yapma (otomatik başlar)
-                  }}
+                  onPress={() => handlePurchaseAddon(addon)}
                   disabled={loading || (isBoostAddon && (activeBoostSession.active || boostCooldown.hasCooldown))}
                 >
                   <View style={[styles.addOnIcon, {
