@@ -484,27 +484,24 @@ export const discoverAPI = {
 
 
 
-  // Teklife başvur (like)
+  // Teklife başvur (like) - Hızlı versiyon
   likeProposal: async (
     proposalId: string,
     userId: string,
     isSuperLike: boolean = false
   ) => {
     try {
-      // Teklif kredisi kontrolü kaldırıldı - eşleşme isteği için gereksiz
-
       // Günlük eşleşme isteği limiti kontrolü
       const { data: canSendRequest, error: requestCheckError } = await supabase.rpc('can_send_request_today', {
         p_user_id: userId
       });
 
       if (requestCheckError) throw requestCheckError;
-
       if (!canSendRequest) {
         throw new Error('Günlük eşleşme isteği hakkınız bitti');
       }
 
-      // Super like kontrolü - database fonksiyonu ile kontrol et
+      // Super like kontrolü
       if (isSuperLike) {
         const { data: canUse } = await supabase.rpc('can_use_super_like', { p_user_id: userId });
         if (!canUse) {
@@ -512,7 +509,7 @@ export const discoverAPI = {
         }
       }
 
-      // Daha önce başvuru yapılmış mı kontrol et (tüm durumlar)
+      // Daha önce başvuru yapılmış mı kontrol et
       const { data: existingRequest } = await supabase
         .from('proposal_requests')
         .select('id, status')
@@ -525,139 +522,53 @@ export const discoverAPI = {
           throw new Error('Bu teklife daha önce başvurdunuz');
         } else if (existingRequest.status === 'accepted') {
           throw new Error('Bu teklifle zaten eşleştiniz');
-        } else if (existingRequest.status === 'rejected') {
-          // Reddedilmiş başvuruyu güncelle (yeni şans ver)
-        const { error: updateError } = await supabase
-          .from('proposal_requests')
-          .update({
-            status: 'pending',
-            is_super_like: isSuperLike,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingRequest.id);
-
-        if (updateError) throw updateError;
-
-        console.log('🔄 Reddedilmiş başvuru güncellendi:', existingRequest.id);
-        
-        // Günlük eşleşme isteği kotasını kullan
-        const { data: useRequestResult, error: useRequestError } = await supabase.rpc('use_daily_request_quota', {
-          p_user_id: userId
-        });
-
-        if (useRequestError) throw useRequestError;
-        if (!useRequestResult) {
-          throw new Error('Günlük eşleşme isteği kotası kontrolü başarısız oldu');
-        }
-
-        // Super like kullanıldıysa sayacı güncelle
-        if (isSuperLike) {
-          await supabase.rpc('use_super_like', { p_user_id: userId });
-        }
-
-        // Notification gönder ve eşleşme kontrol et (aşağıdaki kodla devam et)
-        // Bu durumda yeni başvuru oluşturmaya gerek yok, güncelleme yaptık
-        const skipNewRequest = true;
-        
-        // Notification ve eşleşme kontrolü için aşağıdaki koda geç
-        if (skipNewRequest) {
-          // Notification gönder (arka planda)
-          Promise.all([
-            supabase
-              .from('proposals')
-              .select('creator_id, activity_name')
-              .eq('id', proposalId)
-              .single(),
-            supabase
-              .from('profiles')
-              .select('name')
-              .eq('id', userId)
-              .single()
-          ]).then(async ([proposalResult, requesterResult]) => {
-            if (proposalResult.data && requesterResult.data) {
-              try {
-                const { notificationsAPI } = await import('./notifications');
-                await notificationsAPI.sendNewProposalRequestNotification(
-                  proposalResult.data.creator_id,
-                  requesterResult.data.name,
-                  proposalResult.data.activity_name,
-                  isSuperLike
-                );
-              } catch (error: any) {
-                console.error('Yeni teklif bildirimi gönderme hatası:', error);
-              }
-            }
-          }).catch((error: any) => {
-            console.error('Bildirim verisi alma hatası:', error);
-          });
-
-          // Eşleşme kontrolü yap ve sonucu döndür
-          return await checkForMatch(proposalId, userId);
         }
       }
-    }
 
-    // Günlük eşleşme isteği kotasını kullan
-    const { data: useRequestResult, error: useRequestError } = await supabase.rpc('use_daily_request_quota', {
-      p_user_id: userId
-    });
+      // Kotaları kullan ve başvuru oluştur (paralel)
+      const [useRequestResult, insertResult] = await Promise.all([
+        supabase.rpc('use_daily_request_quota', { p_user_id: userId }),
+        supabase.from('proposal_requests').insert({
+          proposal_id: proposalId,
+          requester_id: userId,
+          is_super_like: isSuperLike,
+        })
+      ]);
 
-    if (useRequestError) throw useRequestError;
+      if (useRequestResult.error) throw useRequestResult.error;
+      if (insertResult.error) throw insertResult.error;
 
-    if (!useRequestResult) {
-      throw new Error('Günlük eşleşme isteği kotası kontrolü başarısız oldu');
-    }
+      // Super like kullanıldıysa sayacı güncelle
+      if (isSuperLike) {
+        supabase.rpc('use_super_like', { p_user_id: userId }); // await kaldırıldı
+      }
 
-    // Başvuru oluştur
-    const { error } = await supabase
-      .from('proposal_requests')
-      .insert({
-        proposal_id: proposalId,
-        requester_id: userId,
-        is_super_like: isSuperLike,
+      // Bildirim gönder (arka planda - bloklamaz)
+      setImmediate(async () => {
+        try {
+          const [proposalResult, requesterResult] = await Promise.all([
+            supabase.from('proposals').select('creator_id, activity_name').eq('id', proposalId).single(),
+            supabase.from('profiles').select('name').eq('id', userId).single()
+          ]);
+
+          if (proposalResult.data && requesterResult.data) {
+            const { notificationsAPI } = await import('./notifications');
+            await notificationsAPI.sendNewProposalRequestNotification(
+              proposalResult.data.creator_id,
+              requesterResult.data.name,
+              proposalResult.data.activity_name,
+              isSuperLike
+            );
+          }
+        } catch (error: any) {
+          console.error('Bildirim gönderme hatası:', error);
+        }
       });
 
-    if (error) throw error;
-
-    // Super like kullanıldıysa sayacı güncelle (sadece bir kez)
-    if (isSuperLike) {
-      await supabase.rpc('use_super_like', { p_user_id: userId });
-    }
-
-    // Yeni teklif bildirimi gönder (arka planda, ana işlemi bloklamadan)
-    Promise.all([
-      supabase
-        .from('proposals')
-        .select('creator_id, activity_name')
-        .eq('id', proposalId)
-        .single(),
-      supabase
-        .from('profiles')
-        .select('name')
-        .eq('id', userId)
-        .single()
-    ]).then(async ([proposalResult, requesterResult]) => {
-      if (proposalResult.data && requesterResult.data) {
-        try {
-          const { notificationsAPI } = await import('./notifications');
-          await notificationsAPI.sendNewProposalRequestNotification(
-            proposalResult.data.creator_id,
-            requesterResult.data.name,
-            proposalResult.data.activity_name,
-            isSuperLike
-          );
-        } catch (error: any) {
-          console.error('Yeni teklif bildirimi gönderme hatası:', error);
-        }
-      }
-    }).catch((error: any) => {
-      console.error('Bildirim verisi alma hatası:', error);
-    });
-
-    return await checkForMatch(proposalId, userId);
-    
+      // Eşleşme kontrolü
+      return await checkForMatch(proposalId, userId);
+      
     } catch (error: any) {
-      // Duplicate key hatalarını sessizce geç
       if (error.code === '23505') {
         console.log('⚠️ Duplicate like engellendi');
         return { matched: false };

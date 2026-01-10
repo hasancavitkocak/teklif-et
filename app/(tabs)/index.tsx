@@ -32,6 +32,7 @@ import { discoverAPI, interestsAPI, proposalsAPI, type DiscoverProposal } from '
 import PremiumPopup from '@/components/PremiumPopup';
 import SimplePremiumAlert from '@/components/SimplePremiumAlert';
 import SuperLikeSuccessModal from '@/components/SuperLikeSuccessModal';
+import SuperLikeToast from '@/components/SuperLikeToast';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { AppIconLoader } from '@/components/AppIconLoader';
 import ProposalSentToast from '@/components/ProposalSentToast';
@@ -90,6 +91,7 @@ export default function DiscoverScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSuperLikeSuccess, setShowSuperLikeSuccess] = useState(false);
+  const [showSuperLikeToast, setShowSuperLikeToast] = useState(false);
   const [superLikeUserName, setSuperLikeUserName] = useState<string>('');
   const [remainingProposals, setRemainingProposals] = useState<number>(0);
   const [showProposalSentToast, setShowProposalSentToast] = useState(false);
@@ -574,18 +576,17 @@ export default function DiscoverScreen() {
       // İşlem tamamlandı, şimdi UI güncellemelerini yap
       const nextIndex = currentIndex + 1;
       
-      // Süper beğeni başarı pop-up'ı göster
+      // Süper beğeni başarı bildirimi göster
       if (isSuperLike && !result.matched) {
         setSuperLikeUserName(proposal.creator.name);
-        setShowSuperLikeSuccess(true);
+        // Modal yerine toast kullan (daha sade)
+        setShowSuperLikeToast(true);
         
         // İşlem tamamlandıktan sonra karta geç
         setCurrentIndex(nextIndex);
         
-        // Pop-up göster ve loading'i temizle
-        setTimeout(() => {
-          setIsSuperLiking(false);
-        }, 2500);
+        // Loading'i hemen temizle - bekleme yok!
+        setIsSuperLiking(false);
         return;
       }
       
@@ -1486,6 +1487,13 @@ export default function DiscoverScreen() {
       <SuperLikeSuccessModal
         visible={showSuperLikeSuccess}
         onClose={() => setShowSuperLikeSuccess(false)}
+        userName={superLikeUserName}
+      />
+
+      {/* Super Like Toast - Daha sade alternatif */}
+      <SuperLikeToast
+        visible={showSuperLikeToast}
+        onClose={() => setShowSuperLikeToast(false)}
         userName={superLikeUserName}
       />
 
